@@ -301,7 +301,7 @@ This button performs all cleanup operations and runs the unins000.exe removal pa
 
 ### Recompiling the Program Using C#
 Requirements:
-- **.NET 6.0 SDK** or higher
+- **.NET 8.0 SDK** or higher
 - **Visual Studio 2022** or **Visual Studio Code**
 - **Windows 10/11** operating system
 
@@ -383,4 +383,5 @@ Using this program is completely free. I do not earn any income from its use. Ho
 - Compliance with legal regulations is the user's responsibility
 > [!IMPORTANT]
 > All legal responsibility arising from the use of this program belongs to the person using it. The application is written and edited only for educational and research purposes; using or not using this application under these conditions is the user's own choice. This project on the Github platform where open source codes are shared is written and edited for information sharing and coding education purposes.
+
 
