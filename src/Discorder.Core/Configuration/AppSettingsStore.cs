@@ -40,14 +40,6 @@ public sealed class AppSettingsStore
         }
     }
 
-    public bool IsBackgroundVideoEnabled()
-    {
-        lock (_gate)
-        {
-            return Load().BackgroundVideoEnabled ?? true;
-        }
-    }
-
     public bool IsRunInBackgroundOnCloseEnabled()
     {
         lock (_gate)
@@ -80,20 +72,6 @@ public sealed class AppSettingsStore
             var settings = Load() with
             {
                 BrowserAccessEnabled = enabled
-            };
-
-            Save(settings);
-        }
-    }
-
-    public void SetBackgroundVideoEnabled(bool enabled)
-    {
-        lock (_gate)
-        {
-            _paths.EnsureDirectories();
-            var settings = Load() with
-            {
-                BackgroundVideoEnabled = enabled
             };
 
             Save(settings);
@@ -202,7 +180,6 @@ public sealed class AppSettingsStore
         string? AcceptedWireSockVersion,
         bool AcceptedCloudflareWarpTerms,
         bool BrowserAccessEnabled,
-        bool? BackgroundVideoEnabled,
         bool? RunInBackgroundOnClose,
         bool? StartWithWindows,
         bool? WireSockInstalledByDiscorder)
@@ -211,7 +188,6 @@ public sealed class AppSettingsStore
             null,
             AcceptedCloudflareWarpTerms: false,
             BrowserAccessEnabled: false,
-            BackgroundVideoEnabled: true,
             RunInBackgroundOnClose: false,
             StartWithWindows: false,
             WireSockInstalledByDiscorder: false);

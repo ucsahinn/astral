@@ -116,6 +116,9 @@ public sealed class WireSockBootstrapper : IWireSockBootstrapper
         }
 
         _settings.SetWireSockInstalledByDiscorder(installed: true);
+        File.WriteAllText(
+            _paths.WireSockInstallMarker,
+            $"{DateTimeOffset.Now:O}{Environment.NewLine}");
         TryDeleteInstaller(installerPath);
         return installedExecutable;
     }

@@ -1,7 +1,9 @@
 using Microsoft.Win32;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.Text.RegularExpressions;
+using Discorder.Core.Diagnostics;
 using Discorder.Core.WireSock;
 
 namespace Discorder.App.Installation;
@@ -17,6 +19,13 @@ public sealed class WindowsWireSockUninstaller : IWireSockUninstaller
         @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
     ];
 
+    private readonly IDiscorderDiagnostics _diagnostics;
+
+    public WindowsWireSockUninstaller(IDiscorderDiagnostics? diagnostics = null)
+    {
+        _diagnostics = diagnostics ?? NullDiscorderDiagnostics.Instance;
+    }
+
     public async Task UninstallIfDiscorderInstalledAsync(
         bool installedByDiscorder,
         CancellationToken cancellationToken)
@@ -24,14 +33,28 @@ public sealed class WindowsWireSockUninstaller : IWireSockUninstaller
         cancellationToken.ThrowIfCancellationRequested();
         if (!installedByDiscorder)
         {
+            _diagnostics.Info(
+                "wiresock.uninstall",
+                "WireSock kaldırma atlandı; Discorder kurulum izi bulunmadı.");
             return;
         }
 
         var productCode = FindWireSockProductCode();
         if (string.IsNullOrWhiteSpace(productCode))
         {
+            _diagnostics.Warning(
+                "wiresock.uninstall",
+                "WireSock kaldırma atlandı; Windows kaldırma kaydı bulunamadı.");
             return;
         }
+
+        _diagnostics.Warning(
+            "wiresock.uninstall",
+            "WireSock VPN Client kaldırılıyor.",
+            new Dictionary<string, string?>
+            {
+                ["productCode"] = productCode
+            });
 
         int exitCode;
         try
@@ -59,9 +82,24 @@ public sealed class WindowsWireSockUninstaller : IWireSockUninstaller
 
         if (exitCode is not 0 and not RestartRequiredExitCode)
         {
+            _diagnostics.Failure(
+                "wiresock.uninstall",
+                "WireSock kaldırma başarısız oldu.",
+                details: new Dictionary<string, string?>
+                {
+                    ["exitCode"] = exitCode.ToString(CultureInfo.InvariantCulture)
+                });
             throw new InvalidOperationException(
                 $"WireSock kaldırma işlemi başarısız oldu. Çıkış kodu: {exitCode}.");
         }
+
+        _diagnostics.Info(
+            "wiresock.uninstall",
+            "WireSock kaldırma tamamlandı.",
+            new Dictionary<string, string?>
+            {
+                ["exitCode"] = exitCode.ToString(CultureInfo.InvariantCulture)
+            });
     }
 
     private static string? FindWireSockProductCode()

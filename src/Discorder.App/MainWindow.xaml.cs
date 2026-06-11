@@ -6,6 +6,7 @@ using System.Windows.Media;
 using Discorder.App.Installation;
 using Discorder.Core.Configuration;
 using Discorder.Core.Connection;
+using Discorder.Core.Diagnostics;
 using Discorder.Core.Maintenance;
 using Discorder.Core.WireSock;
 using Drawing = System.Drawing;
@@ -29,9 +30,10 @@ public partial class MainWindow : Window, IDisposable
     private readonly DiscorderCleanupService _cleanupService;
     private readonly IStartupLaunchService _startupLaunchService;
     private readonly IWireSockUninstaller _wireSockUninstaller;
+    private readonly IDiscorderDiagnostics _diagnostics;
     private bool _isApplyingSettings;
-    private bool _isBackgroundVideoEnabled = true;
     private bool _isRunInBackgroundEnabled;
+    private bool _isToggleOperationRunning;
     private Forms.NotifyIcon? _trayIcon;
     private bool _hasShownTrayNotice;
     private CancellationTokenSource? _operationCancellation;
@@ -46,7 +48,8 @@ public partial class MainWindow : Window, IDisposable
         AppSettingsStore settingsStore,
         DiscorderCleanupService cleanupService,
         IStartupLaunchService startupLaunchService,
-        IWireSockUninstaller wireSockUninstaller)
+        IWireSockUninstaller wireSockUninstaller,
+        IDiscorderDiagnostics? diagnostics = null)
     {
         _controller = controller ?? throw new ArgumentNullException(nameof(controller));
         _paths = paths ?? throw new ArgumentNullException(nameof(paths));
@@ -60,10 +63,10 @@ public partial class MainWindow : Window, IDisposable
             ?? throw new ArgumentNullException(nameof(startupLaunchService));
         _wireSockUninstaller = wireSockUninstaller
             ?? throw new ArgumentNullException(nameof(wireSockUninstaller));
+        _diagnostics = diagnostics ?? NullDiscorderDiagnostics.Instance;
 
         InitializeComponent();
         ApplyBrowserAccessSetting(_settingsStore.IsBrowserAccessEnabled());
-        ApplyBackgroundVideoSetting(_settingsStore.IsBackgroundVideoEnabled());
         ApplyRunInBackgroundSetting(
             _settingsStore.IsRunInBackgroundOnCloseEnabled());
         ApplyStartupSetting(SynchronizeStartupLaunchSetting(
@@ -74,36 +77,44 @@ public partial class MainWindow : Window, IDisposable
 
     private async void ToggleButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_controller.Snapshot.IsBusy)
+        if (_isToggleOperationRunning || _controller.Snapshot.IsBusy)
         {
             return;
         }
 
-        if (!_controller.Snapshot.IsConnected
-            && !_wireSockBootstrapper.IsSetupConsentAccepted)
-        {
-            var consentWindow = new WireSockConsentWindow(_wireSockBootstrapper)
-            {
-                Owner = this
-            };
-
-            if (consentWindow.ShowDialog() != true)
-            {
-                return;
-            }
-
-            _wireSockBootstrapper.AcceptSetupConsent();
-        }
-
-        _operationCancellation?.Dispose();
-        _operationCancellation = new CancellationTokenSource();
+        _isToggleOperationRunning = true;
+        ToggleButton.IsEnabled = false;
 
         try
         {
+            if (!_controller.Snapshot.IsConnected
+                && !_wireSockBootstrapper.IsSetupConsentAccepted)
+            {
+                var consentWindow = new WireSockConsentWindow(_wireSockBootstrapper)
+                {
+                    Owner = this
+                };
+
+                if (consentWindow.ShowDialog() != true)
+                {
+                    return;
+                }
+
+                _wireSockBootstrapper.AcceptSetupConsent();
+            }
+
+            _operationCancellation?.Dispose();
+            _operationCancellation = new CancellationTokenSource();
+
             await _controller.ToggleAsync(_operationCancellation.Token);
         }
         catch (OperationCanceledException)
         {
+        }
+        finally
+        {
+            _isToggleOperationRunning = false;
+            ApplySnapshot(_controller.Snapshot);
         }
     }
 
@@ -131,11 +142,13 @@ public partial class MainWindow : Window, IDisposable
 
     private void ApplySnapshot(TunnelSnapshot snapshot)
     {
-        ToggleButton.IsEnabled = !snapshot.IsBusy;
-        BrowserAccessToggle.IsEnabled = !snapshot.IsBusy && !snapshot.IsConnected;
+        ToggleButton.IsEnabled = !_isToggleOperationRunning && !snapshot.IsBusy;
         RepairButton.IsEnabled = !snapshot.IsBusy;
         StatusMessage.Text = snapshot.Message;
         StatusDetail.Text = GetDetail(snapshot.State);
+        ApplyBrowserAccessView(
+            _controller.IncludeBrowserAccess,
+            snapshot.IsBusy || snapshot.IsConnected);
 
         var templateLabel = ToggleButton.Template.FindName(
             "ToggleButtonLabel",
@@ -143,32 +156,118 @@ public partial class MainWindow : Window, IDisposable
         var powerIcon = ToggleButton.Template.FindName(
             "PowerIcon",
             ToggleButton) as System.Windows.Controls.TextBlock;
+        var stateRing = ToggleButton.Template.FindName(
+            "StateRing",
+            ToggleButton) as System.Windows.Shapes.Ellipse;
+        var coreGlow = ToggleButton.Template.FindName(
+            "CoreGlow",
+            ToggleButton) as System.Windows.Shapes.Ellipse;
+        var visual = GetStateVisual(snapshot.State);
 
         if (templateLabel is not null)
         {
-            templateLabel.Text = snapshot.IsConnected ? "BAĞLANTIYI KES" : "BAĞLAN";
+            templateLabel.Text = visual.ButtonText;
         }
 
-        var (label, color) = snapshot.State switch
-        {
-            TunnelState.Connected => ("AÇIK", MediaColor.FromRgb(59, 165, 92)),
-            TunnelState.Error => ("HATA", MediaColor.FromRgb(237, 66, 69)),
-            TunnelState.Preparing or TunnelState.Connecting or TunnelState.Disconnecting
-                => ("İŞLENİYOR", MediaColor.FromRgb(250, 166, 26)),
-            _ => ("KAPALI", MediaColor.FromRgb(157, 166, 178))
-        };
-
-        var brush = new SolidColorBrush(color);
-        StatusLabel.Text = label;
-        StatusDot.Fill = brush;
-        ToggleButton.BorderBrush = brush;
+        StatusLabel.Text = visual.BadgeText;
+        StatusDot.Fill = visual.StatusBrush;
+        StatusBadge.BorderBrush = visual.StatusBrush;
+        StatusBadge.Background = visual.BadgeBackground;
+        ToggleButton.BorderBrush = (System.Windows.Media.Brush)
+            System.Windows.Application.Current.Resources["AccentBrush"];
 
         if (powerIcon is not null)
         {
-            powerIcon.Foreground = brush;
+            powerIcon.Foreground = visual.PowerBrush;
         }
 
-        ApplyProgress(snapshot, brush);
+        if (stateRing is not null)
+        {
+            stateRing.Stroke = visual.StatusBrush;
+        }
+
+        if (coreGlow is not null)
+        {
+            coreGlow.Fill = visual.CoreFill;
+            coreGlow.Stroke = visual.PowerBrush;
+        }
+
+        ApplyProgress(snapshot, visual.StatusBrush);
+    }
+
+    private static StateVisual GetStateVisual(TunnelState state)
+    {
+        return state switch
+        {
+            TunnelState.Connected => new StateVisual(
+                "BAĞLI",
+                "BAĞLANTIYI KES",
+                MediaColor.FromRgb(86, 240, 123),
+                MediaColor.FromRgb(128, 255, 167),
+                MediaColor.FromRgb(26, 80, 48)),
+            TunnelState.Preparing or TunnelState.Connecting => new StateVisual(
+                "BAĞLANIYOR",
+                "BAĞLANIYOR",
+                MediaColor.FromRgb(249, 214, 107),
+                MediaColor.FromRgb(115, 232, 255),
+                MediaColor.FromRgb(82, 62, 22)),
+            TunnelState.Disconnecting => new StateVisual(
+                "KAPANIYOR",
+                "KAPATILIYOR",
+                MediaColor.FromRgb(255, 163, 92),
+                MediaColor.FromRgb(115, 232, 255),
+                MediaColor.FromRgb(86, 43, 22)),
+            TunnelState.Error => new StateVisual(
+                "HATA",
+                "TEKRAR DENE",
+                MediaColor.FromRgb(255, 107, 122),
+                MediaColor.FromRgb(255, 176, 187),
+                MediaColor.FromRgb(86, 24, 34)),
+            _ => new StateVisual(
+                "KAPALI",
+                "BAĞLAN",
+                MediaColor.FromRgb(157, 184, 205),
+                MediaColor.FromRgb(115, 232, 255),
+                MediaColor.FromRgb(20, 50, 62))
+        };
+    }
+
+    private sealed class StateVisual
+    {
+        public StateVisual(
+            string badgeText,
+            string buttonText,
+            MediaColor statusColor,
+            MediaColor powerColor,
+            MediaColor coreColor)
+        {
+            BadgeText = badgeText;
+            ButtonText = buttonText;
+            StatusBrush = new SolidColorBrush(statusColor);
+            PowerBrush = new SolidColorBrush(powerColor);
+            CoreFill = new SolidColorBrush(MediaColor.FromArgb(
+                76,
+                coreColor.R,
+                coreColor.G,
+                coreColor.B));
+            BadgeBackground = new SolidColorBrush(MediaColor.FromArgb(
+                126,
+                coreColor.R,
+                coreColor.G,
+                coreColor.B));
+        }
+
+        public string BadgeText { get; }
+
+        public string ButtonText { get; }
+
+        public SolidColorBrush StatusBrush { get; }
+
+        public SolidColorBrush PowerBrush { get; }
+
+        public SolidColorBrush CoreFill { get; }
+
+        public SolidColorBrush BadgeBackground { get; }
     }
 
     private void ApplyProgress(
@@ -215,7 +314,7 @@ public partial class MainWindow : Window, IDisposable
                 || message.Contains("wgcf", StringComparison.OrdinalIgnoreCase)
                 => (68, "Profil hazırlanıyor", 3),
             TunnelState.Preparing => (38, "Hazırlık çalışıyor", 2),
-            _ => (8, "Süreç hazır", 0)
+            _ => (8, "Hazır, Discord kilidi aktif", 0)
         };
     }
 
@@ -256,75 +355,52 @@ public partial class MainWindow : Window, IDisposable
         }
 
         var enabled = BrowserAccessToggle.IsChecked == true;
+        if (!_controller.TrySetBrowserAccess(enabled))
+        {
+            ApplyBrowserAccessView(
+                _controller.IncludeBrowserAccess,
+                locked: true);
+            return;
+        }
+
         _settingsStore.SetBrowserAccessEnabled(enabled);
-        _controller.IncludeBrowserAccess = enabled;
-        BrowserAccessStatus.Text = enabled
-            ? "Tarayıcı modu açık. Discord web desteklenen tarayıcılardan tünellenir."
-            : "Varsayılan mod. Yalnızca Discord uygulaması tünellenir.";
+        _diagnostics.Info(
+            "ui.browserAccess",
+            enabled
+                ? "Discord web kapsamı açıldı."
+                : "Discord web kapsamı kapatıldı.");
+        ApplyBrowserAccessView(enabled, locked: false);
     }
 
     private void ApplyBrowserAccessSetting(bool enabled)
     {
+        if (!_controller.TrySetBrowserAccess(enabled))
+        {
+            enabled = _controller.IncludeBrowserAccess;
+        }
+
+        ApplyBrowserAccessView(enabled, _controller.Snapshot.IsBusy
+            || _controller.Snapshot.IsConnected);
+    }
+
+    private void ApplyBrowserAccessView(bool enabled, bool locked)
+    {
         _isApplyingSettings = true;
         try
         {
-            _controller.IncludeBrowserAccess = enabled;
             BrowserAccessToggle.IsChecked = enabled;
+            BrowserAccessToggle.IsEnabled = !locked;
             BrowserAccessStatus.Text = enabled
-                ? "Tarayıcı modu açık. Discord web desteklenen tarayıcılardan tünellenir."
-                : "Varsayılan mod. Yalnızca Discord uygulaması tünellenir.";
+                ? locked
+                    ? "Web kapsamı bu oturumda açık. Değiştirmek için önce bağlantıyı kes."
+                    : "Web kapsamı açık. Discord web desteklenen tarayıcılardan tünellenir."
+                : locked
+                    ? "Web kapsamı bu oturumda kapalı. Açmak için önce bağlantıyı kes."
+                    : "Web kapsamı kapalı. Yalnızca Discord uygulaması tünellenir.";
         }
         finally
         {
             _isApplyingSettings = false;
-        }
-    }
-
-    private void BackgroundVideoToggle_Changed(object sender, RoutedEventArgs e)
-    {
-        if (_isApplyingSettings)
-        {
-            return;
-        }
-
-        var enabled = BackgroundVideoToggle.IsChecked == true;
-        _settingsStore.SetBackgroundVideoEnabled(enabled);
-        ApplyBackgroundVideoState(enabled);
-    }
-
-    private void ApplyBackgroundVideoSetting(bool enabled)
-    {
-        _isApplyingSettings = true;
-        try
-        {
-            BackgroundVideoToggle.IsChecked = enabled;
-            ApplyBackgroundVideoState(enabled);
-        }
-        finally
-        {
-            _isApplyingSettings = false;
-        }
-    }
-
-    private void ApplyBackgroundVideoState(bool enabled)
-    {
-        _isBackgroundVideoEnabled = enabled;
-        BackgroundVideoStatus.Text = enabled
-            ? "Video açık, sahne canlı."
-            : "Video kapalı, arayüz sade.";
-
-        if (!enabled || IsBackgroundVideoDisabled())
-        {
-            StopBackgroundVideo();
-            return;
-        }
-
-        BackgroundVideo.Visibility = Visibility.Visible;
-        BackgroundVideo.Source ??= BackgroundVideoUri;
-
-        if (BackgroundVideo.IsLoaded)
-        {
-            BackgroundVideo.Play();
         }
     }
 
@@ -337,6 +413,11 @@ public partial class MainWindow : Window, IDisposable
 
         var enabled = RunInBackgroundToggle.IsChecked == true;
         _settingsStore.SetRunInBackgroundOnCloseEnabled(enabled);
+        _diagnostics.Info(
+            "ui.runInBackground",
+            enabled
+                ? "Pencere kapanınca arka planda kalma açıldı."
+                : "Pencere kapanınca arka planda kalma kapatıldı.");
         ApplyRunInBackgroundSetting(enabled);
     }
 
@@ -381,6 +462,11 @@ public partial class MainWindow : Window, IDisposable
         {
             _startupLaunchService.SetEnabled(enabled);
             _settingsStore.SetStartWithWindowsEnabled(enabled);
+            _diagnostics.Info(
+                "ui.startup",
+                enabled
+                    ? "Windows başlangıcı açıldı."
+                    : "Windows başlangıcı kapatıldı.");
             ApplyStartupSetting(enabled);
         }
         catch (Exception exception)
@@ -394,6 +480,10 @@ public partial class MainWindow : Window, IDisposable
                 "Discorder",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
+            _diagnostics.Failure(
+                "ui.startup",
+                "Windows başlangıç ayarı kaydedilemedi.",
+                exception);
         }
     }
 
@@ -446,8 +536,8 @@ public partial class MainWindow : Window, IDisposable
     {
         var confirmation = MessageBox.Show(
             "Discorder bağlantıyı kapatacak, hosts ve Windows Firewall üzerindeki Discorder kilidini geri alacak, " +
-            "%LOCALAPPDATA%\\Discorder altındaki profil, ayar, wgcf, kurucu ve log dosyalarını silecek. " +
-            "WireSock VPN Client bu uygulama tarafından kurulduysa Windows'tan kaldırılacak.\n\nDevam edilsin mi?",
+            "%LOCALAPPDATA%\\Discorder altındaki profil, ayar, wgcf, kurucu, tanılama paketi ve log dosyalarını silecek. " +
+            "WireSock VPN Client Discorder tarafından kurulduysa Windows'tan kaldırılacak.\n\nDevam edilsin mi?",
             "Discorder temiz kaldır",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning,
@@ -464,11 +554,13 @@ public partial class MainWindow : Window, IDisposable
         StatusMessage.Text = "Temiz kaldırma çalışıyor";
         StatusDetail.Text = "Tünel kapatılıyor, WireSock ve Discorder izleri temizleniyor.";
         SetMaintenanceProgress(24, "Tünel kapatılıyor");
+        _diagnostics.Warning("ui.cleanUninstall", "Kullanıcı temiz kaldırmayı başlattı.");
 
         try
         {
             _startupLaunchService.SetEnabled(false);
-            var removeWireSock = _settingsStore.IsWireSockInstalledByDiscorder();
+            var removeWireSock = _settingsStore.IsWireSockInstalledByDiscorder()
+                || File.Exists(_paths.WireSockInstallMarker);
             _settingsStore.SetStartWithWindowsEnabled(false);
             _settingsStore.SetRunInBackgroundOnCloseEnabled(false);
             await _controller.DisposeAsync();
@@ -513,9 +605,9 @@ public partial class MainWindow : Window, IDisposable
         }
 
         var confirmation = MessageBox.Show(
-            "Discorder bağlantıyı kapatacak; profil, wgcf, kurucu önbelleği ve logları sıfırlayacak. " +
-            "Tarayıcı modu, video, arka plan çalışma ve başlangıç ayarları korunur.\n\nDevam edilsin mi?",
-            "Discorder sıfırla",
+            "Discorder bağlantıyı kapatacak; profil, wgcf aracı ve kurucu önbelleğini yeniden üretilecek hale getirecek. " +
+            "Ayarlar, WireSock kurulumu ve tanılama kayıtları korunur.\n\nDevam edilsin mi?",
+            "Discorder onar",
             MessageBoxButton.YesNo,
             MessageBoxImage.Question,
             MessageBoxResult.No);
@@ -529,9 +621,10 @@ public partial class MainWindow : Window, IDisposable
         RepairButton.IsEnabled = false;
         BrowserAccessToggle.IsEnabled = false;
         _operationCancellation?.Cancel();
-        StatusMessage.Text = "Sıfırlama çalışıyor";
+        StatusMessage.Text = "Onarım çalışıyor";
         StatusDetail.Text = "Tünel kapatılıyor, Discord kilidi kuruluyor ve profil dosyaları yenileniyor.";
         SetMaintenanceProgress(36, "Onarım hazırlanıyor");
+        _diagnostics.Info("ui.repair", "Kullanıcı onarımı başlattı.");
 
         try
         {
@@ -539,24 +632,24 @@ public partial class MainWindow : Window, IDisposable
             SetMaintenanceProgress(68, "Profil ve önbellek temizleniyor");
             await _cleanupService.RepairAsync(CancellationToken.None);
 
-            StatusMessage.Text = "Sıfırlama tamamlandı";
+            StatusMessage.Text = "Onarım tamamlandı";
             StatusDetail.Text = "Sonraki Bağlan işleminde profil ve wgcf dosyaları yeniden üretilecek.";
             SetMaintenanceProgress(100, "Onarım tamamlandı");
 
             MessageBox.Show(
-                "Discorder sıfırlandı. Sonraki bağlantıda profil yeniden oluşturulacak.",
+                "Discorder onarıldı. Sonraki bağlantıda profil yeniden oluşturulacak.",
                 "Discorder",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            StatusMessage.Text = "Sıfırlama tamamlanamadı";
+            StatusMessage.Text = "Onarım tamamlanamadı";
             StatusDetail.Text = exception.Message;
             SetMaintenanceProgress(100, "Müdahale gerekiyor");
 
             MessageBox.Show(
-                "Sıfırlama tamamlanamadı.\n\n" + exception.Message,
+                "Onarım tamamlanamadı.\n\n" + exception.Message,
                 "Discorder",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
@@ -581,20 +674,12 @@ public partial class MainWindow : Window, IDisposable
 
     private void BackgroundVideo_Loaded(object sender, RoutedEventArgs e)
     {
-        if (!_isBackgroundVideoEnabled || IsBackgroundVideoDisabled())
-        {
-            StopBackgroundVideo();
-            return;
-        }
-
-        BackgroundVideo.Visibility = Visibility.Visible;
-        BackgroundVideo.Source ??= BackgroundVideoUri;
-        BackgroundVideo.Play();
+        StartBackgroundVideo();
     }
 
     private void BackgroundVideo_MediaEnded(object sender, RoutedEventArgs e)
     {
-        if (!_isBackgroundVideoEnabled || IsBackgroundVideoDisabled())
+        if (IsBackgroundVideoDisabled())
         {
             return;
         }
@@ -608,7 +693,13 @@ public partial class MainWindow : Window, IDisposable
         ExceptionRoutedEventArgs e)
     {
         BackgroundVideo.Visibility = Visibility.Collapsed;
-        BackgroundVideoStatus.Text = "Video yüklenemedi";
+        _diagnostics.Warning(
+            "ui.backgroundVideo",
+            "Arka plan videosu yüklenemedi.",
+            new Dictionary<string, string?>
+            {
+                ["error"] = e.ErrorException?.Message
+            });
     }
 
     private static bool IsBackgroundVideoDisabled()
@@ -632,6 +723,23 @@ public partial class MainWindow : Window, IDisposable
         }
     }
 
+    private void StartBackgroundVideo()
+    {
+        if (IsBackgroundVideoDisabled())
+        {
+            StopBackgroundVideo();
+            return;
+        }
+
+        BackgroundVideo.Visibility = Visibility.Visible;
+        BackgroundVideo.Source ??= BackgroundVideoUri;
+
+        if (BackgroundVideo.IsLoaded)
+        {
+            BackgroundVideo.Play();
+        }
+    }
+
     public void HideToTrayOnStartup()
     {
         if (_isRunInBackgroundEnabled)
@@ -646,6 +754,7 @@ public partial class MainWindow : Window, IDisposable
         StopBackgroundVideo();
         ShowInTaskbar = false;
         Hide();
+        _diagnostics.Info("ui.tray", "Discorder bildirim alanına alındı.");
 
         if (showNotification && !_hasShownTrayNotice && _trayIcon is not null)
         {
@@ -668,10 +777,8 @@ public partial class MainWindow : Window, IDisposable
         }
 
         Activate();
-        if (_isBackgroundVideoEnabled)
-        {
-            ApplyBackgroundVideoState(enabled: true);
-        }
+        StartBackgroundVideo();
+        _diagnostics.Info("ui.tray", "Discorder penceresi geri açıldı.");
     }
 
     private void EnsureTrayIcon()
@@ -752,9 +859,26 @@ public partial class MainWindow : Window, IDisposable
     private void OpenDiagnostics_Click(object sender, RoutedEventArgs e)
     {
         _paths.EnsureDirectories();
+        _diagnostics.WriteHealth(
+            "tanılama paketi istendi",
+            new Dictionary<string, string?>
+            {
+                ["browserAccess"] = _controller.IncludeBrowserAccess.ToString(),
+                ["state"] = _controller.Snapshot.State.ToString()
+            });
+        var bundlePath = _diagnostics.CreateBundle();
+        if (!string.IsNullOrWhiteSpace(bundlePath))
+        {
+            MessageBox.Show(
+                "Tanılama paketi hazırlandı.\n\n" + bundlePath,
+                "Discorder tanılama",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+
         Process.Start(new ProcessStartInfo
         {
-            FileName = _paths.DataDirectory,
+            FileName = _paths.LogDirectory,
             UseShellExecute = true
         });
     }

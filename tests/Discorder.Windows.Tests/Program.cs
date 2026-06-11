@@ -1,4 +1,5 @@
 using System.IO;
+using System.Runtime.ExceptionServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -97,7 +98,7 @@ static void RenderWindows()
 
     if (failure is not null)
     {
-        throw failure;
+        ExceptionDispatchInfo.Capture(failure).Throw();
     }
 }
 
@@ -144,33 +145,32 @@ static void RenderMainWindow()
         Assert(text.Contains("KAPALI", StringComparison.Ordinal));
         Assert(text.Contains("TÜNEL KAPSAMI", StringComparison.Ordinal));
         Assert(text.Contains("Discord web", StringComparison.Ordinal));
-        Assert(text.Contains("Video açık", StringComparison.Ordinal));
-        Assert(text.Contains("İŞLETİM AYARLARI", StringComparison.Ordinal));
+        Assert(text.Contains("KONTROL MERKEZİ", StringComparison.Ordinal));
         Assert(text.Contains("Arka planda çalış", StringComparison.Ordinal));
         Assert(text.Contains("Windows başlangıcı", StringComparison.Ordinal));
-        Assert(text.Contains("Süreç hazır", StringComparison.Ordinal));
+        Assert(text.Contains("Tanılama paketi", StringComparison.Ordinal));
+        Assert(text.Contains("Sürekli açık", StringComparison.Ordinal));
+        Assert(text.Contains("Hazır, Discord kilidi aktif", StringComparison.Ordinal));
         var buttons = FindVisualChildren<Button>(window)
             .Select(button => button.Content?.ToString())
             .Where(content => !string.IsNullOrWhiteSpace(content))
             .ToArray();
-        Assert(buttons.Contains("Sıfırla"));
+        Assert(buttons.Contains("Onar"));
         Assert(buttons.Contains("Temiz kaldır"));
+        Assert(buttons.Contains("Tanılama paketi"));
         var switches = FindVisualChildren<CheckBox>(window).ToArray();
         var browserSwitch = switches.Single(toggle =>
             toggle.Name == "BrowserAccessToggle");
-        var backgroundVideoSwitch = switches.Single(toggle =>
-            toggle.Name == "BackgroundVideoToggle");
         var runInBackgroundSwitch = switches.Single(toggle =>
             toggle.Name == "RunInBackgroundToggle");
         var startupSwitch = switches.Single(toggle =>
             toggle.Name == "StartupToggle");
         Assert(browserSwitch.IsChecked == false);
-        Assert(backgroundVideoSwitch.IsChecked == true);
         Assert(runInBackgroundSwitch.IsChecked == false);
         Assert(startupSwitch.IsChecked == false);
         Assert(FindVisualChildren<ProgressBar>(window).Any());
-        Assert(text.Contains("SİSTEM DNS", StringComparison.Ordinal));
-        Assert(text.Contains("ÇALIŞMA MODU", StringComparison.Ordinal));
+        Assert(text.Contains("DNS AYARI", StringComparison.Ordinal));
+        Assert(text.Contains("TÜNEL MODELİ", StringComparison.Ordinal));
         Assert(!text.Contains("Advanced SplitWire", StringComparison.OrdinalIgnoreCase));
         Assert(!text.Contains("Discord-only", StringComparison.OrdinalIgnoreCase));
 

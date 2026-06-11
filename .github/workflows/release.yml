@@ -95,16 +95,17 @@ jobs:
           $notes = @"
           # Discorder $version
 
-          Discorder $version temiz kaldırma ve premium işletim kontrolleri yayınıdır.
+          Discorder $version premium arayüz, devops tanılama ve temiz kaldırma yayınıdır.
 
           ## Öne çıkanlar
 
-          - İlk kurulum ve bağlantı adımlarını gösteren süreç çubuğu eklendi.
-          - İşletim Ayarları paneli eklendi: arka planda çalışma, Windows başlangıcı ve arka plan videosu tek yerden yönetilir.
+          - Arayüz 1240x760 sabit premium sahneye alındı; arka plan videosu kullanıcı ayarı olmadan sürekli görünür.
+          - Kontrol Merkezi paneli eklendi: arka planda çalışma, Windows başlangıcı ve tanılama durumu tek yerden görülür.
+          - Tanılama paketi eklendi: events.jsonl, health.json, diagnostics.md, tunnel.log ve paylaşılabilir zip üretilir.
           - Pencere kapansa bile isteğe bağlı bildirim alanında çalışmaya devam etme desteği eklendi.
           - Windows oturumu açılınca Discorder'ı otomatik başlatma ayarı eklendi.
-          - Sıfırla/onar akışı ayarları ve WireSock kurulumunu koruyarak profil, wgcf, kurucu önbelleği ve logları yeniler.
-          - Temiz kaldırma akışı Discorder kilidini, başlangıç kaydını, yerel veriyi ve Discorder'ın kurduğu WireSock VPN Client kurulumunu geri alır.
+          - Onar akışı ayarları, WireSock kurulumunu ve tanılama loglarını koruyarak profil, wgcf ve kurucu önbelleğini yeniler.
+          - Temiz kaldırma akışı Discorder kilidini, başlangıç kaydını, yerel veriyi, marker izini ve Discorder'ın kurduğu WireSock VPN Client kurulumunu geri alır.
           - Release paketi adı proje sürümünden otomatik üretilir.
 
           ## İndirme

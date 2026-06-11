@@ -17,13 +17,18 @@ public sealed class AppPaths
         InstallerDirectory = Path.Combine(DataDirectory, "installers");
         ProfileDirectory = Path.Combine(DataDirectory, "profiles");
         LogDirectory = Path.Combine(DataDirectory, "logs");
+        DiagnosticBundleDirectory = Path.Combine(DataDirectory, "diagnostic-bundles");
         SettingsFile = Path.Combine(DataDirectory, "settings.json");
+        WireSockInstallMarker = Path.Combine(DataDirectory, "wiresock-installed-by-discorder.marker");
         WgcfExecutable = Path.Combine(ToolsDirectory, "wgcf.exe");
         WgcfAccount = Path.Combine(ProfileDirectory, "wgcf-account.toml");
         WgcfBaseProfile = Path.Combine(ProfileDirectory, "wgcf-profile.conf");
         DiscordProfile = Path.Combine(ProfileDirectory, "discord.conf");
         TunnelLog = Path.Combine(LogDirectory, "tunnel.log");
         ErrorLog = Path.Combine(LogDirectory, "errors.log");
+        EventLog = Path.Combine(LogDirectory, "events.jsonl");
+        HealthReport = Path.Combine(LogDirectory, "health.json");
+        DiagnosticSummary = Path.Combine(LogDirectory, "diagnostics.md");
     }
 
     public string DataDirectory { get; }
@@ -36,7 +41,11 @@ public sealed class AppPaths
 
     public string LogDirectory { get; }
 
+    public string DiagnosticBundleDirectory { get; }
+
     public string SettingsFile { get; }
+
+    public string WireSockInstallMarker { get; }
 
     public string WgcfExecutable { get; }
 
@@ -50,6 +59,12 @@ public sealed class AppPaths
 
     public string ErrorLog { get; }
 
+    public string EventLog { get; }
+
+    public string HealthReport { get; }
+
+    public string DiagnosticSummary { get; }
+
     public void EnsureDirectories()
     {
         Directory.CreateDirectory(DataDirectory);
@@ -57,5 +72,6 @@ public sealed class AppPaths
         Directory.CreateDirectory(InstallerDirectory);
         Directory.CreateDirectory(ProfileDirectory);
         Directory.CreateDirectory(LogDirectory);
+        Directory.CreateDirectory(DiagnosticBundleDirectory);
     }
 }

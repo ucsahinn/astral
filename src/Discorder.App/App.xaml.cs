@@ -7,6 +7,7 @@ using System.Windows;
 using System.Windows.Threading;
 using Discorder.Core.Configuration;
 using Discorder.Core.Connection;
+using Discorder.Core.Diagnostics;
 using Discorder.Core.Discord;
 using Discorder.Core.Firewall;
 using Discorder.Core.Infrastructure;
@@ -26,6 +27,7 @@ public partial class App : System.Windows.Application, IDisposable
     private Mutex? _singleInstanceMutex;
     private HttpClient? _httpClient;
     private DiscordTunnelController? _tunnelController;
+    private DiscorderDiagnostics? _diagnostics;
     private AppPaths? _paths;
     private bool _disposed;
 
@@ -54,6 +56,15 @@ public partial class App : System.Windows.Application, IDisposable
 
         _paths = new AppPaths();
         _paths.EnsureDirectories();
+        _diagnostics = new DiscorderDiagnostics(_paths);
+        _diagnostics.Info(
+            "app.startup",
+            "Discorder başlatıldı.",
+            new Dictionary<string, string?>
+            {
+                ["args"] = string.Join(" ", e.Args),
+                ["processPath"] = Environment.ProcessPath
+            });
 
         var handler = new SocketsHttpHandler
         {
@@ -67,7 +78,7 @@ public partial class App : System.Windows.Application, IDisposable
             Timeout = TimeSpan.FromMinutes(5)
         };
         _httpClient.DefaultRequestHeaders.UserAgent.Add(
-            new ProductInfoHeaderValue("Discorder", "2.0.4"));
+            new ProductInfoHeaderValue("Discorder", "2.0.5"));
 
         var downloader = new VerifiedDownloader(_httpClient);
         var wireSockLocator = new WireSockLocator();
@@ -94,16 +105,18 @@ public partial class App : System.Windows.Application, IDisposable
             wireSockBootstrapper,
             provisioner,
             new ProcessLauncher(),
-            accessLock: accessLock);
+            accessLock: accessLock,
+            diagnostics: _diagnostics);
 
         var window = new MainWindow(
             _tunnelController,
             _paths,
             wireSockBootstrapper,
             settingsStore,
-            new DiscorderCleanupService(_paths, accessLock),
+            new DiscorderCleanupService(_paths, accessLock, _diagnostics),
             new WindowsStartupLaunchService(),
-            new WindowsWireSockUninstaller());
+            new WindowsWireSockUninstaller(_diagnostics),
+            _diagnostics);
         MainWindow = window;
         window.Show();
 
@@ -140,6 +153,7 @@ public partial class App : System.Windows.Application, IDisposable
         }
 
         _httpClient?.Dispose();
+        _diagnostics?.Info("app.exit", "Discorder kapatıldı.");
 
         if (_singleInstanceMutex is not null)
         {
@@ -162,6 +176,10 @@ public partial class App : System.Windows.Application, IDisposable
         DispatcherUnhandledExceptionEventArgs e)
     {
         LogException(e.Exception);
+        _diagnostics?.Failure(
+            "app.dispatcherUnhandledException",
+            "Beklenmeyen arayüz hatası yakalandı.",
+            e.Exception);
         MessageBox.Show(
             "Beklenmeyen bir hata oluştu. Ayrıntılar tanılama günlüğüne yazıldı.",
             "Discorder",
@@ -175,6 +193,10 @@ public partial class App : System.Windows.Application, IDisposable
         if (e.ExceptionObject is Exception exception)
         {
             LogException(exception);
+            _diagnostics?.Failure(
+                "app.unhandledException",
+                "Beklenmeyen uygulama hatası yakalandı.",
+                exception);
         }
     }
 

@@ -1,4 +1,5 @@
 using Discorder.Core.Configuration;
+using Discorder.Core.Diagnostics;
 using Discorder.Core.Discord;
 using Discorder.Core.Firewall;
 using Discorder.Core.Infrastructure;
@@ -16,6 +17,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
     private readonly IProfileProvisioner _provisioner;
     private readonly IProcessLauncher _processLauncher;
     private readonly IDiscordAccessLock _accessLock;
+    private readonly IDiscorderDiagnostics _diagnostics;
     private readonly SemaphoreSlim _operationGate = new(1, 1);
     private readonly TimeSpan _startupGracePeriod;
 
@@ -34,7 +36,8 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         IProfileProvisioner provisioner,
         IProcessLauncher processLauncher,
         TimeSpan? startupGracePeriod = null,
-        IDiscordAccessLock? accessLock = null)
+        IDiscordAccessLock? accessLock = null,
+        IDiscorderDiagnostics? diagnostics = null)
     {
         _paths = paths ?? throw new ArgumentNullException(nameof(paths));
         _discordScope = discordScope ?? throw new ArgumentNullException(nameof(discordScope));
@@ -44,6 +47,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         _processLauncher = processLauncher
             ?? throw new ArgumentNullException(nameof(processLauncher));
         _accessLock = accessLock ?? new NullDiscordAccessLock();
+        _diagnostics = diagnostics ?? NullDiscorderDiagnostics.Instance;
         _startupGracePeriod = startupGracePeriod ?? TimeSpan.FromSeconds(2);
     }
 
@@ -51,7 +55,40 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
     public TunnelSnapshot Snapshot => _snapshot;
 
-    public bool IncludeBrowserAccess { get; set; }
+    private bool _includeBrowserAccess;
+
+    public bool IncludeBrowserAccess
+    {
+        get => _includeBrowserAccess;
+        set
+        {
+            if (!TrySetBrowserAccess(value))
+            {
+                throw new InvalidOperationException(
+                    "Discord web kapsamı yalnızca bağlantı kapalıyken değiştirilebilir.");
+            }
+        }
+    }
+
+    public bool TrySetBrowserAccess(bool enabled)
+    {
+        if (_snapshot.IsConnected || _snapshot.IsBusy)
+        {
+            _diagnostics.Warning(
+                "controller.browserAccess",
+                "Bağlantı aktifken Discord web kapsamı değiştirme isteği reddedildi.",
+                new Dictionary<string, string?>
+                {
+                    ["requested"] = enabled.ToString(),
+                    ["current"] = _includeBrowserAccess.ToString(),
+                    ["state"] = _snapshot.State.ToString()
+                });
+            return false;
+        }
+
+        _includeBrowserAccess = enabled;
+        return true;
+    }
 
     public async Task EnsureDisconnectedLockAsync(
         CancellationToken cancellationToken = default)
@@ -66,6 +103,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 return;
             }
 
+            _diagnostics.Info("controller.lock", "Discord kilidi etkinleştiriliyor.");
             await _accessLock.EnableAsync(cancellationToken);
             SetStatus(TunnelState.Disconnected, "Bağlantı kapalı, Discord kilitli");
         }
@@ -109,12 +147,23 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
             _intentionalStop = false;
             SetStatus(TunnelState.Preparing, "Discord kilidi kaldırılıyor");
+            _diagnostics.Info(
+                "controller.connect",
+                "Bağlantı başlatıldı.",
+                new Dictionary<string, string?>
+                {
+                    ["browserAccess"] = IncludeBrowserAccess.ToString()
+                });
             await _accessLock.DisableAsync(cancellationToken);
 
             SetStatus(TunnelState.Preparing, "Discord tüneli hazırlanıyor");
 
             var progress = new CallbackProgress(
-                message => SetStatus(TunnelState.Preparing, message));
+                message =>
+                {
+                    _diagnostics.Info("controller.prepare", message);
+                    SetStatus(TunnelState.Preparing, message);
+                });
             var wireSockExecutable = await _wireSockBootstrapper.EnsureInstalledAsync(
                 progress,
                 cancellationToken);
@@ -124,12 +173,29 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             var profilePath = await _provisioner.EnsureProfileAsync(
                 allowedApplications,
                 cancellationToken);
+            _diagnostics.Info(
+                "controller.profile",
+                "Discord profili hazırlandı.",
+                new Dictionary<string, string?>
+                {
+                    ["profilePath"] = profilePath,
+                    ["allowedApplicationCount"] =
+                        allowedApplications.Count.ToString(CultureInfo.InvariantCulture)
+                });
 
             SetStatus(TunnelState.Connecting, "Discord ağına bağlanılıyor");
             var arguments = await PrepareWireSockArgumentsAsync(
                 wireSockExecutable,
                 profilePath,
                 cancellationToken);
+            _diagnostics.Info(
+                "controller.process",
+                "WireSock süreci başlatılıyor.",
+                new Dictionary<string, string?>
+                {
+                    ["executable"] = wireSockExecutable,
+                    ["arguments"] = string.Join(" ", arguments)
+                });
             _wireSockProcess = _processLauncher.Start(
                 wireSockExecutable,
                 arguments,
@@ -153,12 +219,21 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 IncludeBrowserAccess
                     ? "Discord uygulaması ve web erişimi tünelleniyor"
                     : "Discord uygulaması tünelleniyor");
+            _diagnostics.WriteHealth(
+                "bağlı",
+                new Dictionary<string, string?>
+                {
+                    ["browserAccess"] = IncludeBrowserAccess.ToString(),
+                    ["profilePath"] = profilePath,
+                    ["tunnelLog"] = _paths.TunnelLog
+                });
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             await DisposeProcessAsync();
             await TryEnableAccessLockAsync("ConnectCanceled");
             SetStatus(TunnelState.Disconnected, "Bağlantı iptal edildi");
+            _diagnostics.Warning("controller.connect", "Bağlantı kullanıcı tarafından iptal edildi.");
             throw;
         }
         catch (Exception exception)
@@ -166,6 +241,13 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             await DisposeProcessAsync();
             await TryEnableAccessLockAsync("ConnectFailure");
             WriteDiagnostic("Connect", exception.ToString());
+            _diagnostics.WriteHealth(
+                "hata",
+                new Dictionary<string, string?>
+                {
+                    ["operation"] = "connect",
+                    ["message"] = exception.Message
+                });
             SetStatus(
                 TunnelState.Error,
                 exception.Message,
@@ -204,6 +286,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         {
             if (_wireSockProcess is null)
             {
+                _diagnostics.Info("controller.disconnect", "Aktif WireSock süreci yok; kilit etkinleştiriliyor.");
                 await _accessLock.EnableAsync(cancellationToken);
                 SetStatus(TunnelState.Disconnected, "Bağlantı kapalı, Discord kilitli");
                 return;
@@ -211,6 +294,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
             _intentionalStop = true;
             SetStatus(TunnelState.Disconnecting, "Bağlantı kapatılıyor");
+            _diagnostics.Info("controller.disconnect", "Bağlantı kapatılıyor.");
 
             if (_wireSockProcess is not null)
             {
@@ -223,6 +307,10 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             await _accessLock.EnableAsync(cancellationToken);
 
             SetStatus(TunnelState.Disconnected, "Bağlantı kapalı, Discord kilitli");
+            _diagnostics.WriteHealth("kapalı", new Dictionary<string, string?>
+            {
+                ["accessLock"] = "enabled"
+            });
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -234,6 +322,13 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         catch (Exception exception)
         {
             WriteDiagnostic("Disconnect", exception.ToString());
+            _diagnostics.WriteHealth(
+                "hata",
+                new Dictionary<string, string?>
+                {
+                    ["operation"] = "disconnect",
+                    ["message"] = exception.Message
+                });
             SetStatus(
                 TunnelState.Error,
                 "Bağlantı kapatılamadı.",
@@ -300,6 +395,14 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     "WireSockExited",
                     $"WireSock exit code: " +
                     $"{exitCode?.ToString(CultureInfo.InvariantCulture) ?? "unknown"}");
+                _diagnostics.WriteHealth(
+                    "hata",
+                    new Dictionary<string, string?>
+                    {
+                        ["operation"] = "WireSockExited",
+                        ["exitCode"] = exitCode?.ToString(CultureInfo.InvariantCulture)
+                            ?? "unknown"
+                    });
                 SetStatus(
                     TunnelState.Error,
                     "Tünel beklenmedik şekilde kapandı.",
@@ -345,16 +448,31 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         string message,
         string? diagnostic = null)
     {
-        _snapshot = new TunnelSnapshot(
-            state,
+            _snapshot = new TunnelSnapshot(
+                state,
+                message,
+                DateTimeOffset.Now,
+                diagnostic);
+        _diagnostics.Info(
+            "controller.status",
             message,
-            DateTimeOffset.Now,
-            diagnostic);
+            new Dictionary<string, string?>
+            {
+                ["state"] = state.ToString()
+            });
         StatusChanged?.Invoke(this, _snapshot);
     }
 
     private void WriteDiagnostic(string operation, string diagnostic)
     {
+        _diagnostics.Failure(
+            "controller." + operation,
+            "Denetleyici tanılaması yazıldı.",
+            details: new Dictionary<string, string?>
+            {
+                ["diagnostic"] = diagnostic
+            });
+
         try
         {
             _paths.EnsureDirectories();

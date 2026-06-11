@@ -1,7 +1,9 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.IO.Compression;
 using Discorder.Core.Configuration;
 using Discorder.Core.Connection;
+using Discorder.Core.Diagnostics;
 using Discorder.Core.Discord;
 using Discorder.Core.Firewall;
 using Discorder.Core.Infrastructure;
@@ -26,10 +28,12 @@ var tests = new (string Name, Func<Task> Run)[]
     ("WireSock hazırlığı resmi paketi doğrulayıp kurar", BootstrapLifecycleAsync),
     ("WireSock hazırlığı yeniden başlatma gerektiren başarı kodunu kabul eder", BootstrapAcceptsRestartRequiredExitCodeAsync),
     ("Denetleyici idempotent bağlanır ve keser", ControllerLifecycleAsync),
+    ("Denetleyici web kapsamını bağlıyken kilitler", ControllerLocksBrowserScopeWhileConnectedAsync),
     ("Denetleyici WireSock hazırlık hatasını bildirir", ControllerBootstrapFailureAsync),
     ("Windows Firewall kilidi Discord alan adı kuralını yönetir", WindowsFirewallAccessLockBuildsExpectedCommandsAsync),
-    ("Sıfırlama ayarları koruyup üretilen veriyi yeniler", CleanupServiceRepairsGeneratedStateAsync),
-    ("Temiz kaldırma Discorder verisini ve kilidini siler", CleanupServiceRemovesDiscorderStateAsync)
+    ("Onarım ayarları ve logları koruyup üretilen veriyi yeniler", CleanupServiceRepairsGeneratedStateAsync),
+    ("Temiz kaldırma Discorder verisini ve kilidini siler", CleanupServiceRemovesDiscorderStateAsync),
+    ("Tanılama logları devops paketi üretir", DiagnosticsWritesDevOpsBundleAsync)
 };
 
 var failures = new List<string>();
@@ -253,13 +257,11 @@ static async Task SettingsPersistConsentAsync()
         var firstStore = new AppSettingsStore(paths);
         Assert(!firstStore.IsSetupConsentAccepted(WireSockPackage.Version));
         Assert(!firstStore.IsBrowserAccessEnabled());
-        Assert(firstStore.IsBackgroundVideoEnabled());
         Assert(!firstStore.IsRunInBackgroundOnCloseEnabled());
         Assert(!firstStore.IsStartWithWindowsEnabled());
         Assert(!firstStore.IsWireSockInstalledByDiscorder());
 
         firstStore.SetBrowserAccessEnabled(true);
-        firstStore.SetBackgroundVideoEnabled(false);
         firstStore.SetRunInBackgroundOnCloseEnabled(true);
         firstStore.SetStartWithWindowsEnabled(true);
         firstStore.SetWireSockInstalledByDiscorder(true);
@@ -269,19 +271,16 @@ static async Task SettingsPersistConsentAsync()
         Assert(reloadedStore.IsSetupConsentAccepted(WireSockPackage.Version));
         Assert(!reloadedStore.IsSetupConsentAccepted("next-version"));
         Assert(reloadedStore.IsBrowserAccessEnabled());
-        Assert(!reloadedStore.IsBackgroundVideoEnabled());
         Assert(reloadedStore.IsRunInBackgroundOnCloseEnabled());
         Assert(reloadedStore.IsStartWithWindowsEnabled());
         Assert(reloadedStore.IsWireSockInstalledByDiscorder());
 
         reloadedStore.SetBrowserAccessEnabled(false);
-        reloadedStore.SetBackgroundVideoEnabled(true);
         reloadedStore.SetRunInBackgroundOnCloseEnabled(false);
         reloadedStore.SetStartWithWindowsEnabled(false);
         reloadedStore.SetWireSockInstalledByDiscorder(false);
         var disabledStore = new AppSettingsStore(paths);
         Assert(!disabledStore.IsBrowserAccessEnabled());
-        Assert(disabledStore.IsBackgroundVideoEnabled());
         Assert(!disabledStore.IsRunInBackgroundOnCloseEnabled());
         Assert(!disabledStore.IsStartWithWindowsEnabled());
         Assert(!disabledStore.IsWireSockInstalledByDiscorder());
@@ -295,7 +294,6 @@ static async Task SettingsPersistConsentAsync()
         var legacyStore = new AppSettingsStore(paths);
         Assert(legacyStore.IsSetupConsentAccepted(WireSockPackage.Version));
         Assert(!legacyStore.IsBrowserAccessEnabled());
-        Assert(legacyStore.IsBackgroundVideoEnabled());
         Assert(!legacyStore.IsRunInBackgroundOnCloseEnabled());
         Assert(!legacyStore.IsStartWithWindowsEnabled());
         Assert(!legacyStore.IsWireSockInstalledByDiscorder());
@@ -447,6 +445,7 @@ static async Task BootstrapLifecycleAsync()
         Assert(verifier.ClientVerifyCount == 1);
         Assert(launcher.LaunchCount == 1);
         Assert(settings.IsWireSockInstalledByDiscorder());
+        Assert(File.Exists(paths.WireSockInstallMarker));
         Assert(!File.Exists(Path.Combine(
             paths.InstallerDirectory,
             WireSockPackage.InstallerFileName)));
@@ -560,6 +559,42 @@ static async Task ControllerLifecycleAsync()
         await controller.DisconnectAsync();
         Assert(controller.Snapshot.State == TunnelState.Disconnected);
         Assert(accessLock.EnableCount == 3);
+    }
+    finally
+    {
+        await controller.DisposeAsync();
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task ControllerLocksBrowserScopeWhileConnectedAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var controller = new DiscordTunnelController(
+        new AppPaths(root),
+        new DiscordAppScope(root, root, root),
+        new FakeWireSockBootstrapper(Path.Combine(
+            root,
+            "WireSock VPN Client",
+            "bin",
+            WireSockPackage.CliExecutableFileName)),
+        new FakeProfileProvisioner(Path.Combine(root, "discord.conf")),
+        new FakeProcessLauncher(new FakeManagedProcess()),
+        TimeSpan.Zero,
+        new FakeDiscordAccessLock());
+
+    try
+    {
+        Assert(controller.TrySetBrowserAccess(false));
+        await controller.ConnectAsync();
+        Assert(controller.Snapshot.State == TunnelState.Connected);
+        Assert(!controller.TrySetBrowserAccess(true));
+        Assert(!controller.IncludeBrowserAccess);
+
+        await controller.DisconnectAsync();
+        Assert(controller.Snapshot.State == TunnelState.Disconnected);
+        Assert(controller.TrySetBrowserAccess(true));
+        Assert(controller.IncludeBrowserAccess);
     }
     finally
     {
@@ -727,7 +762,62 @@ static async Task CleanupServiceRepairsGeneratedStateAsync()
         Assert(Directory.Exists(paths.LogDirectory));
         Assert(!File.Exists(paths.DiscordProfile));
         Assert(!File.Exists(paths.WgcfExecutable));
-        Assert(!File.Exists(paths.ErrorLog));
+        Assert(File.Exists(paths.ErrorLog));
+    }
+    finally
+    {
+        if (Directory.Exists(root))
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+}
+
+static async Task DiagnosticsWritesDevOpsBundleAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var paths = new AppPaths(root);
+    var diagnostics = new DiscorderDiagnostics(paths);
+
+    try
+    {
+        diagnostics.Info(
+            "test.start",
+            "Tanılama başladı.",
+            new Dictionary<string, string?>
+            {
+                ["path"] = paths.DataDirectory
+            });
+        diagnostics.WriteHealth(
+            "test sağlıklı",
+            new Dictionary<string, string?>
+            {
+                ["state"] = "ready"
+            });
+
+        var bundlePath = diagnostics.CreateBundle();
+
+        Assert(File.Exists(paths.EventLog));
+        Assert(File.Exists(paths.HealthReport));
+        Assert(File.Exists(paths.DiagnosticSummary));
+        Assert(File.Exists(bundlePath));
+
+        var events = await File.ReadAllTextAsync(paths.EventLog);
+        var health = await File.ReadAllTextAsync(paths.HealthReport);
+        var summary = await File.ReadAllTextAsync(paths.DiagnosticSummary);
+
+        Assert(events.Contains("\"source\":\"test.start\"", StringComparison.Ordinal));
+        Assert(health.Contains("test sağlıklı", StringComparison.Ordinal));
+        Assert(summary.Contains("Discorder tanılama özeti", StringComparison.Ordinal));
+        Assert(!events.Contains(Environment.UserName, StringComparison.OrdinalIgnoreCase));
+
+        using var archive = ZipFile.OpenRead(bundlePath);
+        Assert(archive.Entries.Any(entry =>
+            entry.FullName.Equals("events.jsonl", StringComparison.OrdinalIgnoreCase)));
+        Assert(archive.Entries.Any(entry =>
+            entry.FullName.Equals("health.json", StringComparison.OrdinalIgnoreCase)));
+        Assert(archive.Entries.Any(entry =>
+            entry.FullName.Equals("diagnostics.md", StringComparison.OrdinalIgnoreCase)));
     }
     finally
     {

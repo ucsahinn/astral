@@ -14,9 +14,10 @@ Amaç basit: **Bağlan** düğmesine basınca Discord uygulaması çalışsın, 
 - ✅ WireSock ve wgcf ikili dosyaları repoya gömülmez; ilk kullanımda resmi kaynaklardan indirilip doğrulanır.
 - ✅ WireSock kurucusu SHA-256, Authenticode imzası, yayıncı ve sürüm bilgisiyle doğrulanır.
 - ✅ Yerel profil ve tanılama dosyaları `%LOCALAPPDATA%\Discorder` altında tutulur.
-- ✅ Premium arka plan videosu varsayılan olarak açıktır; işletim ayarlarından kapatılıp tekrar açılabilir.
+- ✅ Premium arka plan videosu arayüz sahnesinin sabit parçasıdır; kullanıcı tarafından kapatılıp görsel düzen bozulmaz.
 - ✅ İlk kurulum ve bağlantı adımları ana ekrandaki süreç çubuğunda izlenir.
-- ✅ **Sıfırla** işlemi ayarları koruyup profil, wgcf, kurucu önbelleği ve logları yeniden üretilecek hale getirir.
+- ✅ **Onar** işlemi ayarları, WireSock kurulumunu ve tanılama kayıtlarını koruyup profil, wgcf ve kurucu önbelleğini yeniden üretilecek hale getirir.
+- ✅ **Tanılama paketi** JSONL olay akışı, sağlık raporu, okunabilir özet ve WireSock loglarını tek zip içinde hazırlar.
 - ✅ İsteğe bağlı arka plan modu pencere kapansa bile Discorder'ı bildirim alanında çalıştırır.
 - ✅ İsteğe bağlı Windows başlangıcı ayarı Discorder'ı oturum açılışında başlatır.
 - ✅ **Temiz kaldır** işlemi Discorder kilidini, başlangıç kaydını, yerel veriyi ve Discorder'ın kurduğu WireSock VPN Client kurulumunu geri alır.
@@ -59,27 +60,36 @@ Discorder şunları bilinçli olarak yapmaz:
 
 ## 🚀 Kullanım
 
-1. Yayın arşivinden `Discorder-2.0.4-win-x64.zip` dosyasını indirin.
+1. Yayın arşivinden `Discorder-2.0.5-win-x64.zip` dosyasını indirin.
 2. Zip içeriğini istediğiniz klasöre çıkarın.
 3. `Discorder.exe` dosyasını çalıştırın ve Windows UAC onayını verin.
 4. Discord web kullanacaksanız ana ekrandaki **Discord web** seçeneğini açın.
-5. Arka plan videosunu istemiyorsanız **İşletim Ayarları** bölümündeki **Arka plan videosu** kontrolünü kapatın.
-6. Pencere kapansa bile çalışmasını istiyorsanız **Arka planda çalış** seçeneğini açın.
-7. Windows oturumu açılınca başlamasını istiyorsanız **Windows başlangıcı** seçeneğini açın.
-8. **Bağlan** düğmesine basın.
-9. İlk kurulum penceresinde WireSock ve Cloudflare WARP koşullarını okuyup onaylayın.
-10. Windows UAC penceresi gelirse resmi WireSock kurulumuna izin verin.
-11. Durum **AÇIK** olduğunda seçilen kapsam tünellenir.
+5. Pencere kapansa bile çalışmasını istiyorsanız **Arka planda çalış** seçeneğini açın.
+6. Windows oturumu açılınca başlamasını istiyorsanız **Windows başlangıcı** seçeneğini açın.
+7. **Bağlan** düğmesine basın.
+8. İlk kurulum penceresinde WireSock ve Cloudflare WARP koşullarını okuyup onaylayın.
+9. Windows UAC penceresi gelirse resmi WireSock kurulumuna izin verin.
+10. Durum **AÇIK** olduğunda seçilen kapsam tünellenir.
 
-## 🛠️ Sıfırla ve Onar
+## 🛠️ Onar
 
-Ana ekrandaki **Sıfırla** düğmesi profil bozulması, eksik `wgcf` çıktısı, yarım kalan kurucu önbelleği veya eski log kalıntısı gibi durumlar için ayarları kaybetmeden temiz başlangıç sağlar:
+Ana ekrandaki **Onar** düğmesi profil bozulması, eksik `wgcf` çıktısı veya yarım kalan kurucu önbelleği gibi durumlar için ayarları kaybetmeden temiz başlangıç sağlar:
 
 - Çalışan Discorder tünelini kapatır.
 - Discord kilidini güvenli kapalı duruma alır.
-- `%LOCALAPPDATA%\Discorder\profiles`, `tools`, `installers` ve `logs` klasörlerini temizler.
-- Tarayıcı modu, arka plan videosu, arka planda çalışma, başlangıç, WireSock onayı ve WireSock kurulumunu korur.
+- `%LOCALAPPDATA%\Discorder\profiles`, `tools` ve `installers` klasörlerini temizler.
+- Tarayıcı modu, arka planda çalışma, başlangıç, WireSock onayı, WireSock kurulum izi ve tanılama kayıtlarını korur.
 - Sonraki **Bağlan** işleminde profil ve `wgcf` dosyaları yeniden üretilir.
+
+## 🧾 Tanılama Paketi
+
+Ana ekrandaki **Tanılama paketi** düğmesi devops incelemesi için şu dosyaları üretir ve log klasörünü açar:
+
+- `%LOCALAPPDATA%\Discorder\logs\events.jsonl`: uygulama, UI, kilit, profil ve tünel olayları.
+- `%LOCALAPPDATA%\Discorder\logs\health.json`: son bilinen durum, sürüm, ortam ve redakte edilmiş path bilgisi.
+- `%LOCALAPPDATA%\Discorder\logs\diagnostics.md`: okunabilir tanılama özeti.
+- `%LOCALAPPDATA%\Discorder\logs\tunnel.log`: WireSock süreç çıktısı.
+- `%LOCALAPPDATA%\Discorder\diagnostic-bundles\discorder-diagnostics-*.zip`: paylaşılabilir tanılama paketi.
 
 ## 🧹 Temiz Kaldırma
 
@@ -88,9 +98,9 @@ Ana ekrandaki **Temiz kaldır** düğmesi Discorder'ı taşınabilir uygulama ma
 - Çalışan Discorder tünelini kapatır.
 - Discorder'ın hosts dosyasına eklediği yönetilen Discord kilidi bloğunu kaldırır.
 - `Discorder.BlockDiscordDomains` Windows Firewall kuralını siler.
-- Discorder'ın kurduğu WireSock VPN Client genel Windows kurulumunu kaldırır.
+- Discorder'ın kurduğu WireSock VPN Client genel Windows kurulumunu settings ve marker izi üzerinden kaldırır.
 - Discorder'a ait Windows başlangıç kaydını siler.
-- `%LOCALAPPDATA%\Discorder` altındaki ayar, profil, wgcf, kurucu ve log dosyalarını siler.
+- `%LOCALAPPDATA%\Discorder` altındaki ayar, profil, wgcf, kurucu, marker, tanılama paketi ve log dosyalarını siler.
 - İşlem bitince uygulamayı kapatır.
 
 WireSock VPN Client Discorder'dan önce sistemde zaten kuruluysa korunur; Discorder yalnızca kendi ilk kurulumda başlattığı WireSock kurulumunu kaldırır.
