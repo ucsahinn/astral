@@ -18,7 +18,7 @@
                       UnloadedBehavior="Stop"
                       Stretch="UniformToFill"
                       Volume="0"
-                      Opacity="0.58"
+                      Opacity="0.86"
                       IsHitTestVisible="False"
                       Loaded="BackgroundVideo_Loaded"
                       MediaEnded="BackgroundVideo_MediaEnded"
@@ -27,22 +27,36 @@
         <Rectangle IsHitTestVisible="False">
             <Rectangle.Fill>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                    <GradientStop Color="#9F050712" Offset="0" />
-                    <GradientStop Color="#780B1730" Offset="0.42" />
-                    <GradientStop Color="#7A241039" Offset="0.74" />
-                    <GradientStop Color="#B0050712" Offset="1" />
+                    <GradientStop Color="#53050712" Offset="0" />
+                    <GradientStop Color="#3F0B1730" Offset="0.42" />
+                    <GradientStop Color="#44241039" Offset="0.74" />
+                    <GradientStop Color="#70050712" Offset="1" />
                 </LinearGradientBrush>
             </Rectangle.Fill>
         </Rectangle>
 
-        <Rectangle IsHitTestVisible="False" Opacity="0.42">
+        <Rectangle IsHitTestVisible="False" Opacity="0.48">
             <Rectangle.Fill>
                 <LinearGradientBrush StartPoint="0,1" EndPoint="1,0">
                     <GradientStop Color="#00121A30" Offset="0" />
-                    <GradientStop Color="#2E5E6BFF" Offset="0.38" />
-                    <GradientStop Color="#344DDCFF" Offset="0.62" />
+                    <GradientStop Color="#2F5E6BFF" Offset="0.34" />
+                    <GradientStop Color="#3866E8FF" Offset="0.58" />
+                    <GradientStop Color="#30AF6CFF" Offset="0.76" />
                     <GradientStop Color="#00121A30" Offset="1" />
                 </LinearGradientBrush>
+            </Rectangle.Fill>
+        </Rectangle>
+
+        <Rectangle IsHitTestVisible="False" Opacity="0.30">
+            <Rectangle.Fill>
+                <RadialGradientBrush Center="0.46,0.48"
+                                     GradientOrigin="0.44,0.45"
+                                     RadiusX="0.72"
+                                     RadiusY="0.76">
+                    <GradientStop Color="#565F6BFF" Offset="0" />
+                    <GradientStop Color="#1B39E8FF" Offset="0.48" />
+                    <GradientStop Color="#00050712" Offset="1" />
+                </RadialGradientBrush>
             </Rectangle.Fill>
         </Rectangle>
 
@@ -54,11 +68,18 @@
             </Grid.RowDefinitions>
 
             <Border Grid.Row="0"
-                    Background="#7A101827"
-                    BorderBrush="#7E8B7DFF"
+                    Background="#53101827"
+                    BorderBrush="#AA8B7DFF"
                     BorderThickness="1"
                     CornerRadius="8"
                     Padding="18,0">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="22"
+                                      Direction="270"
+                                      Opacity="0.26"
+                                      ShadowDepth="0"
+                                      Color="#6D72FF" />
+                </Border.Effect>
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -87,8 +108,8 @@
                             x:Name="StatusBadge"
                             Padding="13,7"
                             CornerRadius="5"
-                            Background="#A6121B2D"
-                            BorderBrush="#727EDBFF"
+                            Background="#7A121B2D"
+                            BorderBrush="#9D7FE7FF"
                             BorderThickness="1"
                             VerticalAlignment="Center">
                         <StackPanel Orientation="Horizontal">
@@ -114,17 +135,17 @@
                 </Grid.ColumnDefinitions>
 
                 <Border Grid.Column="0"
-                        Background="#8F101827"
-                        BorderBrush="#858B7DFF"
+                        Background="#68101827"
+                        BorderBrush="#B98B7DFF"
                         BorderThickness="1"
                         CornerRadius="8"
                         Padding="34">
                     <Border.Effect>
-                        <DropShadowEffect BlurRadius="34"
+                        <DropShadowEffect BlurRadius="48"
                                           Direction="270"
-                                          Opacity="0.34"
-                                          ShadowDepth="12"
-                                          Color="#17113A" />
+                                          Opacity="0.52"
+                                          ShadowDepth="0"
+                                          Color="#727BFF" />
                     </Border.Effect>
                     <Grid>
                         <Grid.RowDefinitions>
@@ -147,8 +168,8 @@
 
                         <Button Grid.Row="1"
                                 x:Name="ToggleButton"
-                                Width="228"
-                                Height="228"
+                                Width="242"
+                                Height="242"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
                                 Background="#661A2240"
@@ -171,35 +192,41 @@
                                                                      RadiusX="0.86"
                                                                      RadiusY="0.86">
                                                     <GradientStop Color="#C52C315E" Offset="0" />
-                                                    <GradientStop Color="#A11C2347" Offset="0.48" />
+                                                    <GradientStop Color="#B02F2D66" Offset="0.42" />
+                                                    <GradientStop Color="#8D152547" Offset="0.72" />
                                                     <GradientStop Color="#7A11182B" Offset="1" />
                                                 </RadialGradientBrush>
                                             </Ellipse.Fill>
                                             <Ellipse.Effect>
-                                                <DropShadowEffect BlurRadius="28"
+                                                <DropShadowEffect BlurRadius="46"
                                                                   Direction="270"
-                                                                  Opacity="0.55"
+                                                                  Opacity="0.9"
                                                                   ShadowDepth="0"
-                                                                  Color="#5B63FF" />
+                                                                  Color="#727BFF" />
                                             </Ellipse.Effect>
                                         </Ellipse>
                                         <Ellipse Margin="15"
-                                                 Stroke="#7866D9FF"
+                                                 Stroke="#9A66D9FF"
                                                  StrokeThickness="1">
                                             <Ellipse.Fill>
                                                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                                    <GradientStop Color="#9B131B32" Offset="0" />
-                                                    <GradientStop Color="#783A2552" Offset="0.55" />
-                                                    <GradientStop Color="#70203F55" Offset="1" />
+                                                    <GradientStop Color="#B5131B32" Offset="0" />
+                                                    <GradientStop Color="#98402966" Offset="0.55" />
+                                                    <GradientStop Color="#8A1F5768" Offset="1" />
                                                 </LinearGradientBrush>
                                             </Ellipse.Fill>
                                         </Ellipse>
-                                        <Ellipse Width="170"
-                                                 Height="170"
+                                        <Ellipse Width="184"
+                                                 Height="184"
                                                  Fill="Transparent"
-                                                 Stroke="#4466D9FF"
+                                                 Stroke="#6666D9FF"
                                                  StrokeThickness="1"
                                                  StrokeDashArray="2 5" />
+                                        <Ellipse Width="132"
+                                                 Height="132"
+                                                 Fill="#2466D9FF"
+                                                 Stroke="#5066D9FF"
+                                                 StrokeThickness="1" />
                                         <StackPanel HorizontalAlignment="Center"
                                                     VerticalAlignment="Center">
                                             <TextBlock x:Name="PowerIcon"
@@ -207,7 +234,15 @@
                                                        FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
                                                        FontSize="62"
                                                        Foreground="{StaticResource AccentCyanBrush}"
-                                                       Text="&#xE7E8;" />
+                                                       Text="&#xE7E8;">
+                                                <TextBlock.Effect>
+                                                    <DropShadowEffect BlurRadius="18"
+                                                                      Direction="270"
+                                                                      Opacity="0.86"
+                                                                      ShadowDepth="0"
+                                                                      Color="#66D9FF" />
+                                                </TextBlock.Effect>
+                                            </TextBlock>
                                             <TextBlock x:Name="ToggleButtonLabel"
                                                        Margin="0,15,0,0"
                                                        HorizontalAlignment="Center"
@@ -220,7 +255,7 @@
                                         <Trigger Property="IsMouseOver" Value="True">
                                             <Setter TargetName="OuterRing"
                                                     Property="Fill"
-                                                    Value="#AA263056" />
+                                                    Value="#98263056" />
                                         </Trigger>
                                         <Trigger Property="IsKeyboardFocused" Value="True">
                                             <Setter TargetName="OuterRing"
@@ -256,17 +291,17 @@
                 </Border>
 
                 <StackPanel Grid.Column="2">
-                   <Border Background="#C90D121C"
-                            BorderBrush="#747EDBFF"
+                    <Border Background="#5C101827"
+                            BorderBrush="#9D7EDBFF"
                             BorderThickness="1"
                             CornerRadius="8"
                             Padding="24">
                         <Border.Effect>
-                            <DropShadowEffect BlurRadius="24"
+                            <DropShadowEffect BlurRadius="34"
                                               Direction="270"
-                                              Opacity="0.22"
-                                              ShadowDepth="8"
-                                              Color="#11183A" />
+                                              Opacity="0.42"
+                                              ShadowDepth="0"
+                                              Color="#4C72FF" />
                         </Border.Effect>
                         <StackPanel>
                             <TextBlock FontSize="13"
@@ -303,8 +338,8 @@
                     </Border>
 
                     <Border Margin="0,18,0,0"
-                            Background="#80101827"
-                            BorderBrush="#5F66D9FF"
+                            Background="#56101827"
+                            BorderBrush="#8673DBFF"
                             BorderThickness="1"
                             CornerRadius="8"
                             Padding="24">
@@ -352,11 +387,18 @@
             </Grid>
 
             <Border Grid.Row="2"
-                    Background="#7A101827"
-                    BorderBrush="#7E8B7DFF"
+                    Background="#54101827"
+                    BorderBrush="#AA8B7DFF"
                     BorderThickness="1"
                     CornerRadius="8"
                     Padding="16,0">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="24"
+                                      Direction="270"
+                                      Opacity="0.28"
+                                      ShadowDepth="0"
+                                      Color="#6D72FF" />
+                </Border.Effect>
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />

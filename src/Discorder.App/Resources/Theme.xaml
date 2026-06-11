@@ -3,13 +3,13 @@
     <SolidColorBrush x:Key="WindowBrush" Color="#05070D" />
     <SolidColorBrush x:Key="SurfaceBrush" Color="#151A2A" />
     <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="#242944" />
-    <SolidColorBrush x:Key="BorderBrush" Color="#6E78A8" />
+    <SolidColorBrush x:Key="BorderBrush" Color="#7F8BC7" />
     <SolidColorBrush x:Key="PrimaryTextBrush" Color="#F5F7FB" />
     <SolidColorBrush x:Key="SecondaryTextBrush" Color="#C7D1E8" />
     <SolidColorBrush x:Key="MutedTextBrush" Color="#98A5C4" />
-    <SolidColorBrush x:Key="AccentBrush" Color="#A59BFF" />
-    <SolidColorBrush x:Key="AccentSoftBrush" Color="#33406F" />
-    <SolidColorBrush x:Key="AccentCyanBrush" Color="#66D9FF" />
+    <SolidColorBrush x:Key="AccentBrush" Color="#B8A7FF" />
+    <SolidColorBrush x:Key="AccentSoftBrush" Color="#3A477D" />
+    <SolidColorBrush x:Key="AccentCyanBrush" Color="#78E5FF" />
     <SolidColorBrush x:Key="GlassBorderBrush" Color="#8491FF" />
     <SolidColorBrush x:Key="SuccessBrush" Color="#3BA55C" />
     <SolidColorBrush x:Key="DangerBrush" Color="#ED4245" />
@@ -22,7 +22,7 @@
 
     <Style x:Key="CommandButtonStyle" TargetType="Button">
         <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}" />
-        <Setter Property="Background" Value="#7A242944" />
+        <Setter Property="Background" Value="#63242944" />
         <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Padding" Value="16,9" />
@@ -38,6 +38,13 @@
                             BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="6"
                             Padding="{TemplateBinding Padding}">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="16"
+                                              Direction="270"
+                                              Opacity="0.24"
+                                              ShadowDepth="0"
+                                              Color="#66D9FF" />
+                        </Border.Effect>
                         <ContentPresenter HorizontalAlignment="Center"
                                           VerticalAlignment="Center" />
                     </Border>
@@ -45,7 +52,7 @@
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="ButtonBorder"
                                     Property="Background"
-                            Value="#A3313659" />
+                                    Value="#8A313659" />
                         </Trigger>
                         <Trigger Property="IsKeyboardFocused" Value="True">
                             <Setter TargetName="ButtonBorder"
@@ -117,7 +124,7 @@
                     <Grid Width="52" Height="30">
                         <Border x:Name="Track"
                                 CornerRadius="15"
-                                Background="#7A242944"
+                                Background="#6E242944"
                                 BorderBrush="{StaticResource BorderBrush}"
                                 BorderThickness="1" />
                         <Ellipse x:Name="Knob"
@@ -125,7 +132,15 @@
                                  Height="22"
                                  Margin="4"
                                  HorizontalAlignment="Left"
-                                 Fill="{StaticResource SecondaryTextBrush}" />
+                                 Fill="{StaticResource SecondaryTextBrush}">
+                            <Ellipse.Effect>
+                                <DropShadowEffect BlurRadius="10"
+                                                  Direction="270"
+                                                  Opacity="0.4"
+                                                  ShadowDepth="0"
+                                                  Color="#78E5FF" />
+                            </Ellipse.Effect>
+                        </Ellipse>
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsChecked" Value="True">
