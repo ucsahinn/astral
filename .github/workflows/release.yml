@@ -72,13 +72,13 @@ jobs:
 
           ## İndirme
 
-          - `$($archive.Name)` dosyasını indirin.
-          - Zip'i çıkarın ve `Discorder.exe` dosyasını çalıştırın.
-          - SHA-256: `$hash`
+          - $($archive.Name) dosyasını indirin.
+          - Zip'i çıkarın ve Discorder.exe dosyasını çalıştırın.
+          - SHA-256: $hash
 
           ## Doğrulama
 
-          - `scripts/build-release.ps1` geçti.
+          - scripts/build-release.ps1 geçti.
           - Core ve Windows render testleri geçti.
           - Release arşivi self-contained Windows x64 olarak üretildi.
           "@
