@@ -109,10 +109,10 @@ static Task DiscordScopeIncludesBrowsersWhenEnabledAsync()
         Assert(apps.Any(app => app.Equals(
             Path.Combine(root, "Discord"),
             StringComparison.OrdinalIgnoreCase)));
-        Assert(apps.Any(app => app.Equals(
+        Assert(apps.All(app => !app.Equals(
             Path.Combine(root, "Google", "Chrome", "Application"),
             StringComparison.OrdinalIgnoreCase)));
-        Assert(apps.Any(app => app.Equals(
+        Assert(apps.All(app => !app.Equals(
             Path.Combine(root, "Mozilla Firefox"),
             StringComparison.OrdinalIgnoreCase)));
         Assert(apps.All(app => !app.Equals("Update.exe", StringComparison.OrdinalIgnoreCase)));

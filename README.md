@@ -56,8 +56,8 @@ Discorder şunları bilinçli olarak yapmaz:
 1. Yayın arşivinden `Discorder-2.0.0-win-x64.zip` dosyasını indirin.
 2. Zip içeriğini istediğiniz klasöre çıkarın.
 3. `Discorder.exe` dosyasını çalıştırın ve Windows UAC onayını verin.
-4. **Bağlan** düğmesine basın.
-5. Discord web kullanacaksanız ana ekrandaki **Discord web** seçeneğini açın.
+4. Discord web kullanacaksanız ana ekrandaki **Discord web** seçeneğini açın.
+5. **Bağlan** düğmesine basın.
 6. İlk kurulum penceresinde WireSock ve Cloudflare WARP koşullarını okuyup onaylayın.
 7. Windows UAC penceresi gelirse resmi WireSock kurulumuna izin verin.
 8. Durum **AÇIK** olduğunda seçilen kapsam tünellenir.
@@ -105,6 +105,13 @@ için PowerShell'i yönetici olarak açıp şunu çalıştırın:
 
 ```powershell
 .\scripts\verify-firewall-lock.ps1 -ProbeNetwork
+```
+
+Yayın exe'siyle canlı app + web kabul testi için PowerShell'i yönetici
+olarak açıp şunu çalıştırın:
+
+```powershell
+.\scripts\smoke-live-connect.ps1
 ```
 
 ## 📦 Yayın İçeriği

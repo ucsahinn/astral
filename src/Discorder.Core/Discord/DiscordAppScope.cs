@@ -28,30 +28,7 @@ public sealed class DiscordAppScope
         "vivaldi.exe"
     ];
 
-    private static readonly string[][] LocalBrowserDirectories =
-    [
-        ["BraveSoftware", "Brave-Browser", "Application"],
-        ["Google", "Chrome", "Application"],
-        ["Microsoft", "Edge", "Application"],
-        ["Programs", "Opera"],
-        ["Programs", "Opera GX"],
-        ["Vivaldi", "Application"]
-    ];
-
-    private static readonly string[][] ProgramFilesBrowserDirectories =
-    [
-        ["BraveSoftware", "Brave-Browser", "Application"],
-        ["Google", "Chrome", "Application"],
-        ["Microsoft", "Edge", "Application"],
-        ["Mozilla Firefox"],
-        ["Opera"],
-        ["Opera GX"],
-        ["Vivaldi", "Application"]
-    ];
-
     private readonly string _localAppData;
-    private readonly string _programFiles;
-    private readonly string _programFilesX86;
 
     public DiscordAppScope(
         string? localAppData = null,
@@ -60,10 +37,6 @@ public sealed class DiscordAppScope
     {
         _localAppData = localAppData ?? Environment.GetFolderPath(
             Environment.SpecialFolder.LocalApplicationData);
-        _programFiles = programFiles ?? Environment.GetFolderPath(
-            Environment.SpecialFolder.ProgramFiles);
-        _programFilesX86 = programFilesX86 ?? Environment.GetFolderPath(
-            Environment.SpecialFolder.ProgramFilesX86);
     }
 
     public IReadOnlyList<string> GetAllowedApplications(bool includeBrowserAccess = false)
@@ -96,42 +69,8 @@ public sealed class DiscordAppScope
                 allowed.Add(browserProcessName);
             }
 
-            AddExistingDirectories(
-                allowed,
-                _localAppData,
-                LocalBrowserDirectories);
-            AddExistingDirectories(
-                allowed,
-                _programFiles,
-                ProgramFilesBrowserDirectories);
-            AddExistingDirectories(
-                allowed,
-                _programFilesX86,
-                ProgramFilesBrowserDirectories);
         }
 
         return allowed.ToArray();
-    }
-
-    private static void AddExistingDirectories(
-        SortedSet<string> allowed,
-        string root,
-        IReadOnlyList<string[]> relativeDirectories)
-    {
-        if (string.IsNullOrWhiteSpace(root))
-        {
-            return;
-        }
-
-        foreach (var relativeDirectory in relativeDirectories)
-        {
-            var installationPath = Path.GetFullPath(
-                Path.Combine([root, .. relativeDirectory]));
-
-            if (Directory.Exists(installationPath))
-            {
-                allowed.Add(installationPath);
-            }
-        }
     }
 }

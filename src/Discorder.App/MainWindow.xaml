@@ -177,6 +177,7 @@
                                 BorderThickness="3"
                                 Cursor="Hand"
                                 Click="ToggleButton_Click"
+                                AutomationProperties.AutomationId="TunnelToggleButton"
                                 AutomationProperties.Name="Discord tünelini aç veya kapat"
                                 ToolTip="Discord tünelini aç veya kapat">
                             <Button.Template>
