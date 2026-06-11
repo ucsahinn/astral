@@ -16,6 +16,8 @@ public partial class MainWindow : Window, IDisposable
     private readonly DiscordTunnelController _controller;
     private readonly AppPaths _paths;
     private readonly IWireSockBootstrapper _wireSockBootstrapper;
+    private readonly AppSettingsStore _settingsStore;
+    private bool _isApplyingSettings;
     private CancellationTokenSource? _operationCancellation;
     private bool _allowClose;
     private bool _isClosing;
@@ -24,14 +26,18 @@ public partial class MainWindow : Window, IDisposable
     public MainWindow(
         DiscordTunnelController controller,
         AppPaths paths,
-        IWireSockBootstrapper wireSockBootstrapper)
+        IWireSockBootstrapper wireSockBootstrapper,
+        AppSettingsStore settingsStore)
     {
         _controller = controller ?? throw new ArgumentNullException(nameof(controller));
         _paths = paths ?? throw new ArgumentNullException(nameof(paths));
         _wireSockBootstrapper = wireSockBootstrapper
             ?? throw new ArgumentNullException(nameof(wireSockBootstrapper));
+        _settingsStore = settingsStore
+            ?? throw new ArgumentNullException(nameof(settingsStore));
 
         InitializeComponent();
+        ApplyBrowserAccessSetting(_settingsStore.IsBrowserAccessEnabled());
         _controller.StatusChanged += OnStatusChanged;
         ApplySnapshot(_controller.Snapshot);
     }
@@ -85,6 +91,7 @@ public partial class MainWindow : Window, IDisposable
     private void ApplySnapshot(TunnelSnapshot snapshot)
     {
         ToggleButton.IsEnabled = !snapshot.IsBusy;
+        BrowserAccessToggle.IsEnabled = !snapshot.IsBusy && !snapshot.IsConnected;
         StatusMessage.Text = snapshot.Message;
         StatusDetail.Text = GetDetail(snapshot.State);
 
@@ -120,17 +127,95 @@ public partial class MainWindow : Window, IDisposable
         }
     }
 
-    private static string GetDetail(TunnelState state)
+    private string GetDetail(TunnelState state)
     {
         return state switch
         {
-            TunnelState.Connected => "Discord uygulamaları ve desteklenen tarayıcılar kapsamda.",
-            TunnelState.Preparing => "Kurulum, dijital imza ve Discord web profili doğrulanıyor.",
+            TunnelState.Connected => _controller.IncludeBrowserAccess
+                ? "Discord uygulamaları ve desteklenen tarayıcılar kapsamda."
+                : "Varsayılan modda yalnızca Discord uygulamaları kapsamda.",
+            TunnelState.Preparing => "Kurulum, dijital imza ve tünel profili doğrulanıyor.",
             TunnelState.Connecting => "WireSock VPN Client süreci başlatılıyor.",
             TunnelState.Disconnecting => "Tünel süreci güvenli biçimde sonlandırılıyor.",
             TunnelState.Error => "Tanılama klasörünü açarak ayrıntıları inceleyin.",
             _ => "Discorder kapalıyken VPN süreci çalışmaz."
         };
+    }
+
+    private void BrowserAccessToggle_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_isApplyingSettings)
+        {
+            return;
+        }
+
+        var enabled = BrowserAccessToggle.IsChecked == true;
+        _settingsStore.SetBrowserAccessEnabled(enabled);
+        _controller.IncludeBrowserAccess = enabled;
+        BrowserAccessStatus.Text = enabled
+            ? "Tarayıcı modu açık. Discord web desteklenen tarayıcılardan tünellenir."
+            : "Varsayılan mod. Yalnızca Discord uygulaması tünellenir.";
+    }
+
+    private void ApplyBrowserAccessSetting(bool enabled)
+    {
+        _isApplyingSettings = true;
+        try
+        {
+            _controller.IncludeBrowserAccess = enabled;
+            BrowserAccessToggle.IsChecked = enabled;
+            BrowserAccessStatus.Text = enabled
+                ? "Tarayıcı modu açık. Discord web desteklenen tarayıcılardan tünellenir."
+                : "Varsayılan mod. Yalnızca Discord uygulaması tünellenir.";
+        }
+        finally
+        {
+            _isApplyingSettings = false;
+        }
+    }
+
+    private void BackgroundVideo_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (IsBackgroundVideoDisabled())
+        {
+            BackgroundVideo.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        BackgroundVideo.Play();
+    }
+
+    private void BackgroundVideo_MediaEnded(object sender, RoutedEventArgs e)
+    {
+        BackgroundVideo.Position = TimeSpan.Zero;
+        BackgroundVideo.Play();
+    }
+
+    private void BackgroundVideo_MediaFailed(
+        object sender,
+        ExceptionRoutedEventArgs e)
+    {
+        BackgroundVideo.Visibility = Visibility.Collapsed;
+    }
+
+    private static bool IsBackgroundVideoDisabled()
+    {
+        return string.Equals(
+            Environment.GetEnvironmentVariable("DISCORDER_DISABLE_BACKGROUND_VIDEO"),
+            "1",
+            StringComparison.Ordinal);
+    }
+
+    private void StopBackgroundVideo()
+    {
+        try
+        {
+            BackgroundVideo.Stop();
+            BackgroundVideo.Source = null;
+        }
+        catch (InvalidOperationException)
+        {
+        }
     }
 
     private void OpenWireSock_Click(object sender, RoutedEventArgs e)
@@ -178,6 +263,7 @@ public partial class MainWindow : Window, IDisposable
         _isClosing = true;
         IsEnabled = false;
         _operationCancellation?.Cancel();
+        StopBackgroundVideo();
 
         try
         {
@@ -199,6 +285,7 @@ public partial class MainWindow : Window, IDisposable
         }
 
         _disposed = true;
+        StopBackgroundVideo();
         _controller.StatusChanged -= OnStatusChanged;
         _operationCancellation?.Cancel();
         _operationCancellation?.Dispose();

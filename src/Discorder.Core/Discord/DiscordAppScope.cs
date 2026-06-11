@@ -66,18 +66,13 @@ public sealed class DiscordAppScope
             Environment.SpecialFolder.ProgramFilesX86);
     }
 
-    public IReadOnlyList<string> GetAllowedApplications()
+    public IReadOnlyList<string> GetAllowedApplications(bool includeBrowserAccess = false)
     {
         var allowed = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var processName in ProcessNames)
         {
             allowed.Add(processName);
-        }
-
-        foreach (var browserProcessName in BrowserProcessNames)
-        {
-            allowed.Add(browserProcessName);
         }
 
         if (!string.IsNullOrWhiteSpace(_localAppData))
@@ -92,21 +87,28 @@ public sealed class DiscordAppScope
                     allowed.Add(installationPath);
                 }
             }
+        }
+
+        if (includeBrowserAccess)
+        {
+            foreach (var browserProcessName in BrowserProcessNames)
+            {
+                allowed.Add(browserProcessName);
+            }
 
             AddExistingDirectories(
                 allowed,
                 _localAppData,
                 LocalBrowserDirectories);
+            AddExistingDirectories(
+                allowed,
+                _programFiles,
+                ProgramFilesBrowserDirectories);
+            AddExistingDirectories(
+                allowed,
+                _programFilesX86,
+                ProgramFilesBrowserDirectories);
         }
-
-        AddExistingDirectories(
-            allowed,
-            _programFiles,
-            ProgramFilesBrowserDirectories);
-        AddExistingDirectories(
-            allowed,
-            _programFilesX86,
-            ProgramFilesBrowserDirectories);
 
         return allowed.ToArray();
     }

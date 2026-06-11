@@ -102,9 +102,15 @@ static void RenderMainWindow()
 {
     MainWindow? window = null;
     var root = CreateTemporaryDirectory();
+    var previousVideoSetting = Environment.GetEnvironmentVariable(
+        "DISCORDER_DISABLE_BACKGROUND_VIDEO");
 
     try
     {
+        Environment.SetEnvironmentVariable(
+            "DISCORDER_DISABLE_BACKGROUND_VIDEO",
+            "1");
+
         var bootstrapper = new FakeWireSockBootstrapper();
         var controller = new DiscordTunnelController(
             new AppPaths(root),
@@ -117,7 +123,8 @@ static void RenderMainWindow()
         window = new MainWindow(
             controller,
             new AppPaths(root),
-            bootstrapper);
+            bootstrapper,
+            new AppSettingsStore(new AppPaths(root)));
         window.Show();
         window.UpdateLayout();
 
@@ -125,9 +132,12 @@ static void RenderMainWindow()
             "\n",
             FindVisualChildren<TextBlock>(window).Select(block => block.Text));
         Assert(text.Contains("Discorder", StringComparison.Ordinal));
-        Assert(text.Contains("Discord uygulaması ve web için VPN", StringComparison.Ordinal));
+        Assert(text.Contains("Discord uygulaması için hazır", StringComparison.Ordinal));
         Assert(text.Contains("KAPALI", StringComparison.Ordinal));
         Assert(text.Contains("TÜNEL KAPSAMI", StringComparison.Ordinal));
+        Assert(text.Contains("Discord web", StringComparison.Ordinal));
+        var browserSwitch = FindVisualChildren<CheckBox>(window).Single();
+        Assert(browserSwitch.IsChecked == false);
         Assert(text.Contains("SİSTEM DNS", StringComparison.Ordinal));
         Assert(text.Contains("ÇALIŞMA MODU", StringComparison.Ordinal));
         Assert(!text.Contains("Advanced SplitWire", StringComparison.OrdinalIgnoreCase));
@@ -141,6 +151,9 @@ static void RenderMainWindow()
     finally
     {
         window?.Close();
+        Environment.SetEnvironmentVariable(
+            "DISCORDER_DISABLE_BACKGROUND_VIDEO",
+            previousVideoSetting);
         Directory.Delete(root, recursive: true);
     }
 

@@ -68,9 +68,10 @@ public partial class App : Application, IDisposable
 
         var downloader = new VerifiedDownloader(_httpClient);
         var wireSockLocator = new WireSockLocator();
+        var settingsStore = new AppSettingsStore(_paths);
         var wireSockBootstrapper = new WireSockBootstrapper(
             _paths,
-            new AppSettingsStore(_paths),
+            settingsStore,
             wireSockLocator,
             downloader,
             new WireSockPackageVerifier(),
@@ -91,7 +92,8 @@ public partial class App : Application, IDisposable
         var window = new MainWindow(
             _tunnelController,
             _paths,
-            wireSockBootstrapper);
+            wireSockBootstrapper,
+            settingsStore);
         MainWindow = window;
         window.Show();
     }

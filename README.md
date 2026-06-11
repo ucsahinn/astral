@@ -1,13 +1,13 @@
 # Discorder
 
-🟣 **Discorder**, Windows üzerinde Discord uygulamasını ve Discord web erişimi için desteklenen tarayıcıları WireSock VPN Client ve Cloudflare WARP üzerinden tünelleyen tek tuşlu bir VPN aracıdır.
+🟣 **Discorder**, Windows üzerinde Discord uygulamasını WireSock VPN Client ve Cloudflare WARP üzerinden tünelleyen tek tuşlu bir VPN aracıdır. Discord web için desteklenen tarayıcı modu ayrıca açılabilir.
 
-Amaç basit: **Bağlan** düğmesine basınca Discord uygulaması ve Discord web çalışsın, **Bağlantıyı Kes** düğmesine basınca Discorder VPN sürecini kapatsın. Oyunlar, yayın uygulamaları, sistem DNS'i ve eski DPI motorları Discorder kapsamına girmez.
+Amaç basit: **Bağlan** düğmesine basınca Discord uygulaması çalışsın, web modu açılmışsa Discord web de desteklenen tarayıcılarla çalışsın, **Bağlantıyı Kes** düğmesine basınca Discorder VPN sürecini kapatsın. Oyunlar, yayın uygulamaları, sistem DNS'i ve eski DPI motorları Discorder kapsamına girmez.
 
 ## 🎯 Ürün Sözü
 
-- ✅ Discord, Discord PTB, Discord Canary, Discord Development ve desteklenen tarayıcılar kapsamda.
-- ✅ Desteklenen tarayıcılar: Chrome, Edge, Firefox, Brave, Opera ve Vivaldi.
+- ✅ Varsayılan kapsam: Discord, Discord PTB, Discord Canary ve Discord Development.
+- ✅ İsteğe bağlı web modu: Chrome, Edge, Firefox, Brave, Opera ve Vivaldi.
 - ✅ Sistem DNS, DoH, proxy, görev zamanlayıcı ve kalıcı servis ayarı değiştirilmez.
 - ✅ Eski DPI aşma motorları, oyun yönlendirmeleri ve paket filtre sürücüleri yoktur.
 - ✅ WireSock ve wgcf ikili dosyaları repoya gömülmez; ilk kullanımda resmi kaynaklardan indirilip doğrulanır.
@@ -32,11 +32,11 @@ Discorder şunları bilinçli olarak yapmaz:
 3. WireSock yüklü değilse resmi WireSock VPN Client x64 MSI kurucusu indirilir.
 4. Kurucu doğrulanır ve Windows yönetici onayıyla başlatılır.
 5. Cloudflare WARP profili `wgcf` ile üretilir.
-6. Profil Discord uygulamalarını ve desteklenen tarayıcı süreçlerini içerecek şekilde hazırlanır.
+6. Profil varsayılan olarak Discord uygulamalarını içerir; web modu açıksa desteklenen tarayıcı süreçleri de eklenir.
 7. WireSock VPN Client `discord.conf` dosyasını `run -config` modeliyle çalıştırır.
 8. **Bağlantıyı Kes** düğmesi çalışan WireSock sürecini kapatır ve sistem normal rotasına döner.
 
-> WireSock kapsamı süreç bazlıdır. Discorder açıkken desteklenen tarayıcıdan Discord web'e girebilirsiniz; aynı tarayıcı sürecindeki diğer sekmeler de tarayıcı süreci üzerinden çalışır. Discorder kapalıyken VPN süreci çalışmaz ve sistemde kalıcı DNS, firewall, servis veya görev zamanlayıcı kuralı bırakılmaz.
+> Tarayıcı modu varsayılan olarak kapalıdır. Açıldığında WireSock kapsamı süreç bazlı çalışır: desteklenen tarayıcıdan Discord web'e girebilirsiniz; aynı tarayıcı sürecindeki diğer sekmeler de tarayıcı süreci üzerinden çalışır. Discorder kapalıyken VPN süreci çalışmaz ve sistemde kalıcı DNS, firewall, servis veya görev zamanlayıcı kuralı bırakılmaz.
 
 ## ⚙️ Gereksinimler
 
@@ -54,9 +54,10 @@ Discorder şunları bilinçli olarak yapmaz:
 2. Zip içeriğini istediğiniz klasöre çıkarın.
 3. `Discorder.exe` dosyasını çalıştırın ve Windows UAC onayını verin.
 4. **Bağlan** düğmesine basın.
-5. İlk kurulum penceresinde WireSock ve Cloudflare WARP koşullarını okuyup onaylayın.
-6. Windows UAC penceresi gelirse resmi WireSock kurulumuna izin verin.
-7. Durum **AÇIK** olduğunda Discord uygulaması ve desteklenen tarayıcılar tünellenir.
+5. Discord web kullanacaksanız ana ekrandaki **Discord web** seçeneğini açın.
+6. İlk kurulum penceresinde WireSock ve Cloudflare WARP koşullarını okuyup onaylayın.
+7. Windows UAC penceresi gelirse resmi WireSock kurulumuna izin verin.
+8. Durum **AÇIK** olduğunda seçilen kapsam tünellenir.
 
 ## 🔐 Güvenlik Modeli
 
@@ -65,7 +66,7 @@ Discorder şunları bilinçli olarak yapmaz:
 - Beklenen WireSock sürümü: `1.4.7.1`.
 - Beklenen yayıncı: `IP SMIRNOV VADIM VALERIEVICH`.
 - TLS doğrulaması devre dışı bırakılmaz.
-- Discord uygulaması ve desteklenen tarayıcı kapsamı `AllowedApps` satırında testlerle kilitlenir.
+- Discord uygulaması ve isteğe bağlı tarayıcı kapsamı `AllowedApps` satırında testlerle kilitlenir.
 - Geniş uygulama adları, satır enjeksiyonu ve `Update.exe` gibi riskli kapsamlar reddedilir.
 
 ## 🧪 Geliştirme

@@ -47,6 +47,8 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
     public TunnelSnapshot Snapshot => _snapshot;
 
+    public bool IncludeBrowserAccess { get; set; }
+
     public async Task ToggleAsync(CancellationToken cancellationToken = default)
     {
         if (_snapshot.IsConnected)
@@ -80,7 +82,8 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 progress,
                 cancellationToken);
 
-            var allowedApplications = _discordScope.GetAllowedApplications();
+            var allowedApplications = _discordScope.GetAllowedApplications(
+                IncludeBrowserAccess);
             var profilePath = await _provisioner.EnsureProfileAsync(
                 allowedApplications,
                 cancellationToken);
@@ -110,7 +113,9 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
             SetStatus(
                 TunnelState.Connected,
-                "Discord uygulaması ve web erişimi tünelleniyor");
+                IncludeBrowserAccess
+                    ? "Discord uygulaması ve web erişimi tünelleniyor"
+                    : "Discord uygulaması tünelleniyor");
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

@@ -32,6 +32,28 @@ public sealed class AppSettingsStore
         }
     }
 
+    public bool IsBrowserAccessEnabled()
+    {
+        lock (_gate)
+        {
+            return Load().BrowserAccessEnabled;
+        }
+    }
+
+    public void SetBrowserAccessEnabled(bool enabled)
+    {
+        lock (_gate)
+        {
+            _paths.EnsureDirectories();
+            var settings = Load() with
+            {
+                BrowserAccessEnabled = enabled
+            };
+
+            Save(settings);
+        }
+    }
+
     public void AcceptSetupConsent(string wireSockVersion)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(wireSockVersion);
@@ -39,25 +61,13 @@ public sealed class AppSettingsStore
         lock (_gate)
         {
             _paths.EnsureDirectories();
-            var settings = new StoredSettings(
-                wireSockVersion,
-                AcceptedCloudflareWarpTerms: true);
-            var temporaryPath = _paths.SettingsFile + ".tmp";
+            var settings = Load() with
+            {
+                AcceptedWireSockVersion = wireSockVersion,
+                AcceptedCloudflareWarpTerms = true
+            };
 
-            try
-            {
-                File.WriteAllText(
-                    temporaryPath,
-                    JsonSerializer.Serialize(settings, JsonOptions));
-                File.Move(temporaryPath, _paths.SettingsFile, overwrite: true);
-            }
-            finally
-            {
-                if (File.Exists(temporaryPath))
-                {
-                    File.Delete(temporaryPath);
-                }
-            }
+            Save(settings);
         }
     }
 
@@ -65,22 +75,49 @@ public sealed class AppSettingsStore
     {
         if (!File.Exists(_paths.SettingsFile))
         {
-            return new StoredSettings(null, AcceptedCloudflareWarpTerms: false);
+            return StoredSettings.Default;
         }
 
         try
         {
             var json = File.ReadAllText(_paths.SettingsFile);
             return JsonSerializer.Deserialize<StoredSettings>(json)
-                ?? new StoredSettings(null, AcceptedCloudflareWarpTerms: false);
+                ?? StoredSettings.Default;
         }
         catch (JsonException)
         {
-            return new StoredSettings(null, AcceptedCloudflareWarpTerms: false);
+            return StoredSettings.Default;
+        }
+    }
+
+    private void Save(StoredSettings settings)
+    {
+        var temporaryPath = _paths.SettingsFile + ".tmp";
+
+        try
+        {
+            File.WriteAllText(
+                temporaryPath,
+                JsonSerializer.Serialize(settings, JsonOptions));
+            File.Move(temporaryPath, _paths.SettingsFile, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath))
+            {
+                File.Delete(temporaryPath);
+            }
         }
     }
 
     private sealed record StoredSettings(
         string? AcceptedWireSockVersion,
-        bool AcceptedCloudflareWarpTerms);
+        bool AcceptedCloudflareWarpTerms,
+        bool BrowserAccessEnabled)
+    {
+        public static StoredSettings Default { get; } = new(
+            null,
+            AcceptedCloudflareWarpTerms: false,
+            BrowserAccessEnabled: false);
+    }
 }

@@ -4,7 +4,7 @@
 
 ## Ürün sözleşmesi
 
-- [ ] Discord uygulaması ve desteklenen tarayıcı kapsamı korunuyor.
+- [ ] Discord uygulaması varsayılan kapsamı ve isteğe bağlı tarayıcı modu korunuyor.
 - [ ] DNS, servis ve görev zamanlayıcı davranışı eklenmedi.
 - [ ] Üçüncü taraf ikili dosya, kurucu, sürücü veya arşiv eklenmedi.
 - [ ] TLS doğrulaması ve hata kontrolleri zayıflatılmadı.

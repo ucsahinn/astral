@@ -11,7 +11,8 @@ using Discorder.Core.WireSock;
 
 var tests = new (string Name, Func<Task> Run)[]
 {
-    ("Discord kapsamı uygulama ve desteklenen tarayıcıları içerir", DiscordScopeIncludesBrowsersAsync),
+    ("Discord kapsamı varsayılan olarak tarayıcıları kapalı tutar", DiscordScopeDefaultsToAppOnlyAsync),
+    ("Discord web modu desteklenen tarayıcıları içerir", DiscordScopeIncludesBrowsersWhenEnabledAsync),
     ("Profil üretici geniş AllowedApps değerlerini değiştirir", ProfileBuilderIsStrictAsync),
     ("Profil üretici yapılandırma enjeksiyonunu reddeder", ProfileBuilderRejectsInjectionAsync),
     ("wgcf Discord uygulama ve web profili üretir", WgcfProvisionerBuildsDiscordAccessProfileAsync),
@@ -54,7 +55,34 @@ Console.WriteLine();
 Console.WriteLine($"{tests.Length} test geçti.");
 return 0;
 
-static Task DiscordScopeIncludesBrowsersAsync()
+static Task DiscordScopeDefaultsToAppOnlyAsync()
+{
+    var root = CreateTemporaryDirectory();
+    Directory.CreateDirectory(Path.Combine(root, "Discord"));
+    Directory.CreateDirectory(Path.Combine(root, "Google", "Chrome", "Application"));
+
+    try
+    {
+        var apps = new DiscordAppScope(root, root, root).GetAllowedApplications();
+
+        Assert(apps.Any(app => app.Equals("Discord.exe", StringComparison.OrdinalIgnoreCase)));
+        Assert(apps.Any(app => app.Equals(
+            Path.Combine(root, "Discord"),
+            StringComparison.OrdinalIgnoreCase)));
+        Assert(apps.All(app => !app.Equals("chrome.exe", StringComparison.OrdinalIgnoreCase)));
+        Assert(apps.All(app => !app.Contains("Chrome", StringComparison.OrdinalIgnoreCase)));
+        Assert(apps.All(app => !app.Equals("firefox.exe", StringComparison.OrdinalIgnoreCase)));
+        Assert(apps.All(app => !app.Contains("roblox", StringComparison.OrdinalIgnoreCase)));
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+
+    return Task.CompletedTask;
+}
+
+static Task DiscordScopeIncludesBrowsersWhenEnabledAsync()
 {
     var root = CreateTemporaryDirectory();
     Directory.CreateDirectory(Path.Combine(root, "Discord"));
@@ -69,7 +97,8 @@ static Task DiscordScopeIncludesBrowsersAsync()
 
     try
     {
-        var apps = new DiscordAppScope(root, root, root).GetAllowedApplications();
+        var apps = new DiscordAppScope(root, root, root)
+            .GetAllowedApplications(includeBrowserAccess: true);
 
         Assert(apps.Any(app => app.Equals("Discord.exe", StringComparison.OrdinalIgnoreCase)));
         Assert(apps.Any(app => app.Equals("chrome.exe", StringComparison.OrdinalIgnoreCase)));
@@ -209,7 +238,7 @@ static async Task HashVerifierIsStrictAsync()
     }
 }
 
-static Task SettingsPersistConsentAsync()
+static async Task SettingsPersistConsentAsync()
 {
     var root = CreateTemporaryDirectory();
 
@@ -218,19 +247,34 @@ static Task SettingsPersistConsentAsync()
         var paths = new AppPaths(root);
         var firstStore = new AppSettingsStore(paths);
         Assert(!firstStore.IsSetupConsentAccepted(WireSockPackage.Version));
+        Assert(!firstStore.IsBrowserAccessEnabled());
 
+        firstStore.SetBrowserAccessEnabled(true);
         firstStore.AcceptSetupConsent(WireSockPackage.Version);
 
         var reloadedStore = new AppSettingsStore(paths);
         Assert(reloadedStore.IsSetupConsentAccepted(WireSockPackage.Version));
         Assert(!reloadedStore.IsSetupConsentAccepted("next-version"));
+        Assert(reloadedStore.IsBrowserAccessEnabled());
+
+        reloadedStore.SetBrowserAccessEnabled(false);
+        var disabledStore = new AppSettingsStore(paths);
+        Assert(!disabledStore.IsBrowserAccessEnabled());
+
+        await File.WriteAllTextAsync(paths.SettingsFile, """
+            {
+              "AcceptedWireSockVersion": "1.4.7.1",
+              "AcceptedCloudflareWarpTerms": true
+            }
+            """);
+        var legacyStore = new AppSettingsStore(paths);
+        Assert(legacyStore.IsSetupConsentAccepted(WireSockPackage.Version));
+        Assert(!legacyStore.IsBrowserAccessEnabled());
     }
     finally
     {
         Directory.Delete(root, recursive: true);
     }
-
-    return Task.CompletedTask;
 }
 
 static async Task BootstrapRequiresConsentAsync()
@@ -439,7 +483,10 @@ static async Task ControllerLifecycleAsync()
         new FakeWireSockBootstrapper(wireSockExecutable),
         profileProvisioner,
         processLauncher,
-        TimeSpan.Zero);
+        TimeSpan.Zero)
+    {
+        IncludeBrowserAccess = true
+    };
 
     try
     {

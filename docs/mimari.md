@@ -1,6 +1,6 @@
 # Discorder Mimarisi
 
-Discorder tek amaçlı bir Windows uygulamasıdır: Discord uygulamasını ve Discord web erişimi için desteklenen tarayıcıları Cloudflare WARP tabanlı WireGuard profili üzerinden WireSock ile tünellemek.
+Discorder tek amaçlı bir Windows uygulamasıdır: Discord uygulamasını Cloudflare WARP tabanlı WireGuard profili üzerinden WireSock ile tünellemek. Discord web erişimi için desteklenen tarayıcı modu kullanıcı tarafından ayrıca açılır.
 
 ## Ana Kararlar
 
@@ -8,7 +8,8 @@ Discorder tek amaçlı bir Windows uygulamasıdır: Discord uygulamasını ve Di
 - WireSock ve wgcf repoya gömülmez.
 - Sistem DNS'i değiştirilmez.
 - Kalıcı paket filtre sürücüsü veya DPI aşma motoru çalıştırılmaz.
-- Tünel kapsamı `AllowedApps` ile Discord uygulamalarına ve desteklenen tarayıcı süreçlerine daraltılır.
+- Tünel kapsamı `AllowedApps` ile varsayılan olarak Discord uygulamalarına daraltılır.
+- Desteklenen tarayıcı süreçleri yalnızca web modu açıldığında kapsama eklenir.
 - Profil, ayar ve log dosyaları `%LOCALAPPDATA%\Discorder` altında tutulur.
 
 ## Bileşenler
@@ -36,7 +37,7 @@ Tünel yaşam döngüsü, Discord kapsamı, profil üretimi, indirme doğrulamas
 6. Kurulu WireSock komut satırı aracı bulunur ve imzası doğrulanır.
 7. `wgcf` indirilir, doğrulanır ve Cloudflare WARP profili üretilir.
 8. Profildeki eski veya geniş `AllowedApps` satırları kaldırılır.
-9. Discord uygulamaları ve desteklenen tarayıcılar yeni `AllowedApps` satırına yazılır.
+9. Discord uygulamaları yeni `AllowedApps` satırına yazılır; web modu açıksa desteklenen tarayıcılar da eklenir.
 10. WireSock VPN Client `run -config <discord.conf> -log-level error` komutuyla kullanıcı süreci olarak başlar.
 11. Bağlantı kesilirken çalışan WireSock süreci sonlandırılır.
 
@@ -61,7 +62,7 @@ wiresock-client.exe run -config <discord.conf> -log-level error
 - TLS doğrulaması devre dışı bırakılamaz.
 - İndirilen her ikili dosya sabit hash ile doğrulanır.
 - Kurulu WireSock komut satırı dosyası imza ve yayıncı kontrolünden geçmeden çalıştırılmaz.
-- Discord uygulaması ve desteklenen tarayıcılar dışındaki özel uygulama adları `AllowedApps` içine testlerle alınmaz.
+- Discord uygulaması ve isteğe bağlı tarayıcı kapsamı dışındaki özel uygulama adları `AllowedApps` içine testlerle alınmaz.
 - Virgül, satır sonu ve boş değer enjeksiyonu reddedilir.
 - Discorder kapalıyken kalıcı firewall, DNS, servis veya görev zamanlayıcı kuralı bırakılmaz; kapalı durum VPN sürecinin durduğu anlamına gelir.
 
@@ -76,7 +77,7 @@ Desteklenen tarayıcı süreçleri:
 - Opera: `opera.exe`
 - Vivaldi: `vivaldi.exe`
 
-WireSock süreç bazlı filtreleme kullandığı için tarayıcı içinde yalnızca tek bir sekmeyi ayırmak yerine desteklenen tarayıcı sürecini tüneller. Bu karar Discord web erişimini çalıştırmak için bilinçli olarak alınır; oyunlar, sistem DNS'i, kalıcı servisler ve eski DPI motorları yine kapsam dışındadır.
+Tarayıcı modu varsayılan kapalıdır. Açıldığında WireSock süreç bazlı filtreleme kullandığı için tarayıcı içinde yalnızca tek bir sekmeyi ayırmak yerine desteklenen tarayıcı sürecini tüneller. Bu karar Discord web erişimini çalıştırmak için bilinçli olarak alınır; oyunlar, sistem DNS'i, kalıcı servisler ve eski DPI motorları yine kapsam dışındadır.
 
 ## Yayın Modeli
 
