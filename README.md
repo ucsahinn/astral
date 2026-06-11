@@ -14,7 +14,11 @@ Amaç basit: **Bağlan** düğmesine basınca Discord uygulaması çalışsın, 
 - ✅ WireSock ve wgcf ikili dosyaları repoya gömülmez; ilk kullanımda resmi kaynaklardan indirilip doğrulanır.
 - ✅ WireSock kurucusu SHA-256, Authenticode imzası, yayıncı ve sürüm bilgisiyle doğrulanır.
 - ✅ Yerel profil ve tanılama dosyaları `%LOCALAPPDATA%\Discorder` altında tutulur.
-- ✅ Premium arka plan videosu varsayılan olarak açıktır; alt şeritten kapatılıp tekrar açılabilir.
+- ✅ Premium arka plan videosu varsayılan olarak açıktır; işletim ayarlarından kapatılıp tekrar açılabilir.
+- ✅ İlk kurulum ve bağlantı adımları ana ekrandaki süreç çubuğunda izlenir.
+- ✅ **Sıfırla** işlemi ayarları koruyup profil, wgcf, kurucu önbelleği ve logları yeniden üretilecek hale getirir.
+- ✅ İsteğe bağlı arka plan modu pencere kapansa bile Discorder'ı bildirim alanında çalıştırır.
+- ✅ İsteğe bağlı Windows başlangıcı ayarı Discorder'ı oturum açılışında başlatır.
 - ✅ **Temiz kaldır** işlemi Discorder kilidini geri alır ve yerel Discorder verisini sıfırlar.
 
 ## 🧭 Kapsam Dışı
@@ -55,15 +59,27 @@ Discorder şunları bilinçli olarak yapmaz:
 
 ## 🚀 Kullanım
 
-1. Yayın arşivinden `Discorder-2.0.0-win-x64.zip` dosyasını indirin.
+1. Yayın arşivinden `Discorder-2.0.1-win-x64.zip` dosyasını indirin.
 2. Zip içeriğini istediğiniz klasöre çıkarın.
 3. `Discorder.exe` dosyasını çalıştırın ve Windows UAC onayını verin.
 4. Discord web kullanacaksanız ana ekrandaki **Discord web** seçeneğini açın.
-5. Arka plan videosunu istemiyorsanız alt şeritteki **Video açık** kontrolünü kapatın.
-6. **Bağlan** düğmesine basın.
-7. İlk kurulum penceresinde WireSock ve Cloudflare WARP koşullarını okuyup onaylayın.
-8. Windows UAC penceresi gelirse resmi WireSock kurulumuna izin verin.
-9. Durum **AÇIK** olduğunda seçilen kapsam tünellenir.
+5. Arka plan videosunu istemiyorsanız **İşletim Ayarları** bölümündeki **Arka plan videosu** kontrolünü kapatın.
+6. Pencere kapansa bile çalışmasını istiyorsanız **Arka planda çalış** seçeneğini açın.
+7. Windows oturumu açılınca başlamasını istiyorsanız **Windows başlangıcı** seçeneğini açın.
+8. **Bağlan** düğmesine basın.
+9. İlk kurulum penceresinde WireSock ve Cloudflare WARP koşullarını okuyup onaylayın.
+10. Windows UAC penceresi gelirse resmi WireSock kurulumuna izin verin.
+11. Durum **AÇIK** olduğunda seçilen kapsam tünellenir.
+
+## 🛠️ Sıfırla ve Onar
+
+Ana ekrandaki **Sıfırla** düğmesi profil bozulması, eksik `wgcf` çıktısı, yarım kalan kurucu önbelleği veya eski log kalıntısı gibi durumlar için ayarları kaybetmeden temiz başlangıç sağlar:
+
+- Çalışan Discorder tünelini kapatır.
+- Discord kilidini güvenli kapalı duruma alır.
+- `%LOCALAPPDATA%\Discorder\profiles`, `tools`, `installers` ve `logs` klasörlerini temizler.
+- Tarayıcı modu, arka plan videosu, arka planda çalışma, başlangıç ve WireSock onay ayarlarını korur.
+- Sonraki **Bağlan** işleminde profil ve `wgcf` dosyaları yeniden üretilir.
 
 ## 🧹 Temiz Kaldırma
 

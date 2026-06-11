@@ -15,10 +15,11 @@ using Discorder.Core.Provisioning;
 using Discorder.Core.WireSock;
 using Discorder.App.Installation;
 using Discorder.App.Security;
+using MessageBox = System.Windows.MessageBox;
 
 namespace Discorder.App;
 
-public partial class App : Application, IDisposable
+public partial class App : System.Windows.Application, IDisposable
 {
     private const string MutexName = @"Local\Discorder.ucsahinn.SingleInstance";
 
@@ -40,7 +41,7 @@ public partial class App : Application, IDisposable
         if (!createdNew)
         {
             MessageBox.Show(
-                "Discorder zaten çalışıyor.",
+                "Discorder zaten çalışıyor. Simge bildirim alanında olabilir.",
                 "Discorder",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
@@ -66,7 +67,7 @@ public partial class App : Application, IDisposable
             Timeout = TimeSpan.FromMinutes(5)
         };
         _httpClient.DefaultRequestHeaders.UserAgent.Add(
-            new ProductInfoHeaderValue("Discorder", "2.0.0"));
+            new ProductInfoHeaderValue("Discorder", "2.0.1"));
 
         var downloader = new VerifiedDownloader(_httpClient);
         var wireSockLocator = new WireSockLocator();
@@ -100,9 +101,19 @@ public partial class App : Application, IDisposable
             _paths,
             wireSockBootstrapper,
             settingsStore,
-            new DiscorderCleanupService(_paths, accessLock));
+            new DiscorderCleanupService(_paths, accessLock),
+            new WindowsStartupLaunchService());
         MainWindow = window;
         window.Show();
+
+        if (e.Args.Any(arg => string.Equals(
+                arg,
+                "--background-start",
+                StringComparison.OrdinalIgnoreCase))
+            && settingsStore.IsRunInBackgroundOnCloseEnabled())
+        {
+            window.HideToTrayOnStartup();
+        }
     }
 
     protected override void OnExit(ExitEventArgs e)

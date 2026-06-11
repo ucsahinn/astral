@@ -28,6 +28,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Denetleyici idempotent bağlanır ve keser", ControllerLifecycleAsync),
     ("Denetleyici WireSock hazırlık hatasını bildirir", ControllerBootstrapFailureAsync),
     ("Windows Firewall kilidi Discord alan adı kuralını yönetir", WindowsFirewallAccessLockBuildsExpectedCommandsAsync),
+    ("Sıfırlama ayarları koruyup üretilen veriyi yeniler", CleanupServiceRepairsGeneratedStateAsync),
     ("Temiz kaldırma Discorder verisini ve kilidini siler", CleanupServiceRemovesDiscorderStateAsync)
 };
 
@@ -253,9 +254,13 @@ static async Task SettingsPersistConsentAsync()
         Assert(!firstStore.IsSetupConsentAccepted(WireSockPackage.Version));
         Assert(!firstStore.IsBrowserAccessEnabled());
         Assert(firstStore.IsBackgroundVideoEnabled());
+        Assert(!firstStore.IsRunInBackgroundOnCloseEnabled());
+        Assert(!firstStore.IsStartWithWindowsEnabled());
 
         firstStore.SetBrowserAccessEnabled(true);
         firstStore.SetBackgroundVideoEnabled(false);
+        firstStore.SetRunInBackgroundOnCloseEnabled(true);
+        firstStore.SetStartWithWindowsEnabled(true);
         firstStore.AcceptSetupConsent(WireSockPackage.Version);
 
         var reloadedStore = new AppSettingsStore(paths);
@@ -263,12 +268,18 @@ static async Task SettingsPersistConsentAsync()
         Assert(!reloadedStore.IsSetupConsentAccepted("next-version"));
         Assert(reloadedStore.IsBrowserAccessEnabled());
         Assert(!reloadedStore.IsBackgroundVideoEnabled());
+        Assert(reloadedStore.IsRunInBackgroundOnCloseEnabled());
+        Assert(reloadedStore.IsStartWithWindowsEnabled());
 
         reloadedStore.SetBrowserAccessEnabled(false);
         reloadedStore.SetBackgroundVideoEnabled(true);
+        reloadedStore.SetRunInBackgroundOnCloseEnabled(false);
+        reloadedStore.SetStartWithWindowsEnabled(false);
         var disabledStore = new AppSettingsStore(paths);
         Assert(!disabledStore.IsBrowserAccessEnabled());
         Assert(disabledStore.IsBackgroundVideoEnabled());
+        Assert(!disabledStore.IsRunInBackgroundOnCloseEnabled());
+        Assert(!disabledStore.IsStartWithWindowsEnabled());
 
         await File.WriteAllTextAsync(paths.SettingsFile, """
             {
@@ -280,6 +291,8 @@ static async Task SettingsPersistConsentAsync()
         Assert(legacyStore.IsSetupConsentAccepted(WireSockPackage.Version));
         Assert(!legacyStore.IsBrowserAccessEnabled());
         Assert(legacyStore.IsBackgroundVideoEnabled());
+        Assert(!legacyStore.IsRunInBackgroundOnCloseEnabled());
+        Assert(!legacyStore.IsStartWithWindowsEnabled());
     }
     finally
     {
@@ -667,6 +680,46 @@ static async Task CleanupServiceRemovesDiscorderStateAsync()
         Assert(accessLock.RemoveCount == 1);
         Assert(!Directory.Exists(paths.DataDirectory));
         Assert(Directory.Exists(root));
+    }
+    finally
+    {
+        if (Directory.Exists(root))
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+}
+
+static async Task CleanupServiceRepairsGeneratedStateAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var paths = new AppPaths(root);
+    var accessLock = new FakeDiscordAccessLock();
+    var cleanup = new DiscorderCleanupService(paths, accessLock);
+
+    try
+    {
+        paths.EnsureDirectories();
+        await File.WriteAllTextAsync(paths.SettingsFile, "ayar");
+        await File.WriteAllTextAsync(paths.DiscordProfile, "profil");
+        await File.WriteAllTextAsync(paths.WgcfExecutable, "wgcf");
+        await File.WriteAllTextAsync(
+            Path.Combine(paths.InstallerDirectory, "wiresock.msi"),
+            "kurucu");
+        await File.WriteAllTextAsync(paths.ErrorLog, "log");
+
+        await cleanup.RepairAsync(CancellationToken.None);
+
+        Assert(accessLock.EnableCount == 1);
+        Assert(accessLock.RemoveCount == 0);
+        Assert(File.Exists(paths.SettingsFile));
+        Assert(Directory.Exists(paths.ProfileDirectory));
+        Assert(Directory.Exists(paths.ToolsDirectory));
+        Assert(Directory.Exists(paths.InstallerDirectory));
+        Assert(Directory.Exists(paths.LogDirectory));
+        Assert(!File.Exists(paths.DiscordProfile));
+        Assert(!File.Exists(paths.WgcfExecutable));
+        Assert(!File.Exists(paths.ErrorLog));
     }
     finally
     {

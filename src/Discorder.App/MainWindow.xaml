@@ -168,6 +168,7 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                             <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
 
                         <StackPanel Grid.Row="0">
@@ -184,8 +185,8 @@
 
                         <Button Grid.Row="1"
                                 x:Name="ToggleButton"
-                                Width="230"
-                                Height="230"
+                                Width="218"
+                                Height="218"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
                                 Background="#661A2240"
@@ -304,6 +305,59 @@
                                        Foreground="{StaticResource SecondaryTextBrush}"
                                        Text="Hazır" />
                         </StackPanel>
+
+                        <Border Grid.Row="3"
+                                Margin="0,22,0,0"
+                                Padding="16,14"
+                                Background="#39132033"
+                                BorderBrush="#5F8EA7FF"
+                                BorderThickness="1"
+                                CornerRadius="8">
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBlock x:Name="StageProgressLabel"
+                                               FontSize="12"
+                                               FontWeight="SemiBold"
+                                               Text="Süreç hazır" />
+                                    <TextBlock Grid.Column="1"
+                                               x:Name="StageProgressPercent"
+                                               FontSize="12"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource SecondaryTextBrush}"
+                                               Text="8%" />
+                                </Grid>
+
+                                <ProgressBar x:Name="StageProgressBar"
+                                             Margin="0,10,0,0"
+                                             Style="{StaticResource StageProgressStyle}"
+                                             Value="8" />
+
+                                <UniformGrid Margin="0,12,0,0"
+                                             Columns="4">
+                                    <TextBlock x:Name="StageStepLock"
+                                               FontSize="11"
+                                               Foreground="{StaticResource SecondaryTextBrush}"
+                                               Text="Kilit" />
+                                    <TextBlock x:Name="StageStepSetup"
+                                               FontSize="11"
+                                               Foreground="{StaticResource SecondaryTextBrush}"
+                                               Text="Kurulum" />
+                                    <TextBlock x:Name="StageStepProfile"
+                                               FontSize="11"
+                                               Foreground="{StaticResource SecondaryTextBrush}"
+                                               Text="Profil" />
+                                    <TextBlock x:Name="StageStepTunnel"
+                                               FontSize="11"
+                                               Foreground="{StaticResource SecondaryTextBrush}"
+                                               Text="Tünel" />
+                                </UniformGrid>
+                            </StackPanel>
+                        </Border>
                     </Grid>
                 </Border>
 
@@ -316,7 +370,7 @@
 
                     <Border Grid.Row="0"
                             HorizontalAlignment="Right"
-                            Width="410"
+                            Width="560"
                             Background="#42101827"
                             BorderBrush="#8D7EDBFF"
                             BorderThickness="1"
@@ -361,6 +415,134 @@
                                           ToolTip="Chrome, Edge, Firefox, Brave, Opera ve Vivaldi ile Discord web tünelini aç" />
                             </Grid>
                         </StackPanel>
+                    </Border>
+
+                    <Border Grid.Row="1"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center"
+                            Width="560"
+                            Background="#3C101827"
+                            BorderBrush="#7478E5FF"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="20,18">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="34"
+                                              Direction="270"
+                                              Opacity="0.30"
+                                              ShadowDepth="0"
+                                              Color="#63D9FF" />
+                        </Border.Effect>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock FontSize="13"
+                                       Foreground="{StaticResource MutedTextBrush}"
+                                       Text="İŞLETİM AYARLARI" />
+
+                            <Grid Grid.Row="1"
+                                  Margin="0,14,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="1" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="1" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <Grid Grid.Column="0"
+                                      Margin="0,0,18,0">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <TextBlock FontSize="15"
+                                               FontWeight="SemiBold"
+                                               Text="Arka planda çalış" />
+                                    <TextBlock Grid.Row="1"
+                                               x:Name="RunInBackgroundStatus"
+                                               Margin="0,5,0,10"
+                                               TextWrapping="Wrap"
+                                               FontSize="12"
+                                               LineHeight="17"
+                                               Foreground="{StaticResource SecondaryTextBrush}"
+                                               Text="Pencere kapanınca güvenli biçimde kapanır." />
+                                    <CheckBox Grid.Row="2"
+                                              x:Name="RunInBackgroundToggle"
+                                              Style="{StaticResource BrowserSwitchStyle}"
+                                              HorizontalAlignment="Left"
+                                              Checked="RunInBackgroundToggle_Changed"
+                                              Unchecked="RunInBackgroundToggle_Changed"
+                                              ToolTip="Pencere kapanınca Discorder'ı bildirim alanında çalıştır" />
+                                </Grid>
+
+                                <Rectangle Grid.Column="1"
+                                           Width="1"
+                                           Fill="#35FFFFFF" />
+
+                                <Grid Grid.Column="2"
+                                      Margin="18,0">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <TextBlock FontSize="15"
+                                               FontWeight="SemiBold"
+                                               Text="Windows başlangıcı" />
+                                    <TextBlock Grid.Row="1"
+                                               x:Name="StartupStatus"
+                                               Margin="0,5,0,10"
+                                               TextWrapping="Wrap"
+                                               FontSize="12"
+                                               LineHeight="17"
+                                               Foreground="{StaticResource SecondaryTextBrush}"
+                                               Text="Oturum açılışında başlamaz." />
+                                    <CheckBox Grid.Row="2"
+                                              x:Name="StartupToggle"
+                                              Style="{StaticResource BrowserSwitchStyle}"
+                                              HorizontalAlignment="Left"
+                                              Checked="StartupToggle_Changed"
+                                              Unchecked="StartupToggle_Changed"
+                                              ToolTip="Discorder'ı Windows oturumu açılınca başlat" />
+                                </Grid>
+
+                                <Rectangle Grid.Column="3"
+                                           Width="1"
+                                           Fill="#35FFFFFF" />
+
+                                <Grid Grid.Column="4"
+                                      Margin="18,0,0,0">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <TextBlock FontSize="15"
+                                               FontWeight="SemiBold"
+                                               Text="Arka plan videosu" />
+                                    <TextBlock Grid.Row="1"
+                                               x:Name="BackgroundVideoStatus"
+                                               Margin="0,5,0,10"
+                                               TextWrapping="Wrap"
+                                               FontSize="12"
+                                               LineHeight="17"
+                                               Foreground="{StaticResource SecondaryTextBrush}"
+                                               Text="Video açık, sahne canlı." />
+                                    <CheckBox Grid.Row="2"
+                                              x:Name="BackgroundVideoToggle"
+                                              Style="{StaticResource BrowserSwitchStyle}"
+                                              HorizontalAlignment="Left"
+                                              Checked="BackgroundVideoToggle_Changed"
+                                              Unchecked="BackgroundVideoToggle_Changed"
+                                              ToolTip="Arka plan videosunu aç veya kapat" />
+                                </Grid>
+                            </Grid>
+                        </Grid>
                     </Border>
 
                     <Border Grid.Row="2"
@@ -419,7 +601,8 @@
                                 <TextBlock FontSize="11"
                                            Foreground="{StaticResource MutedTextBrush}"
                                            Text="KAPANIŞ" />
-                                <TextBlock Margin="0,6,0,0"
+                                <TextBlock x:Name="CloseBehaviorSummary"
+                                           Margin="0,6,0,0"
                                            FontSize="16"
                                            FontWeight="SemiBold"
                                            Text="Discord kilitlenir" />
@@ -470,34 +653,18 @@
                             Click="OpenDiagnostics_Click"
                             ToolTip="Yerel tanılama klasörünü aç" />
 
-                    <Border Grid.Column="2"
-                            Height="46"
+                    <Button Grid.Column="2"
+                            x:Name="RepairButton"
                             Margin="10,0,0,0"
-                            Padding="14,0"
+                            Height="46"
                             VerticalAlignment="Center"
-                            Background="#3C132033"
-                            BorderBrush="#668EA7FF"
-                            BorderThickness="1"
-                            CornerRadius="7">
-                        <StackPanel Orientation="Horizontal"
-                                    VerticalAlignment="Center">
-                            <TextBlock x:Name="BackgroundVideoStatus"
-                                       MinWidth="70"
-                                       VerticalAlignment="Center"
-                                       FontSize="12"
-                                       FontWeight="SemiBold"
-                                       Text="Video açık" />
-                            <CheckBox x:Name="BackgroundVideoToggle"
-                                      Margin="10,0,0,0"
-                                      Style="{StaticResource BrowserSwitchStyle}"
-                                      VerticalAlignment="Center"
-                                      Checked="BackgroundVideoToggle_Changed"
-                                      Unchecked="BackgroundVideoToggle_Changed"
-                                      ToolTip="Arka plan videosunu aç veya kapat" />
-                        </StackPanel>
-                    </Border>
+                            Style="{StaticResource CommandButtonStyle}"
+                            Content="Sıfırla"
+                            Click="Repair_Click"
+                            ToolTip="Profil, wgcf, kurucu önbelleği ve logları yeniden üretilecek hale getir" />
 
                     <Button Grid.Column="3"
+                            x:Name="CleanUninstallButton"
                             Margin="10,0,0,0"
                             Height="46"
                             VerticalAlignment="Center"
@@ -511,7 +678,7 @@
                                VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource SecondaryTextBrush}"
-                               Text="v2.0.0" />
+                               Text="v2.0.1" />
 
                     <Button Grid.Column="5"
                             Height="46"

@@ -48,6 +48,22 @@ public sealed class AppSettingsStore
         }
     }
 
+    public bool IsRunInBackgroundOnCloseEnabled()
+    {
+        lock (_gate)
+        {
+            return Load().RunInBackgroundOnClose ?? false;
+        }
+    }
+
+    public bool IsStartWithWindowsEnabled()
+    {
+        lock (_gate)
+        {
+            return Load().StartWithWindows ?? false;
+        }
+    }
+
     public void SetBrowserAccessEnabled(bool enabled)
     {
         lock (_gate)
@@ -70,6 +86,34 @@ public sealed class AppSettingsStore
             var settings = Load() with
             {
                 BackgroundVideoEnabled = enabled
+            };
+
+            Save(settings);
+        }
+    }
+
+    public void SetRunInBackgroundOnCloseEnabled(bool enabled)
+    {
+        lock (_gate)
+        {
+            _paths.EnsureDirectories();
+            var settings = Load() with
+            {
+                RunInBackgroundOnClose = enabled
+            };
+
+            Save(settings);
+        }
+    }
+
+    public void SetStartWithWindowsEnabled(bool enabled)
+    {
+        lock (_gate)
+        {
+            _paths.EnsureDirectories();
+            var settings = Load() with
+            {
+                StartWithWindows = enabled
             };
 
             Save(settings);
@@ -136,12 +180,16 @@ public sealed class AppSettingsStore
         string? AcceptedWireSockVersion,
         bool AcceptedCloudflareWarpTerms,
         bool BrowserAccessEnabled,
-        bool? BackgroundVideoEnabled)
+        bool? BackgroundVideoEnabled,
+        bool? RunInBackgroundOnClose,
+        bool? StartWithWindows)
     {
         public static StoredSettings Default { get; } = new(
             null,
             AcceptedCloudflareWarpTerms: false,
             BrowserAccessEnabled: false,
-            BackgroundVideoEnabled: true);
+            BackgroundVideoEnabled: true,
+            RunInBackgroundOnClose: false,
+            StartWithWindows: false);
     }
 }

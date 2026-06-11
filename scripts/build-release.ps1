@@ -6,7 +6,14 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $output = Join-Path $root "artifacts\publish\$Runtime"
-$archive = Join-Path $root "artifacts\Discorder-2.0.0-$Runtime.zip"
+$projectPath = Join-Path $root 'src\Discorder.App\Discorder.App.csproj'
+$project = [xml](Get-Content -Raw -LiteralPath $projectPath)
+$version = $project.Project.PropertyGroup.Version
+if ([string]::IsNullOrWhiteSpace($version)) {
+    throw "Discorder surumu proje dosyasindan okunamadi"
+}
+
+$archive = Join-Path $root "artifacts\Discorder-$version-$Runtime.zip"
 
 Push-Location $root
 

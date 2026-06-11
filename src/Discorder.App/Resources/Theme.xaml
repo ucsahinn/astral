@@ -13,6 +13,7 @@
     <SolidColorBrush x:Key="GlassBorderBrush" Color="#7FA6FF" />
     <SolidColorBrush x:Key="SuccessBrush" Color="#3BA55C" />
     <SolidColorBrush x:Key="DangerBrush" Color="#ED4245" />
+    <SolidColorBrush x:Key="WarningBrush" Color="#FAA61A" />
 
     <Style TargetType="TextBlock">
         <Setter Property="FontFamily" Value="Segoe UI Variable Text, Segoe UI" />
@@ -165,6 +166,41 @@
                             <Setter Property="Opacity" Value="0.45" />
                         </Trigger>
                     </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="StageProgressStyle" TargetType="ProgressBar">
+        <Setter Property="Height" Value="8" />
+        <Setter Property="Minimum" Value="0" />
+        <Setter Property="Maximum" Value="100" />
+        <Setter Property="Background" Value="#42132033" />
+        <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ProgressBar">
+                    <Grid x:Name="TemplateRoot"
+                          SnapsToDevicePixels="True">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="4" />
+                        <Grid x:Name="PART_Track"
+                              ClipToBounds="True">
+                            <Border x:Name="PART_Indicator"
+                                    HorizontalAlignment="Left"
+                                    Background="{TemplateBinding Foreground}"
+                                    CornerRadius="4">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="14"
+                                                      Direction="270"
+                                                      Opacity="0.72"
+                                                      ShadowDepth="0"
+                                                      Color="#73E8FF" />
+                                </Border.Effect>
+                            </Border>
+                        </Grid>
+                    </Grid>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Discorder.App;
+using Discorder.App.Installation;
 using Discorder.App.Security;
 using Discorder.Core.Configuration;
 using Discorder.Core.Connection;
@@ -129,7 +130,8 @@ static void RenderMainWindow()
             new AppSettingsStore(new AppPaths(root)),
             new DiscorderCleanupService(
                 new AppPaths(root),
-                new NullDiscordAccessLock()));
+                new NullDiscordAccessLock()),
+            new FakeStartupLaunchService());
         window.Show();
         window.UpdateLayout();
 
@@ -142,18 +144,30 @@ static void RenderMainWindow()
         Assert(text.Contains("TÜNEL KAPSAMI", StringComparison.Ordinal));
         Assert(text.Contains("Discord web", StringComparison.Ordinal));
         Assert(text.Contains("Video açık", StringComparison.Ordinal));
+        Assert(text.Contains("İŞLETİM AYARLARI", StringComparison.Ordinal));
+        Assert(text.Contains("Arka planda çalış", StringComparison.Ordinal));
+        Assert(text.Contains("Windows başlangıcı", StringComparison.Ordinal));
+        Assert(text.Contains("Süreç hazır", StringComparison.Ordinal));
         var buttons = FindVisualChildren<Button>(window)
             .Select(button => button.Content?.ToString())
             .Where(content => !string.IsNullOrWhiteSpace(content))
             .ToArray();
+        Assert(buttons.Contains("Sıfırla"));
         Assert(buttons.Contains("Temiz kaldır"));
         var switches = FindVisualChildren<CheckBox>(window).ToArray();
         var browserSwitch = switches.Single(toggle =>
             toggle.Name == "BrowserAccessToggle");
         var backgroundVideoSwitch = switches.Single(toggle =>
             toggle.Name == "BackgroundVideoToggle");
+        var runInBackgroundSwitch = switches.Single(toggle =>
+            toggle.Name == "RunInBackgroundToggle");
+        var startupSwitch = switches.Single(toggle =>
+            toggle.Name == "StartupToggle");
         Assert(browserSwitch.IsChecked == false);
         Assert(backgroundVideoSwitch.IsChecked == true);
+        Assert(runInBackgroundSwitch.IsChecked == false);
+        Assert(startupSwitch.IsChecked == false);
+        Assert(FindVisualChildren<ProgressBar>(window).Any());
         Assert(text.Contains("SİSTEM DNS", StringComparison.Ordinal));
         Assert(text.Contains("ÇALIŞMA MODU", StringComparison.Ordinal));
         Assert(!text.Contains("Advanced SplitWire", StringComparison.OrdinalIgnoreCase));
@@ -310,6 +324,18 @@ file sealed class FakeWireSockBootstrapper : IWireSockBootstrapper
         CancellationToken cancellationToken)
     {
         throw new NotSupportedException();
+    }
+}
+
+file sealed class FakeStartupLaunchService : IStartupLaunchService
+{
+    public bool Enabled { get; private set; }
+
+    public bool IsEnabled() => Enabled;
+
+    public void SetEnabled(bool enabled)
+    {
+        Enabled = enabled;
     }
 }
 
