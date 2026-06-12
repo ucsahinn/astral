@@ -20,7 +20,7 @@
                       UnloadedBehavior="Stop"
                       Stretch="UniformToFill"
                       Volume="0"
-                      Opacity="1"
+                      Opacity="0.92"
                       IsHitTestVisible="False"
                       Loaded="BackgroundVideo_Loaded"
                       MediaEnded="BackgroundVideo_MediaEnded"
@@ -29,15 +29,15 @@
         <Rectangle IsHitTestVisible="False">
             <Rectangle.Fill>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                    <GradientStop Color="#90040710" Offset="0" />
-                    <GradientStop Color="#65071120" Offset="0.36" />
-                    <GradientStop Color="#36071120" Offset="0.72" />
-                    <GradientStop Color="#2B040710" Offset="1" />
+                    <GradientStop Color="#A6040710" Offset="0" />
+                    <GradientStop Color="#82071120" Offset="0.36" />
+                    <GradientStop Color="#56071120" Offset="0.72" />
+                    <GradientStop Color="#4A040710" Offset="1" />
                 </LinearGradientBrush>
             </Rectangle.Fill>
         </Rectangle>
 
-        <Rectangle IsHitTestVisible="False" Opacity="0.34">
+        <Rectangle IsHitTestVisible="False" Opacity="0.24">
             <Rectangle.Fill>
                 <RadialGradientBrush Center="0.72,0.42"
                                      GradientOrigin="0.72,0.38"
@@ -51,7 +51,7 @@
             </Rectangle.Fill>
         </Rectangle>
 
-        <Rectangle IsHitTestVisible="False" Opacity="0.68">
+        <Rectangle IsHitTestVisible="False" Opacity="0.78">
             <Rectangle.Fill>
                 <LinearGradientBrush StartPoint="0,1" EndPoint="0,0">
                     <GradientStop Color="#85040710" Offset="0" />
@@ -82,7 +82,7 @@
             </Grid.RowDefinitions>
 
             <Border Grid.Row="0"
-                    Background="#5C0B1422"
+                    Background="#760B1422"
                     BorderBrush="#A89FCEFF"
                     BorderThickness="1"
                     CornerRadius="8"
@@ -103,9 +103,9 @@
                     </Grid.ColumnDefinitions>
 
                     <Image Grid.Column="0"
-                           Width="42"
-                           Height="42"
-                           Margin="0,0,14,0"
+                           Width="48"
+                           Height="48"
+                           Margin="0,0,16,0"
                            Source="Assets/discorder-mark.png"
                            Stretch="Uniform" />
 
@@ -149,7 +149,7 @@
                 </Grid.ColumnDefinitions>
 
                 <Border Grid.Column="0"
-                        Background="#6F0B1422"
+                        Background="#820B1422"
                         BorderBrush="#B895DFFF"
                         BorderThickness="1"
                         CornerRadius="8"
@@ -166,27 +166,15 @@
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
 
-                        <StackPanel Grid.Row="0">
-                            <TextBlock FontSize="13"
-                                       Foreground="{StaticResource MutedTextBrush}"
-                                       Text="ÖZEL BAĞLANTI" />
-                            <TextBlock Margin="0,8,0,0"
-                                       FontSize="36"
-                                       FontWeight="SemiBold"
-                                       LineHeight="41"
-                                       TextWrapping="Wrap"
-                                       Text="Discord bağlantısını yönet" />
-                        </StackPanel>
-
-                        <Button Grid.Row="1"
+                        <Button Grid.Row="0"
                                 x:Name="ToggleButton"
-                                Width="230"
-                                Height="230"
+                                Width="270"
+                                Height="270"
+                                Margin="0,-4,0,0"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
                                 Background="#661A2240"
@@ -202,7 +190,7 @@
                                     <Grid Width="{TemplateBinding Width}"
                                           Height="{TemplateBinding Height}">
                                         <Ellipse x:Name="OuterRing"
-                                                 Margin="22"
+                                                 Margin="18"
                                                  Stroke="{TemplateBinding BorderBrush}"
                                                  StrokeThickness="{TemplateBinding BorderThickness}">
                                             <Ellipse.Fill>
@@ -224,7 +212,7 @@
                                                                   Color="#56F07B" />
                                             </Ellipse.Effect>
                                         </Ellipse>
-                                        <Ellipse Margin="34"
+                                        <Ellipse Margin="36"
                                                  Stroke="#A0B9F8FF"
                                                  StrokeThickness="1.2">
                                             <Ellipse.Fill>
@@ -236,15 +224,15 @@
                                             </Ellipse.Fill>
                                         </Ellipse>
                                         <Ellipse x:Name="StateRing"
-                                                 Width="152"
-                                                 Height="152"
+                                                 Width="190"
+                                                 Height="190"
                                                  Fill="Transparent"
                                                  Stroke="#7A66D9FF"
                                                  StrokeThickness="1"
                                                  StrokeDashArray="2 5" />
                                         <Ellipse x:Name="CoreGlow"
-                                                 Width="104"
-                                                 Height="104"
+                                                 Width="122"
+                                                 Height="122"
                                                  Fill="#2246F07B"
                                                  Stroke="#6C56F07B"
                                                  StrokeThickness="1" />
@@ -253,7 +241,7 @@
                                             <TextBlock x:Name="PowerIcon"
                                                        HorizontalAlignment="Center"
                                                        FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
-                                                       FontSize="56"
+                                                       FontSize="62"
                                                        Foreground="{StaticResource AccentCyanBrush}"
                                                        Text="&#xE7E8;">
                                                 <TextBlock.Effect>
@@ -265,9 +253,9 @@
                                                 </TextBlock.Effect>
                                             </TextBlock>
                                             <TextBlock x:Name="ToggleButtonLabel"
-                                                       Margin="0,13,0,0"
+                                                       Margin="0,14,0,0"
                                                        HorizontalAlignment="Center"
-                                                       FontSize="14"
+                                                       FontSize="15"
                                                        FontWeight="Bold"
                                                        Text="BAĞLAN" />
                                         </StackPanel>
@@ -291,7 +279,9 @@
                             </Button.Template>
                         </Button>
 
-                        <StackPanel Grid.Row="2" HorizontalAlignment="Center">
+                        <StackPanel Grid.Row="1"
+                                    Margin="0,2,0,0"
+                                    HorizontalAlignment="Center">
                             <TextBlock x:Name="StatusMessage"
                                        HorizontalAlignment="Center"
                                        TextAlignment="Center"
@@ -309,9 +299,9 @@
                                        Text="Hazır" />
                         </StackPanel>
 
-                        <Border Grid.Row="3"
-                                Margin="0,22,0,0"
-                                Padding="16,14"
+                        <Border Grid.Row="2"
+                                Margin="0,14,0,0"
+                                Padding="16,12"
                                 Background="#39132033"
                                 BorderBrush="#5F8EA7FF"
                                 BorderThickness="1"
@@ -340,7 +330,7 @@
                                              Style="{StaticResource StageProgressStyle}"
                                              Value="8" />
 
-                                <UniformGrid Margin="0,12,0,0"
+                                <UniformGrid Margin="0,10,0,0"
                                              Columns="4">
                                     <TextBlock x:Name="StageStepLock"
                                                FontSize="11"
@@ -374,7 +364,7 @@
                     <Border Grid.Row="0"
                             HorizontalAlignment="Right"
                             Width="650"
-                            Background="#4D0B1422"
+                            Background="#690B1422"
                             BorderBrush="#9A86DFFF"
                             BorderThickness="1"
                             CornerRadius="8"
@@ -431,7 +421,7 @@
                             HorizontalAlignment="Right"
                             VerticalAlignment="Center"
                             Width="650"
-                            Background="#4F0B1422"
+                            Background="#6F0B1422"
                             BorderBrush="#9A86DFFF"
                             BorderThickness="1"
                             CornerRadius="8"
@@ -589,7 +579,7 @@
                     <Border Grid.Row="2"
                             HorizontalAlignment="Right"
                             Width="650"
-                            Background="#4D0B1422"
+                            Background="#690B1422"
                             BorderBrush="#9A86DFFF"
                             BorderThickness="1"
                             CornerRadius="8"
@@ -613,11 +603,17 @@
                             <StackPanel Grid.Column="0">
                                 <TextBlock FontSize="11"
                                            Foreground="{StaticResource MutedTextBrush}"
-                                           Text="DNS" />
-                                <TextBlock Margin="0,6,0,0"
+                                           Text="DNS SUNUCUSU" />
+                                <TextBlock x:Name="DnsSummary"
+                                           Margin="0,6,0,0"
                                            FontSize="16"
                                            FontWeight="SemiBold"
-                                           Text="Değiştirilmez" />
+                                           Text="Okunuyor" />
+                                <TextBlock x:Name="DnsDetail"
+                                           Margin="0,4,0,0"
+                                           FontSize="11"
+                                           Foreground="{StaticResource SecondaryTextBrush}"
+                                           Text="Makinenin aldığı DNS" />
                             </StackPanel>
 
                             <Rectangle Grid.Column="1"
@@ -627,11 +623,17 @@
                             <StackPanel Grid.Column="2" Margin="20,0">
                                 <TextBlock FontSize="11"
                                            Foreground="{StaticResource MutedTextBrush}"
-                                               Text="BAĞLANTI" />
-                                <TextBlock Margin="0,6,0,0"
+                                           Text="BAĞLANTI DURUMU" />
+                                <TextBlock x:Name="ConnectionSummary"
+                                           Margin="0,6,0,0"
                                            FontSize="16"
                                            FontWeight="SemiBold"
-                                           Text="Kullanıcı süreci" />
+                                           Text="Hazır" />
+                                <TextBlock x:Name="ConnectionDetail"
+                                           Margin="0,4,0,0"
+                                           FontSize="11"
+                                           Foreground="{StaticResource SecondaryTextBrush}"
+                                           Text="Henüz bağlı değil" />
                             </StackPanel>
 
                             <Rectangle Grid.Column="3"
@@ -641,12 +643,17 @@
                             <StackPanel Grid.Column="4" Margin="20,0,0,0">
                                 <TextBlock FontSize="11"
                                            Foreground="{StaticResource MutedTextBrush}"
-                                           Text="KAPANIŞ" />
-                                <TextBlock x:Name="CloseBehaviorSummary"
+                                           Text="UYGULAMA KAPSAMI" />
+                                <TextBlock x:Name="ScopeSummary"
                                            Margin="0,6,0,0"
                                            FontSize="16"
                                            FontWeight="SemiBold"
-                                           Text="Bağlı değil" />
+                                           Text="Sadece uygulama" />
+                                <TextBlock x:Name="ScopeDetail"
+                                           Margin="0,4,0,0"
+                                           FontSize="11"
+                                           Foreground="{StaticResource SecondaryTextBrush}"
+                                           Text="Tarayıcı modu kapalı" />
                             </StackPanel>
                         </Grid>
                     </Border>
@@ -654,7 +661,7 @@
             </Grid>
 
             <Border Grid.Row="2"
-                    Background="#640B1422"
+                    Background="#760B1422"
                     BorderBrush="#A58B7DFF"
                     BorderThickness="1"
                     CornerRadius="8"

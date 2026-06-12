@@ -194,8 +194,12 @@ static void RenderMainWindow()
         Assert(runInBackgroundSwitch.IsChecked == false);
         Assert(startupSwitch.IsChecked == false);
         Assert(FindVisualChildren<ProgressBar>(window).Any());
-        Assert(text.Contains("DNS", StringComparison.Ordinal));
-        Assert(text.Contains("BAĞLANTI", StringComparison.Ordinal));
+        Assert(text.Contains("DNS SUNUCUSU", StringComparison.Ordinal));
+        Assert(text.Contains("BAĞLANTI DURUMU", StringComparison.Ordinal));
+        Assert(text.Contains("UYGULAMA KAPSAMI", StringComparison.Ordinal));
+        Assert(!text.Contains("ÖZEL BAĞLANTI", StringComparison.Ordinal));
+        Assert(!text.Contains("Discord bağlantısını yönet", StringComparison.Ordinal));
+        Assert(!text.Contains("KAPANIŞ", StringComparison.Ordinal));
         Assert(!text.Contains("Advanced SplitWire", StringComparison.OrdinalIgnoreCase));
         Assert(!text.Contains("Discord-only", StringComparison.OrdinalIgnoreCase));
 

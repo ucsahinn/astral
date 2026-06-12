@@ -2,6 +2,9 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Net;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
@@ -171,6 +174,7 @@ public partial class MainWindow : Window, IDisposable
         ApplyBrowserAccessView(
             _controller.IncludeBrowserAccess,
             snapshot.IsBusy || snapshot.IsConnected);
+        RefreshLiveStatusCards(snapshot);
 
         var templateLabel = ToggleButton.Template.FindName(
             "ToggleButtonLabel",
@@ -223,6 +227,122 @@ public partial class MainWindow : Window, IDisposable
         }
 
         ApplyProgress(snapshot, visual.StatusBrush);
+    }
+
+    private void RefreshLiveStatusCards(TunnelSnapshot snapshot)
+    {
+        var dns = GetDnsStatus();
+        DnsSummary.Text = dns.Summary;
+        DnsDetail.Text = dns.Detail;
+
+        ConnectionSummary.Text = GetConnectionSummary(snapshot.State);
+        ConnectionDetail.Text = GetConnectionDetail(snapshot);
+
+        ScopeSummary.Text = _controller.IncludeBrowserAccess
+            ? "Uygulama + tarayıcı"
+            : "Sadece uygulama";
+        ScopeDetail.Text = _controller.IncludeBrowserAccess
+            ? "Discord web bağlantıya dahil"
+            : "Tarayıcı modu kapalı";
+    }
+
+    private static (string Summary, string Detail) GetDnsStatus()
+    {
+        try
+        {
+            var addresses = NetworkInterface
+                .GetAllNetworkInterfaces()
+                .Where(IsActiveAdapter)
+                .SelectMany(GetDnsAddresses)
+                .Where(IsDisplayableDnsAddress)
+                .Select(address => address.ToString())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Take(3)
+                .ToArray();
+
+            return addresses.Length switch
+            {
+                0 => ("Algılanmadı", "Windows DNS adresi yok"),
+                1 => (addresses[0], "Makinenin aldığı DNS"),
+                _ => (
+                    string.Join(", ", addresses.Take(2)),
+                    $"{addresses.Length} DNS adresi aktif")
+            };
+        }
+        catch (NetworkInformationException)
+        {
+            return ("Okunamadı", "DNS bilgisi alınamadı");
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return ("Okunamadı", "DNS bilgisi alınamadı");
+        }
+    }
+
+    private static bool IsActiveAdapter(NetworkInterface adapter)
+    {
+        return adapter.OperationalStatus == OperationalStatus.Up
+            && adapter.NetworkInterfaceType is not NetworkInterfaceType.Loopback
+            && adapter.NetworkInterfaceType is not NetworkInterfaceType.Tunnel;
+    }
+
+    private static IEnumerable<IPAddress> GetDnsAddresses(NetworkInterface adapter)
+    {
+        try
+        {
+            return adapter.GetIPProperties().DnsAddresses;
+        }
+        catch (NetworkInformationException)
+        {
+            return [];
+        }
+    }
+
+    private static bool IsDisplayableDnsAddress(IPAddress address)
+    {
+        if (IPAddress.IsLoopback(address))
+        {
+            return false;
+        }
+
+        if (address.AddressFamily == AddressFamily.InterNetworkV6)
+        {
+            return !address.IsIPv6LinkLocal
+                && !address.IsIPv6Multicast
+                && !address.IsIPv6SiteLocal;
+        }
+
+        return address.AddressFamily == AddressFamily.InterNetwork;
+    }
+
+    private static string GetConnectionSummary(TunnelState state)
+    {
+        return state switch
+        {
+            TunnelState.Connected => "Bağlı",
+            TunnelState.Preparing => "Hazırlanıyor",
+            TunnelState.Connecting => "Bağlanıyor",
+            TunnelState.Disconnecting => "Kapanıyor",
+            TunnelState.Error => "Kontrol gerekiyor",
+            _ => "Bağlı değil"
+        };
+    }
+
+    private static string GetConnectionDetail(TunnelSnapshot snapshot)
+    {
+        var time = snapshot.ChangedAt
+            .ToLocalTime()
+            .ToString("HH:mm", CultureInfo.CurrentCulture);
+
+        return snapshot.State switch
+        {
+            TunnelState.Connected => $"Tünel aktif, son durum {time}",
+            TunnelState.Preparing or TunnelState.Connecting
+                => $"Kurulum ve profil kontrolü, {time}",
+            TunnelState.Disconnecting => $"Bağlantı kapatılıyor, {time}",
+            TunnelState.Error => $"Tanılama gerekebilir, {time}",
+            _ => $"Son durum {time}"
+        };
     }
 
     private static DropShadowEffect CreateGlowEffect(
@@ -456,6 +576,8 @@ public partial class MainWindow : Window, IDisposable
         {
             _isApplyingSettings = false;
         }
+
+        RefreshLiveStatusCards(_controller.Snapshot);
     }
 
     private void RunInBackgroundToggle_Changed(object sender, RoutedEventArgs e)
@@ -485,9 +607,6 @@ public partial class MainWindow : Window, IDisposable
             RunInBackgroundStatus.Text = enabled
                 ? "Pencere kapanınca bildirim alanında kalır."
                 : "Pencere kapanınca bildirim alanında kalmaz.";
-            CloseBehaviorSummary.Text = enabled
-                ? "Arka planda çalışır"
-                : "Bağlı değil";
 
             if (enabled)
             {
@@ -502,6 +621,8 @@ public partial class MainWindow : Window, IDisposable
         {
             _isApplyingSettings = false;
         }
+
+        RefreshLiveStatusCards(_controller.Snapshot);
     }
 
     private void StartupToggle_Changed(object sender, RoutedEventArgs e)
@@ -1018,7 +1139,7 @@ public partial class MainWindow : Window, IDisposable
             _diagnostics.Info("ui.update.check", "Güncelleme denetimi istendi.");
             DiagnosticsStatus.Text = "Güncelleme denetleniyor…";
             using var timeoutSource = new CancellationTokenSource(
-                TimeSpan.FromMinutes(2));
+                TimeSpan.FromMinutes(3));
             var update = await _updateService.CheckLatestUpdateAsync(
                 GetCurrentVersion(),
                 timeoutSource.Token);
@@ -1116,7 +1237,7 @@ public partial class MainWindow : Window, IDisposable
             }
 
             using var timeoutSource = new CancellationTokenSource(
-                TimeSpan.FromMinutes(10));
+                TimeSpan.FromMinutes(15));
             var executableName = GetExecutableName();
             DiagnosticsStatus.Text =
                 $"v{AppUpdateService.FormatVersion(_pendingUpdate.LatestVersion)} indiriliyor ve doğrulanıyor…";
@@ -1284,6 +1405,8 @@ public partial class MainWindow : Window, IDisposable
 
         _isClosing = true;
         IsEnabled = false;
+        StatusMessage.Text = "Discorder kapanıyor";
+        StatusDetail.Text = "Bağlantı ve koruma durumu güvenle kapatılıyor.";
         _operationCancellation?.Cancel();
         StopBackgroundVideo();
 
@@ -1291,12 +1414,24 @@ public partial class MainWindow : Window, IDisposable
         {
             await _controller.DisposeAsync();
         }
-        finally
+        catch (Exception exception)
         {
-            Dispose();
-            _allowClose = true;
-            _ = Dispatcher.BeginInvoke(new Action(Close));
+            _diagnostics.Failure(
+                "ui.shutdown",
+                "Kapanış temizliği tamamlanamadı.",
+                exception);
+            _isClosing = false;
+            IsEnabled = true;
+            Show();
+            Activate();
+            StatusMessage.Text = "Kapanış tamamlanamadı";
+            StatusDetail.Text = "Bağlantı koruması doğrulanamadı. Tanılama raporu hazırlayın.";
+            return;
         }
+
+        Dispose();
+        _allowClose = true;
+        _ = Dispatcher.BeginInvoke(new Action(Close));
     }
 
     protected override void OnClosed(EventArgs e)

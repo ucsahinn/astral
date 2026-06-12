@@ -30,6 +30,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         DateTimeOffset.Now);
     private bool _disposed;
     private bool _intentionalStop;
+    private bool _accessLockConfirmed;
 
     public DiscordTunnelController(
         AppPaths paths,
@@ -107,6 +108,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
             _diagnostics.Info("controller.lock", "Discord bağlantı koruması etkinleştiriliyor.");
             await _accessLock.EnableAsync(cancellationToken);
+            _accessLockConfirmed = true;
             SetStatus(TunnelState.Disconnected, "Discorder Bağlı Değil");
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -155,8 +157,9 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 new Dictionary<string, string?>
                 {
                     ["browserAccess"] = IncludeBrowserAccess.ToString()
-                });
+            });
             await _accessLock.DisableAsync(cancellationToken);
+            _accessLockConfirmed = false;
             await _accessLock.ApplyTunnelScopeAsync(
                 IncludeBrowserAccess,
                 cancellationToken);
@@ -298,6 +301,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 _diagnostics.Info("controller.disconnect", "Aktif WireSock süreci yok; bağlantı koruması etkinleştiriliyor.");
                 await TryClearTunnelScopeAsync("DisconnectWithoutProcess");
                 await _accessLock.EnableAsync(cancellationToken);
+                _accessLockConfirmed = true;
                 SetStatus(TunnelState.Disconnected, "Discorder Bağlı Değil");
                 return;
             }
@@ -316,6 +320,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             await DisposeProcessAsync();
             await TryClearTunnelScopeAsync("Disconnect");
             await _accessLock.EnableAsync(cancellationToken);
+            _accessLockConfirmed = true;
 
             SetStatus(TunnelState.Disconnected, "Discorder Bağlı Değil");
             _diagnostics.WriteHealth("kapalı", new Dictionary<string, string?>
@@ -362,6 +367,10 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         await _operationGate.WaitAsync();
         try
         {
+            var requiresTunnelCleanup = _wireSockProcess is not null
+                || _snapshot.State is not TunnelState.Disconnected;
+            var requiresAccessLockRefresh = requiresTunnelCleanup
+                || !_accessLockConfirmed;
             _disposed = true;
             _intentionalStop = true;
 
@@ -373,8 +382,15 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 await DisposeProcessAsync();
             }
 
-            await TryClearTunnelScopeAsync("Dispose");
-            await TryEnableAccessLockAsync("Dispose");
+            if (requiresTunnelCleanup)
+            {
+                await TryClearTunnelScopeAsync("Dispose");
+            }
+
+            if (requiresAccessLockRefresh)
+            {
+                await TryEnableAccessLockAsync("Dispose");
+            }
         }
         finally
         {
@@ -449,6 +465,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         try
         {
             await _accessLock.EnableAsync(CancellationToken.None);
+            _accessLockConfirmed = true;
         }
         catch (Exception exception)
         {

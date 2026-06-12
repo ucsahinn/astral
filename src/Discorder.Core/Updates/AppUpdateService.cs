@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -18,9 +19,11 @@ public sealed class AppUpdateService
     private const string RepositoryName = "discorder";
     private const string GitHubHost = "github.com";
     private const string UpdaterExecutableName = "Discorder.Updater.exe";
+    private const int MetadataMaxAttempts = 3;
 
     private static readonly JsonSerializerOptions JsonOptions = new(
         JsonSerializerDefaults.Web);
+    private static readonly TimeSpan MetadataRetryDelay = TimeSpan.FromSeconds(2);
 
     private readonly HttpClient _httpClient;
     private readonly AppPaths _paths;
@@ -248,38 +251,130 @@ public sealed class AppUpdateService
     private async Task<GitHubRelease> FetchLatestReleaseAsync(
         CancellationToken cancellationToken)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, _latestReleaseUri);
+        return await ExecuteUpdateRequestWithRetryAsync(
+            CreateLatestReleaseRequest,
+            async (response, token) =>
+            {
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new HttpRequestException(
+                        $"{_latestReleaseUri.Host} HTTP {(int)response.StatusCode} ({response.ReasonPhrase}).",
+                        null,
+                        response.StatusCode);
+                }
+
+                await using var stream = await response.Content.ReadAsStreamAsync(
+                    token);
+                var release = await JsonSerializer.DeserializeAsync<GitHubRelease>(
+                    stream,
+                    JsonOptions,
+                    token);
+
+                if (release is null || string.IsNullOrWhiteSpace(release.TagName))
+                {
+                    throw new InvalidDataException(
+                        "GitHub release bilgisi okunamadı.");
+                }
+
+                return release;
+            },
+            cancellationToken);
+    }
+
+    private HttpRequestMessage CreateLatestReleaseRequest()
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, _latestReleaseUri);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue(
             "application/vnd.github+json"));
         request.Headers.Add("X-GitHub-Api-Version", "2022-11-28");
+        return request;
+    }
 
-        using var response = await _httpClient.SendAsync(
-            request,
-            HttpCompletionOption.ResponseHeadersRead,
-            cancellationToken);
+    private async Task<T> ExecuteUpdateRequestWithRetryAsync<T>(
+        Func<HttpRequestMessage> createRequest,
+        Func<HttpResponseMessage, CancellationToken, Task<T>> readResponse,
+        CancellationToken cancellationToken)
+    {
+        Exception? lastException = null;
 
-        if (!response.IsSuccessStatusCode)
+        for (var attempt = 1; attempt <= MetadataMaxAttempts; attempt++)
         {
-            throw new HttpRequestException(
-                $"{_latestReleaseUri.Host} HTTP {(int)response.StatusCode} ({response.ReasonPhrase}).",
-                null,
-                response.StatusCode);
+            cancellationToken.ThrowIfCancellationRequested();
+            using var request = createRequest();
+
+            try
+            {
+                var response = await _httpClient.SendAsync(
+                    request,
+                    HttpCompletionOption.ResponseHeadersRead,
+                    cancellationToken);
+
+                using var _ = response;
+                if (!response.IsSuccessStatusCode
+                    && attempt < MetadataMaxAttempts
+                    && IsTransientStatusCode(response.StatusCode))
+                {
+                    lastException = new HttpRequestException(
+                        $"{request.RequestUri?.Host ?? "update"} HTTP {(int)response.StatusCode} ({response.ReasonPhrase}).",
+                        null,
+                        response.StatusCode);
+                }
+                else
+                {
+                    return await readResponse(response, cancellationToken);
+                }
+            }
+            catch (Exception exception) when (
+                attempt < MetadataMaxAttempts
+                && IsTransientUpdateFailure(exception, cancellationToken))
+            {
+                lastException = exception;
+            }
+
+            await Task.Delay(GetMetadataRetryDelay(attempt), cancellationToken);
         }
 
-        await using var stream = await response.Content.ReadAsStreamAsync(
-            cancellationToken);
-        var release = await JsonSerializer.DeserializeAsync<GitHubRelease>(
-            stream,
-            JsonOptions,
-            cancellationToken);
+        throw new InvalidOperationException(
+            "Güncelleme bilgisi alınamadı.",
+            lastException);
+    }
 
-        if (release is null || string.IsNullOrWhiteSpace(release.TagName))
+    private static bool IsTransientUpdateFailure(
+        Exception exception,
+        CancellationToken cancellationToken)
+    {
+        if (cancellationToken.IsCancellationRequested)
         {
-            throw new InvalidDataException(
-                "GitHub release bilgisi okunamadı.");
+            return false;
         }
 
-        return release;
+        return exception switch
+        {
+            TaskCanceledException => true,
+            TimeoutException => true,
+            HttpRequestException httpException
+                => IsTransientStatusCode(httpException.StatusCode),
+            IOException => true,
+            _ => false
+        };
+    }
+
+    private static bool IsTransientStatusCode(HttpStatusCode? statusCode)
+    {
+        if (statusCode is null
+            or HttpStatusCode.RequestTimeout
+            or HttpStatusCode.TooManyRequests)
+        {
+            return true;
+        }
+
+        return (int)statusCode.Value >= 500;
+    }
+
+    private static TimeSpan GetMetadataRetryDelay(int failedAttempt)
+    {
+        return TimeSpan.FromMilliseconds(
+            MetadataRetryDelay.TotalMilliseconds * failedAttempt);
     }
 
     private static Version ParseReleaseVersion(string? tagName)
@@ -417,43 +512,44 @@ public sealed class AppUpdateService
         string checksumFileName,
         CancellationToken cancellationToken)
     {
-        using var response = await _httpClient.GetAsync(
-            checksumUri,
-            HttpCompletionOption.ResponseHeadersRead,
-            cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
-        {
-            throw new HttpRequestException(
-                $"{checksumUri.Host} HTTP {(int)response.StatusCode} ({response.ReasonPhrase}).",
-                null,
-                response.StatusCode);
-        }
-
-        if (response.Content.Headers.ContentLength is > 8192)
-        {
-            throw new InvalidDataException(
-                $"{checksumFileName} beklenenden büyük.");
-        }
-
-        var checksumText = await ReadLimitedTextAsync(
-            response.Content,
-            checksumFileName,
-            maxBytes: 8192,
-            cancellationToken);
-
-        foreach (var token in checksumText.Split(
-                     [' ', '\t', '\r', '\n'],
-                     StringSplitOptions.RemoveEmptyEntries))
-        {
-            if (token.Length == 64 && token.All(Uri.IsHexDigit))
+        return await ExecuteUpdateRequestWithRetryAsync(
+            () => new HttpRequestMessage(HttpMethod.Get, checksumUri),
+            async (response, token) =>
             {
-                return token.ToUpperInvariant();
-            }
-        }
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new HttpRequestException(
+                        $"{checksumUri.Host} HTTP {(int)response.StatusCode} ({response.ReasonPhrase}).",
+                        null,
+                        response.StatusCode);
+                }
 
-        throw new InvalidDataException(
-            $"{checksumFileName} geçerli SHA-256 içermiyor.");
+                if (response.Content.Headers.ContentLength is > 8192)
+                {
+                    throw new InvalidDataException(
+                        $"{checksumFileName} beklenenden büyük.");
+                }
+
+                var checksumText = await ReadLimitedTextAsync(
+                    response.Content,
+                    checksumFileName,
+                    maxBytes: 8192,
+                    token);
+
+                foreach (var tokenText in checksumText.Split(
+                             [' ', '\t', '\r', '\n'],
+                             StringSplitOptions.RemoveEmptyEntries))
+                {
+                    if (tokenText.Length == 64 && tokenText.All(Uri.IsHexDigit))
+                    {
+                        return tokenText.ToUpperInvariant();
+                    }
+                }
+
+                throw new InvalidDataException(
+                    $"{checksumFileName} geçerli SHA-256 içermiyor.");
+            },
+            cancellationToken);
     }
 
     private static async Task<string> ReadLimitedTextAsync(

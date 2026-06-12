@@ -30,6 +30,9 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Doğrulanmış indirici geçici zaman aşımını tekrar dener", VerifiedDownloaderRetriesTransientTimeoutAsync),
     ("Otomatik güncelleme güncel sürümde indirme yapmaz", AppUpdateSkipsCurrentReleaseAsync),
     ("Otomatik güncelleme yeni sürümü indirmeden bildirir", AppUpdateCheckFindsReleaseWithoutDownloadAsync),
+    ("Otomatik güncelleme geçici release hatasını tekrar dener", AppUpdateCheckRetriesTransientMetadataFailureAsync),
+    ("Otomatik güncelleme geçici release gövde hatasını tekrar dener", AppUpdateCheckRetriesTransientMetadataBodyFailureAsync),
+    ("Otomatik güncelleme geçici checksum hatasını tekrar dener", AppUpdateCheckRetriesTransientChecksumFailureAsync),
     ("Otomatik güncelleme yeni GitHub paketini hazırlar", AppUpdatePreparesVerifiedReleaseAsync),
     ("Otomatik güncelleme GitHub digest uyuşmazlığını reddeder", AppUpdateRejectsDigestMismatchAsync),
     ("Otomatik güncelleme manifest sürüm uyuşmazlığını reddeder", AppUpdateRejectsManifestVersionMismatchAsync),
@@ -44,6 +47,9 @@ var tests = new (string Name, Func<Task> Run)[]
     ("WireSock hazırlığı resmi paketi doğrulayıp kurar", BootstrapLifecycleAsync),
     ("WireSock hazırlığı yeniden başlatma gerektiren başarı kodunu kabul eder", BootstrapAcceptsRestartRequiredExitCodeAsync),
     ("Denetleyici idempotent bağlanır ve keser", ControllerLifecycleAsync),
+    ("Denetleyici temiz kapanışta firewall scriptini tekrar çalıştırmaz", ControllerDisposeSkipsDisconnectedCleanupAsync),
+    ("Denetleyici kilit doğrulanmadan kapanışta kilidi yeniler", ControllerDisposeRefreshesUnconfirmedDisconnectedLockAsync),
+    ("Denetleyici aktif bağlantıyı kapanışta güvenle temizler", ControllerDisposeCleansActiveConnectionAsync),
     ("Denetleyici web kapsamını bağlıyken kilitler", ControllerLocksBrowserScopeWhileConnectedAsync),
     ("Denetleyici WireSock hazırlık hatasını bildirir", ControllerBootstrapFailureAsync),
     ("Denetleyici GitHub DNS hatasını Türkçe açıklar", ControllerNetworkFailureIsUserFriendlyAsync),
@@ -398,6 +404,187 @@ static async Task AppUpdateCheckFindsReleaseWithoutDownloadAsync()
         Assert(check.LatestVersion == new Version(2, 0, 13, 0));
         Assert(check.PackageUri == zipUri);
         Assert(check.ExpectedSha256 == expectedSha256);
+        Assert(downloader.DownloadCount == 0);
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task AppUpdateCheckRetriesTransientMetadataFailureAsync()
+{
+    var root = CreateTemporaryDirectory();
+    try
+    {
+        var latestUri = new Uri("https://updates.example.test/releases/latest");
+        var zipUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.13/Discorder-2.0.13-win-x64.zip");
+        var checksumUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.13/Discorder-2.0.13-win-x64.sha256.txt");
+        var packageBytes = CreateUpdatePackage();
+        var expectedSha256 = Convert.ToHexString(SHA256.HashData(packageBytes));
+        var handler = new MapHttpMessageHandler();
+        var attempts = 0;
+        handler.AddResponse(
+            latestUri,
+            () =>
+            {
+                attempts++;
+                if (attempts == 1)
+                {
+                    return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
+                }
+
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        CreateReleaseJson(
+                            "2.0.13",
+                            zipUri,
+                            checksumUri,
+                            expectedSha256,
+                            packageBytes.Length),
+                        Encoding.UTF8,
+                        "application/json")
+                };
+            });
+        handler.AddText(
+            checksumUri,
+            $"{expectedSha256}  Discorder-2.0.13-win-x64.zip");
+        using var httpClient = new HttpClient(handler);
+        var downloader = new CapturingVerifiedDownloader(packageBytes);
+        var service = new AppUpdateService(
+            httpClient,
+            new AppPaths(root),
+            downloader,
+            latestUri,
+            requireUpdateAuthenticode: false);
+
+        var check = await service.CheckLatestUpdateAsync(
+            new Version(2, 0, 12, 0),
+            CancellationToken.None);
+
+        Assert(check.Status == AppUpdateCheckStatus.UpdateAvailable);
+        Assert(attempts == 2);
+        Assert(downloader.DownloadCount == 0);
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task AppUpdateCheckRetriesTransientMetadataBodyFailureAsync()
+{
+    var root = CreateTemporaryDirectory();
+    try
+    {
+        var latestUri = new Uri("https://updates.example.test/releases/latest");
+        var zipUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.13/Discorder-2.0.13-win-x64.zip");
+        var checksumUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.13/Discorder-2.0.13-win-x64.sha256.txt");
+        var packageBytes = CreateUpdatePackage();
+        var expectedSha256 = Convert.ToHexString(SHA256.HashData(packageBytes));
+        var handler = new MapHttpMessageHandler();
+        var attempts = 0;
+        handler.AddResponse(
+            latestUri,
+            () =>
+            {
+                attempts++;
+                if (attempts == 1)
+                {
+                    return new HttpResponseMessage(HttpStatusCode.OK)
+                    {
+                        Content = new FailingHttpContent(new IOException("temporary body failure"))
+                    };
+                }
+
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        CreateReleaseJson(
+                            "2.0.13",
+                            zipUri,
+                            checksumUri,
+                            expectedSha256,
+                            packageBytes.Length),
+                        Encoding.UTF8,
+                        "application/json")
+                };
+            });
+        handler.AddText(
+            checksumUri,
+            $"{expectedSha256}  Discorder-2.0.13-win-x64.zip");
+        using var httpClient = new HttpClient(handler);
+        var downloader = new CapturingVerifiedDownloader(packageBytes);
+        var service = new AppUpdateService(
+            httpClient,
+            new AppPaths(root),
+            downloader,
+            latestUri,
+            requireUpdateAuthenticode: false);
+
+        var check = await service.CheckLatestUpdateAsync(
+            new Version(2, 0, 12, 0),
+            CancellationToken.None);
+
+        Assert(check.Status == AppUpdateCheckStatus.UpdateAvailable);
+        Assert(attempts == 2);
+        Assert(downloader.DownloadCount == 0);
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task AppUpdateCheckRetriesTransientChecksumFailureAsync()
+{
+    var root = CreateTemporaryDirectory();
+    try
+    {
+        var latestUri = new Uri("https://updates.example.test/releases/latest");
+        var zipUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.13/Discorder-2.0.13-win-x64.zip");
+        var checksumUri = new Uri("https://github.com/ucsahinn/discorder/releases/download/v2.0.13/Discorder-2.0.13-win-x64.sha256.txt");
+        var packageBytes = CreateUpdatePackage();
+        var expectedSha256 = Convert.ToHexString(SHA256.HashData(packageBytes));
+        var handler = new MapHttpMessageHandler();
+        handler.AddJson(
+            latestUri,
+            CreateReleaseJson("2.0.13", zipUri, checksumUri, expectedSha256, packageBytes.Length));
+        var checksumAttempts = 0;
+        handler.AddResponse(
+            checksumUri,
+            () =>
+            {
+                checksumAttempts++;
+                if (checksumAttempts == 1)
+                {
+                    return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
+                }
+
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        $"{expectedSha256}  Discorder-2.0.13-win-x64.zip",
+                        Encoding.UTF8,
+                        "text/plain")
+                };
+            });
+        using var httpClient = new HttpClient(handler);
+        var downloader = new CapturingVerifiedDownloader(packageBytes);
+        var service = new AppUpdateService(
+            httpClient,
+            new AppPaths(root),
+            downloader,
+            latestUri,
+            requireUpdateAuthenticode: false);
+
+        var check = await service.CheckLatestUpdateAsync(
+            new Version(2, 0, 12, 0),
+            CancellationToken.None);
+
+        Assert(check.Status == AppUpdateCheckStatus.UpdateAvailable);
+        Assert(checksumAttempts == 2);
         Assert(downloader.DownloadCount == 0);
     }
     finally
@@ -948,6 +1135,100 @@ static async Task ControllerLifecycleAsync()
     finally
     {
         await controller.DisposeAsync();
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task ControllerDisposeSkipsDisconnectedCleanupAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var accessLock = new FakeDiscordAccessLock();
+    var controller = new DiscordTunnelController(
+        new AppPaths(root),
+        new DiscordAppScope(root, root, root),
+        new FakeWireSockBootstrapper(Path.Combine(
+            root,
+            "WireSock VPN Client",
+            "bin",
+            WireSockPackage.CliExecutableFileName)),
+        new FakeProfileProvisioner(Path.Combine(root, "discord.conf")),
+        new FakeProcessLauncher(new FakeManagedProcess()),
+        TimeSpan.Zero,
+        accessLock);
+
+    try
+    {
+        await controller.EnsureDisconnectedLockAsync();
+        await controller.DisposeAsync();
+
+        Assert(accessLock.EnableCount == 1);
+        Assert(accessLock.ClearTunnelScopeCount == 0);
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task ControllerDisposeRefreshesUnconfirmedDisconnectedLockAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var accessLock = new FakeDiscordAccessLock();
+    var controller = new DiscordTunnelController(
+        new AppPaths(root),
+        new DiscordAppScope(root, root, root),
+        new FakeWireSockBootstrapper(Path.Combine(
+            root,
+            "WireSock VPN Client",
+            "bin",
+            WireSockPackage.CliExecutableFileName)),
+        new FakeProfileProvisioner(Path.Combine(root, "discord.conf")),
+        new FakeProcessLauncher(new FakeManagedProcess()),
+        TimeSpan.Zero,
+        accessLock);
+
+    try
+    {
+        await controller.DisposeAsync();
+
+        Assert(accessLock.EnableCount == 1);
+        Assert(accessLock.ClearTunnelScopeCount == 0);
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task ControllerDisposeCleansActiveConnectionAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var process = new FakeManagedProcess();
+    var accessLock = new FakeDiscordAccessLock();
+    var controller = new DiscordTunnelController(
+        new AppPaths(root),
+        new DiscordAppScope(root, root, root),
+        new FakeWireSockBootstrapper(Path.Combine(
+            root,
+            "WireSock VPN Client",
+            "bin",
+            WireSockPackage.CliExecutableFileName)),
+        new FakeProfileProvisioner(Path.Combine(root, "discord.conf")),
+        new FakeProcessLauncher(process),
+        TimeSpan.Zero,
+        accessLock);
+
+    try
+    {
+        await controller.ConnectAsync();
+        await controller.DisposeAsync();
+
+        Assert(process.StopCount == 1);
+        Assert(accessLock.ClearTunnelScopeCount == 1);
+        Assert(accessLock.EnableCount == 1);
+    }
+    finally
+    {
         Directory.Delete(root, recursive: true);
     }
 }
@@ -1678,6 +1959,11 @@ file sealed class MapHttpMessageHandler : HttpMessageHandler
 {
     private readonly Dictionary<string, Func<HttpResponseMessage>> _responses = [];
 
+    public void AddResponse(Uri uri, Func<HttpResponseMessage> response)
+    {
+        _responses[uri.AbsoluteUri] = response;
+    }
+
     public void AddJson(Uri uri, string json)
     {
         _responses[uri.AbsoluteUri] = () => new HttpResponseMessage(HttpStatusCode.OK)
@@ -1707,6 +1993,22 @@ file sealed class MapHttpMessageHandler : HttpMessageHandler
         }
 
         return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+    }
+}
+
+file sealed class FailingHttpContent(Exception exception) : HttpContent
+{
+    protected override Task SerializeToStreamAsync(
+        Stream stream,
+        TransportContext? context)
+    {
+        return Task.FromException(exception);
+    }
+
+    protected override bool TryComputeLength(out long length)
+    {
+        length = -1;
+        return false;
     }
 }
 
