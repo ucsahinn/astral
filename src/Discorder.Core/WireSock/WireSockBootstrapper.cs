@@ -1,5 +1,6 @@
 using Discorder.Core.Configuration;
 using Discorder.Core.Provisioning;
+using Discorder.Core.Updates;
 
 namespace Discorder.Core.WireSock;
 
@@ -7,6 +8,8 @@ public sealed class WireSockBootstrapper : IWireSockBootstrapper
 {
     private const int DiscoveryAttempts = 20;
     private const int RestartRequiredExitCode = 3010;
+    private const long ProgressByteInterval = 1024 * 1024;
+    private const double ProgressPercentInterval = 5;
     private static readonly TimeSpan DiscoveryDelay = TimeSpan.FromMilliseconds(500);
 
     private readonly AppPaths _paths;
@@ -73,25 +76,55 @@ public sealed class WireSockBootstrapper : IWireSockBootstrapper
 
         cancellationToken.ThrowIfCancellationRequested();
         _paths.EnsureDirectories();
+        var installerDirectory = ProtectedUpdateStaging.CreateVersionDirectory(
+            _paths.WireSockInstallerStagingDirectory,
+            WireSockPackage.Version,
+            _paths.ProtectUpdateStaging);
         var installerPath = Path.Combine(
-            _paths.InstallerDirectory,
+            installerDirectory,
             WireSockPackage.InstallerFileName);
 
         progress?.Report("WireSock resmi kurucusu indiriliyor");
-        await _downloader.DownloadAsync(
-            WireSockPackage.WindowsX64Download,
-            installerPath,
-            WireSockPackage.WindowsX64Sha256,
-            cancellationToken);
+        double? lastProgressPercent = null;
+        long lastProgressBytes = -ProgressByteInterval;
+        var downloadProgress = new DirectProgress<DownloadProgress>(
+            download =>
+            {
+                if (ShouldReportDownloadProgress(
+                    download,
+                    ref lastProgressPercent,
+                    ref lastProgressBytes))
+                {
+                    progress?.Report(FormatDownloadProgress(
+                        "WireSock kurucusu",
+                        download));
+                }
+            });
+        int exitCode;
+        try
+        {
+            await _downloader.DownloadAsync(
+                WireSockPackage.WindowsX64Download,
+                installerPath,
+                WireSockPackage.WindowsX64Sha256,
+                cancellationToken,
+                maxBytes: WireSockPackage.WindowsX64MaxBytes,
+                progress: downloadProgress);
 
-        progress?.Report("WireSock kurucusunun imzası doğrulanıyor");
-        _packageVerifier.VerifyInstaller(installerPath);
+            progress?.Report("WireSock kurucusunun imzası doğrulanıyor");
+            _packageVerifier.VerifyInstaller(installerPath);
 
-        cancellationToken.ThrowIfCancellationRequested();
-        progress?.Report("WireSock kurulumu tamamlanmayı bekliyor");
-        var exitCode = await _installerLauncher.InstallAsync(
-            installerPath,
-            cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            progress?.Report("WireSock kurulumunun tamamlanması bekleniyor");
+            _packageVerifier.VerifyInstaller(installerPath);
+            exitCode = await _installerLauncher.InstallAsync(
+                installerPath,
+                cancellationToken);
+        }
+        finally
+        {
+            TryDeleteInstallerDirectory(installerDirectory);
+        }
 
         if (!IsSuccessfulInstallerExitCode(exitCode))
         {
@@ -119,7 +152,6 @@ public sealed class WireSockBootstrapper : IWireSockBootstrapper
         File.WriteAllText(
             _paths.WireSockInstallMarker,
             $"{DateTimeOffset.Now:O}{Environment.NewLine}");
-        TryDeleteInstaller(installerPath);
         return installedExecutable;
     }
 
@@ -175,17 +207,118 @@ public sealed class WireSockBootstrapper : IWireSockBootstrapper
         }
     }
 
-    private static void TryDeleteInstaller(string installerPath)
+    private static void TryDeleteInstallerDirectory(string installerDirectory)
     {
         try
         {
-            File.Delete(installerPath);
+            if (Directory.Exists(installerDirectory))
+            {
+                Directory.Delete(installerDirectory, recursive: true);
+            }
         }
         catch (IOException)
         {
         }
         catch (UnauthorizedAccessException)
         {
+        }
+    }
+
+    private static bool ShouldReportDownloadProgress(
+        DownloadProgress progress,
+        ref double? lastPercent,
+        ref long lastBytes)
+    {
+        if (!string.IsNullOrWhiteSpace(progress.Message))
+        {
+            return true;
+        }
+
+        if (progress.BytesReceived <= 0)
+        {
+            lastBytes = 0;
+            lastPercent = progress.Percent;
+            return true;
+        }
+
+        if (progress.Percent >= 100)
+        {
+            lastBytes = progress.BytesReceived;
+            lastPercent = progress.Percent;
+            return true;
+        }
+
+        if (progress.Percent is { } percent)
+        {
+            if (lastPercent is null
+                || percent - lastPercent.Value >= ProgressPercentInterval)
+            {
+                lastPercent = percent;
+                lastBytes = progress.BytesReceived;
+                return true;
+            }
+
+            return false;
+        }
+
+        if (progress.BytesReceived - lastBytes >= ProgressByteInterval)
+        {
+            lastBytes = progress.BytesReceived;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static string FormatDownloadProgress(
+        string label,
+        DownloadProgress progress)
+    {
+        var attempt = progress.Attempt is not null && progress.MaxAttempts is not null
+            ? $" ({progress.Attempt}/{progress.MaxAttempts})"
+            : string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(progress.Message))
+        {
+            return $"{label}: {progress.Message}{attempt}";
+        }
+
+        if (progress.TotalBytes is > 0)
+        {
+            return $"{label} indiriliyor: {FormatBytes(progress.BytesReceived)} / {FormatBytes(progress.TotalBytes.Value)}";
+        }
+
+        return $"{label} indiriliyor: {FormatBytes(progress.BytesReceived)}";
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        string[] units = ["B", "KB", "MB", "GB"];
+        var value = (double)Math.Max(0, bytes);
+        var unitIndex = 0;
+        while (value >= 1024 && unitIndex < units.Length - 1)
+        {
+            value /= 1024;
+            unitIndex++;
+        }
+
+        return unitIndex == 0
+            ? $"{value:0} {units[unitIndex]}"
+            : $"{value:0.0} {units[unitIndex]}";
+    }
+
+    private sealed class DirectProgress<T> : IProgress<T>
+    {
+        private readonly Action<T> _handler;
+
+        public DirectProgress(Action<T> handler)
+        {
+            _handler = handler ?? throw new ArgumentNullException(nameof(handler));
+        }
+
+        public void Report(T value)
+        {
+            _handler(value);
         }
     }
 }

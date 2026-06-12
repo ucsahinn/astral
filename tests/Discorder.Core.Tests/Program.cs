@@ -29,6 +29,11 @@ var tests = new (string Name, Func<Task> Run)[]
     ("SHA-256 doğrulayıcı yalnızca sabit özeti kabul eder", HashVerifierIsStrictAsync),
     ("Doğrulanmış indirici geçici zaman aşımını tekrar dener", VerifiedDownloaderRetriesTransientTimeoutAsync),
     ("Doğrulanmış indirici geçici DNS hatasını tekrar dener", VerifiedDownloaderRetriesTransientDnsFailureAsync),
+    ("Doğrulanmış indirici duran veri akışını tekrar dener", VerifiedDownloaderRetriesStalledBodyAsync),
+    ("Doğrulanmış indirici uzunluğu bilinmeyen büyük dosyayı reddeder", VerifiedDownloaderRejectsOversizedUnknownLengthAsync),
+    ("Doğrulanmış indirici uzunluğu bilinmeyen indirmeyi tamamlandı bildirir", VerifiedDownloaderReportsUnknownLengthCompletionAsync),
+    ("Doğrulanmış indirici eksik gelen bilinen boyutu reddeder", VerifiedDownloaderRejectsTruncatedKnownLengthAsync),
+    ("WireSock kurucu indirmesi canlı ilerleme bildirir", BootstrapReportsDownloadProgressAsync),
     ("Otomatik güncelleme güncel sürümde indirme yapmaz", AppUpdateSkipsCurrentReleaseAsync),
     ("Otomatik güncelleme yeni sürümü indirmeden bildirir", AppUpdateCheckFindsReleaseWithoutDownloadAsync),
     ("Otomatik güncelleme geçici release hatasını tekrar dener", AppUpdateCheckRetriesTransientMetadataFailureAsync),
@@ -317,6 +322,7 @@ static async Task VerifiedDownloaderRetriesTransientTimeoutAsync()
         maxAttempts: 2,
         retryDelay: TimeSpan.Zero);
     var destination = Path.Combine(root, "wiresock.msi");
+    var progressEvents = new List<DownloadProgress>();
 
     try
     {
@@ -324,11 +330,21 @@ static async Task VerifiedDownloaderRetriesTransientTimeoutAsync()
             new Uri("https://downloads.example.test/wiresock.msi"),
             destination,
             expectedSha256,
-            CancellationToken.None);
+            CancellationToken.None,
+            progress: new ImmediateProgress<DownloadProgress>(
+                progressEvents.Add));
 
         Assert(handler.RequestCount == 2);
         Assert(await File.ReadAllTextAsync(destination) == "dogrulanmis-kurucu");
         Assert(!File.Exists(destination + ".download"));
+        Assert(progressEvents.Any(item =>
+            item.IsRetry
+            && item.Attempt == 2
+            && item.MaxAttempts == 2
+            && item.Message is not null
+            && item.Message.Contains(
+                "tekrar deneniyor",
+                StringComparison.OrdinalIgnoreCase)));
     }
     finally
     {
@@ -348,6 +364,7 @@ static async Task VerifiedDownloaderRetriesTransientDnsFailureAsync()
         maxAttempts: 2,
         retryDelay: TimeSpan.Zero);
     var destination = Path.Combine(root, "wiresock.msi");
+    var progressEvents = new List<DownloadProgress>();
 
     try
     {
@@ -355,10 +372,163 @@ static async Task VerifiedDownloaderRetriesTransientDnsFailureAsync()
             new Uri("https://github.com/example/wiresock.msi"),
             destination,
             expectedSha256,
-            CancellationToken.None);
+            CancellationToken.None,
+            progress: new ImmediateProgress<DownloadProgress>(
+                progressEvents.Add));
 
         Assert(handler.RequestCount == 2);
         Assert(await File.ReadAllTextAsync(destination) == "dogrulanmis-kurucu");
+        Assert(!File.Exists(destination + ".download"));
+        Assert(progressEvents.Any(item =>
+            item.IsRetry
+            && item.Message is not null
+            && item.Message.Contains(
+                "Bağlantı kurulamadı",
+                StringComparison.OrdinalIgnoreCase)));
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task VerifiedDownloaderRetriesStalledBodyAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var handler = new StalledDownloadHandler();
+    using var httpClient = new HttpClient(handler);
+    var downloader = new VerifiedDownloader(
+        httpClient,
+        maxAttempts: 2,
+        retryDelay: TimeSpan.Zero,
+        readIdleTimeout: TimeSpan.FromMilliseconds(20));
+    var destination = Path.Combine(root, "wiresock.msi");
+    var progressEvents = new List<DownloadProgress>();
+
+    try
+    {
+        await AssertThrowsAsync<TimeoutException>(
+            () => downloader.DownloadAsync(
+                new Uri("https://downloads.example.test/wiresock.msi"),
+                destination,
+                new string('0', 64),
+                CancellationToken.None,
+                maxBytes: 64 * 1024,
+                progress: new ImmediateProgress<DownloadProgress>(
+                    progressEvents.Add)));
+
+        Assert(handler.RequestCount == 2);
+        Assert(!File.Exists(destination));
+        Assert(!File.Exists(destination + ".download"));
+        Assert(progressEvents.Any(item => item.IsRetry));
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task VerifiedDownloaderRejectsOversizedUnknownLengthAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var payload = Encoding.UTF8.GetBytes("bu-dosya-beklenen-sinirdan-buyuk");
+    var expectedSha256 = Convert.ToHexString(SHA256.HashData(payload));
+    var uri = new Uri("https://downloads.example.test/wiresock.msi");
+    var handler = new MapHttpMessageHandler();
+    handler.AddResponse(uri, () => new HttpResponseMessage(HttpStatusCode.OK)
+    {
+        Content = new UnknownLengthContent(payload)
+    });
+    using var httpClient = new HttpClient(handler);
+    var downloader = new VerifiedDownloader(httpClient);
+    var destination = Path.Combine(root, "wiresock.msi");
+
+    try
+    {
+        await AssertThrowsAsync<InvalidDataException>(
+            () => downloader.DownloadAsync(
+                uri,
+                destination,
+                expectedSha256,
+                CancellationToken.None,
+                maxBytes: 8));
+
+        Assert(!File.Exists(destination));
+        Assert(!File.Exists(destination + ".download"));
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task VerifiedDownloaderReportsUnknownLengthCompletionAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var payload = Encoding.UTF8.GetBytes("dogrulanmis-kurucu");
+    var expectedSha256 = Convert.ToHexString(SHA256.HashData(payload));
+    var uri = new Uri("https://downloads.example.test/wiresock.msi");
+    var handler = new MapHttpMessageHandler();
+    handler.AddResponse(uri, () => new HttpResponseMessage(HttpStatusCode.OK)
+    {
+        Content = new UnknownLengthContent(payload)
+    });
+    using var httpClient = new HttpClient(handler);
+    var downloader = new VerifiedDownloader(httpClient);
+    var destination = Path.Combine(root, "wiresock.msi");
+    var progressEvents = new List<DownloadProgress>();
+
+    try
+    {
+        await downloader.DownloadAsync(
+            uri,
+            destination,
+            expectedSha256,
+            CancellationToken.None,
+            maxBytes: 64 * 1024,
+            progress: new ImmediateProgress<DownloadProgress>(
+                progressEvents.Add));
+
+        var finalProgress = progressEvents.Last();
+        Assert(finalProgress.BytesReceived == payload.Length);
+        Assert(finalProgress.TotalBytes == payload.Length);
+        Assert(finalProgress.Percent == 100);
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task VerifiedDownloaderRejectsTruncatedKnownLengthAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var payload = Encoding.UTF8.GetBytes("eksik");
+    var expectedSha256 = Convert.ToHexString(SHA256.HashData(payload));
+    var uri = new Uri("https://downloads.example.test/wiresock.msi");
+    var handler = new MapHttpMessageHandler();
+    handler.AddResponse(uri, () => new HttpResponseMessage(HttpStatusCode.OK)
+    {
+        Content = new DeclaredLengthContent(payload, declaredLength: payload.Length + 10)
+    });
+    using var httpClient = new HttpClient(handler);
+    var downloader = new VerifiedDownloader(httpClient);
+    var destination = Path.Combine(root, "wiresock.msi");
+
+    try
+    {
+        var exception = await AssertThrowsAsync<InvalidDataException>(
+            () => downloader.DownloadAsync(
+                uri,
+                destination,
+                expectedSha256,
+                CancellationToken.None,
+                maxBytes: 64 * 1024));
+
+        Assert(exception.Message.Contains(
+            "beklenen boyuta",
+            StringComparison.OrdinalIgnoreCase));
+        Assert(!File.Exists(destination));
         Assert(!File.Exists(destination + ".download"));
     }
     finally
@@ -1111,7 +1281,7 @@ static async Task BootstrapIgnoresUntrustedInstallAsync()
 
         Assert(result == trustedPath);
         Assert(downloader.DownloadCount == 1);
-        Assert(verifier.InstallerVerifyCount == 1);
+        Assert(verifier.InstallerVerifyCount == 2);
         Assert(verifier.ClientVerifyCount == 2);
         Assert(launcher.LaunchCount == 1);
     }
@@ -1148,9 +1318,16 @@ static async Task BootstrapLifecycleAsync()
 
         Assert(result == installedPath);
         Assert(downloader.DownloadCount == 1);
-        Assert(verifier.InstallerVerifyCount == 1);
+        Assert(downloader.LastMaxBytes == WireSockPackage.WindowsX64MaxBytes);
+        Assert(verifier.InstallerVerifyCount == 2);
         Assert(verifier.ClientVerifyCount == 1);
         Assert(launcher.LaunchCount == 1);
+        var launchedInstallerPath = launcher.LastInstallerPath
+            ?? throw new InvalidOperationException("Kurucu yolu kaydedilmedi.");
+        Assert(Path.GetFullPath(launchedInstallerPath).StartsWith(
+            Path.GetFullPath(paths.WireSockInstallerStagingDirectory),
+            StringComparison.OrdinalIgnoreCase));
+        Assert(!File.Exists(launchedInstallerPath));
         Assert(settings.IsWireSockInstalledByDiscorder());
         Assert(File.Exists(paths.WireSockInstallMarker));
         Assert(!File.Exists(Path.Combine(
@@ -1192,9 +1369,49 @@ static async Task BootstrapAcceptsRestartRequiredExitCodeAsync()
 
         Assert(result == installedPath);
         Assert(downloader.DownloadCount == 1);
-        Assert(verifier.InstallerVerifyCount == 1);
+        Assert(verifier.InstallerVerifyCount == 2);
         Assert(verifier.ClientVerifyCount == 1);
         Assert(launcher.LaunchCount == 1);
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task BootstrapReportsDownloadProgressAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var paths = new AppPaths(root);
+    var settings = new AppSettingsStore(paths);
+    var locator = new MutableWireSockLocator();
+    var downloader = new FakeVerifiedDownloader();
+    var verifier = new FakeWireSockPackageVerifier();
+    var installedPath = Path.Combine(root, "WireSock", "wiresock-client.exe");
+    var launcher = new FakeInstallerLauncher(() => locator.Path = installedPath);
+    var bootstrapper = new WireSockBootstrapper(
+        paths,
+        settings,
+        locator,
+        downloader,
+        verifier,
+        launcher);
+    var progressMessages = new List<string>();
+
+    try
+    {
+        bootstrapper.AcceptSetupConsent();
+        await bootstrapper.EnsureInstalledAsync(
+            new ImmediateProgress<string>(progressMessages.Add),
+            CancellationToken.None);
+
+        Assert(progressMessages.Any(message => message.Contains(
+            "WireSock kurucusu",
+            StringComparison.OrdinalIgnoreCase)));
+        Assert(progressMessages.Any(message => message.Contains(
+            "20 B / 20 B",
+            StringComparison.OrdinalIgnoreCase)));
+        Assert(downloader.LastMaxBytes == WireSockPackage.WindowsX64MaxBytes);
     }
     finally
     {
@@ -2154,6 +2371,24 @@ file sealed class FlakyDnsDownloadHandler(byte[] payload) : HttpMessageHandler
     }
 }
 
+file sealed class StalledDownloadHandler : HttpMessageHandler
+{
+    public int RequestCount { get; private set; }
+
+    protected override Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        RequestCount++;
+
+        return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StalledHttpContent()
+        });
+    }
+}
+
 file sealed class MapHttpMessageHandler : HttpMessageHandler
 {
     private readonly Dictionary<string, Func<HttpResponseMessage>> _responses = [];
@@ -2211,6 +2446,115 @@ file sealed class FailingHttpContent(Exception exception) : HttpContent
     }
 }
 
+file sealed class UnknownLengthContent(byte[] payload) : HttpContent
+{
+    protected override Task SerializeToStreamAsync(
+        Stream stream,
+        TransportContext? context)
+    {
+        return stream.WriteAsync(payload).AsTask();
+    }
+
+    protected override bool TryComputeLength(out long length)
+    {
+        length = -1;
+        return false;
+    }
+}
+
+file sealed class DeclaredLengthContent(
+    byte[] payload,
+    long declaredLength) : HttpContent
+{
+    protected override Task SerializeToStreamAsync(
+        Stream stream,
+        TransportContext? context)
+    {
+        return stream.WriteAsync(payload).AsTask();
+    }
+
+    protected override bool TryComputeLength(out long length)
+    {
+        length = declaredLength;
+        return true;
+    }
+
+    protected override Task<Stream> CreateContentReadStreamAsync()
+    {
+        return Task.FromResult<Stream>(new MemoryStream(payload, writable: false));
+    }
+}
+
+file sealed class StalledHttpContent : HttpContent
+{
+    protected override Task SerializeToStreamAsync(
+        Stream stream,
+        TransportContext? context)
+    {
+        return Task.CompletedTask;
+    }
+
+    protected override bool TryComputeLength(out long length)
+    {
+        length = -1;
+        return false;
+    }
+
+    protected override Task<Stream> CreateContentReadStreamAsync()
+    {
+        return Task.FromResult<Stream>(new StalledStream());
+    }
+}
+
+file sealed class StalledStream : Stream
+{
+    public override bool CanRead => true;
+
+    public override bool CanSeek => false;
+
+    public override bool CanWrite => false;
+
+    public override long Length => throw new NotSupportedException();
+
+    public override long Position
+    {
+        get => throw new NotSupportedException();
+        set => throw new NotSupportedException();
+    }
+
+    public override void Flush()
+    {
+    }
+
+    public override int Read(byte[] buffer, int offset, int count)
+    {
+        throw new NotSupportedException();
+    }
+
+    public override async ValueTask<int> ReadAsync(
+        Memory<byte> buffer,
+        CancellationToken cancellationToken = default)
+    {
+        await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        return 0;
+    }
+
+    public override long Seek(long offset, SeekOrigin origin)
+    {
+        throw new NotSupportedException();
+    }
+
+    public override void SetLength(long value)
+    {
+        throw new NotSupportedException();
+    }
+
+    public override void Write(byte[] buffer, int offset, int count)
+    {
+        throw new NotSupportedException();
+    }
+}
+
 file sealed class CapturingVerifiedDownloader(byte[] payload) : IVerifiedDownloader
 {
     public int DownloadCount { get; private set; }
@@ -2245,6 +2589,8 @@ file sealed class FakeVerifiedDownloader : IVerifiedDownloader
 {
     public int DownloadCount { get; private set; }
 
+    public long? LastMaxBytes { get; private set; }
+
     public async Task DownloadAsync(
         Uri source,
         string destination,
@@ -2254,6 +2600,7 @@ file sealed class FakeVerifiedDownloader : IVerifiedDownloader
         IProgress<DownloadProgress>? progress = null)
     {
         DownloadCount++;
+        LastMaxBytes = maxBytes;
         Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
         progress?.Report(new DownloadProgress(0, 20, 0));
         await File.WriteAllTextAsync(
@@ -2369,6 +2716,8 @@ file sealed class FakeInstallerLauncher(
 {
     public int LaunchCount { get; private set; }
 
+    public string? LastInstallerPath { get; private set; }
+
     public Task<int> InstallAsync(
         string installerPath,
         CancellationToken cancellationToken)
@@ -2380,6 +2729,7 @@ file sealed class FakeInstallerLauncher(
         }
 
         LaunchCount++;
+        LastInstallerPath = installerPath;
         onLaunch?.Invoke();
         return Task.FromResult(exitCode);
     }

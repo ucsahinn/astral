@@ -18,6 +18,9 @@ public sealed class AppPaths
         DataDirectory = Path.Combine(root, "Discorder");
         SharedDataDirectory = Path.Combine(sharedRoot, "Discorder");
         UpdateStagingDirectory = Path.Combine(SharedDataDirectory, "updates");
+        WireSockInstallerStagingDirectory = Path.Combine(
+            SharedDataDirectory,
+            "installers");
         ProtectUpdateStaging = localAppData is null;
         ToolsDirectory = Path.Combine(DataDirectory, "tools");
         InstallerDirectory = Path.Combine(DataDirectory, "installers");
@@ -42,6 +45,8 @@ public sealed class AppPaths
     public string SharedDataDirectory { get; }
 
     public string UpdateStagingDirectory { get; }
+
+    public string WireSockInstallerStagingDirectory { get; }
 
     public bool ProtectUpdateStaging { get; }
 

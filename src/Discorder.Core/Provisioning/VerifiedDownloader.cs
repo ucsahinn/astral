@@ -7,15 +7,18 @@ public sealed class VerifiedDownloader : IVerifiedDownloader
 {
     private const int DefaultMaxAttempts = 3;
     private static readonly TimeSpan DefaultRetryDelay = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan DefaultReadIdleTimeout = TimeSpan.FromSeconds(60);
 
     private readonly HttpClient _httpClient;
     private readonly int _maxAttempts;
     private readonly TimeSpan _retryDelay;
+    private readonly TimeSpan _readIdleTimeout;
 
     public VerifiedDownloader(
         HttpClient httpClient,
         int maxAttempts = DefaultMaxAttempts,
-        TimeSpan? retryDelay = null)
+        TimeSpan? retryDelay = null,
+        TimeSpan? readIdleTimeout = null)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         if (maxAttempts < 1)
@@ -23,6 +26,14 @@ public sealed class VerifiedDownloader : IVerifiedDownloader
             throw new ArgumentOutOfRangeException(
                 nameof(maxAttempts),
                 "En az bir indirme denemesi yapılmalıdır.");
+        }
+
+        _readIdleTimeout = readIdleTimeout ?? DefaultReadIdleTimeout;
+        if (_readIdleTimeout <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(readIdleTimeout),
+                "İndirme veri bekleme süresi pozitif olmalıdır.");
         }
 
         _maxAttempts = maxAttempts;
@@ -58,6 +69,13 @@ public sealed class VerifiedDownloader : IVerifiedDownloader
             {
                 try
                 {
+                    progress?.Report(new DownloadProgress(
+                        0,
+                        maxBytes,
+                        0,
+                        Message: "İndirme bağlantısı kuruluyor.",
+                        Attempt: attempt,
+                        MaxAttempts: _maxAttempts));
                     await DownloadOnceAsync(
                         source,
                         temporaryPath,
@@ -73,6 +91,14 @@ public sealed class VerifiedDownloader : IVerifiedDownloader
                     && IsTransientDownloadFailure(exception, cancellationToken))
                 {
                     TryDelete(temporaryPath);
+                    progress?.Report(new DownloadProgress(
+                        0,
+                        maxBytes,
+                        null,
+                        Message: "Bağlantı kurulamadı, tekrar deneniyor.",
+                        Attempt: attempt + 1,
+                        MaxAttempts: _maxAttempts,
+                        IsRetry: true));
                     await Task.Delay(GetRetryDelay(attempt), cancellationToken);
                 }
             }
@@ -113,8 +139,10 @@ public sealed class VerifiedDownloader : IVerifiedDownloader
                 $"{source.Host} dosyası beklenenden büyük.");
         }
 
-        var totalBytes = response.Content.Headers.ContentLength is > 0
-            ? response.Content.Headers.ContentLength.Value
+        var contentLength = response.Content.Headers.ContentLength;
+        var hasExactContentLength = contentLength is > 0;
+        var totalBytes = hasExactContentLength
+            ? contentLength.GetValueOrDefault()
             : maxBytes;
 
         progress?.Report(new DownloadProgress(0, totalBytes, 0));
@@ -134,6 +162,8 @@ public sealed class VerifiedDownloader : IVerifiedDownloader
                 destinationStream,
                 maxBytes,
                 totalBytes,
+                hasExactContentLength,
+                _readIdleTimeout,
                 progress,
                 cancellationToken);
         }
@@ -155,6 +185,8 @@ public sealed class VerifiedDownloader : IVerifiedDownloader
         Stream destination,
         long? maxBytes,
         long? expectedBytes,
+        bool expectedBytesAreExact,
+        TimeSpan readIdleTimeout,
         IProgress<DownloadProgress>? progress,
         CancellationToken cancellationToken)
     {
@@ -162,9 +194,25 @@ public sealed class VerifiedDownloader : IVerifiedDownloader
         var bytesReceived = 0L;
         while (true)
         {
-            var bytesRead = await source.ReadAsync(buffer, cancellationToken);
+            var bytesRead = await ReadWithIdleTimeoutAsync(
+                source,
+                buffer,
+                readIdleTimeout,
+                cancellationToken);
             if (bytesRead == 0)
             {
+                if (expectedBytesAreExact
+                    && expectedBytes is > 0
+                    && bytesReceived != expectedBytes.Value)
+                {
+                    throw new InvalidDataException(
+                        "İndirilen dosya beklenen boyuta ulaşmadı.");
+                }
+
+                progress?.Report(new DownloadProgress(
+                    bytesReceived,
+                    expectedBytesAreExact ? expectedBytes : bytesReceived,
+                    100));
                 return;
             }
 
@@ -195,6 +243,30 @@ public sealed class VerifiedDownloader : IVerifiedDownloader
         }
     }
 
+    private static async ValueTask<int> ReadWithIdleTimeoutAsync(
+        Stream source,
+        Memory<byte> buffer,
+        TimeSpan readIdleTimeout,
+        CancellationToken cancellationToken)
+    {
+        using var readTimeout = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken);
+        readTimeout.CancelAfter(readIdleTimeout);
+
+        try
+        {
+            return await source.ReadAsync(buffer, readTimeout.Token);
+        }
+        catch (OperationCanceledException exception)
+            when (!cancellationToken.IsCancellationRequested
+                  && readTimeout.IsCancellationRequested)
+        {
+            throw new TimeoutException(
+                "İndirme sırasında veri akışı zaman aşımına uğradı.",
+                exception);
+        }
+    }
+
     private static bool IsTransientDownloadFailure(
         Exception exception,
         CancellationToken cancellationToken)
@@ -207,6 +279,7 @@ public sealed class VerifiedDownloader : IVerifiedDownloader
         return exception switch
         {
             TaskCanceledException => true,
+            OperationCanceledException => true,
             TimeoutException => true,
             HttpRequestException httpException
                 => IsTransientStatusCode(httpException.StatusCode),

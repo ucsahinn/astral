@@ -8,6 +8,7 @@ public static class WireSockPackage
     public const string CliExecutableFileName = "wiresock-client.exe";
     public const string WindowsX64Sha256 =
         "FA3F483DA7EA1AE6C234F95BECB0AA6A18E7EB18B944D3FFB4518D40F4292F40";
+    public const long WindowsX64MaxBytes = 64L * 1024 * 1024;
     public const string ExpectedPublisher = "IP SMIRNOV VADIM VALERIEVICH";
     public const string ExpectedProductName = "WireSock VPN Client x64";
     private static readonly string[] DownloadPathChunks =

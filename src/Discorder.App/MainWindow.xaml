@@ -283,8 +283,11 @@
                                     Margin="0,2,0,0"
                                     HorizontalAlignment="Center">
                             <TextBlock x:Name="StatusMessage"
+                                       MaxWidth="520"
                                        HorizontalAlignment="Center"
                                        TextAlignment="Center"
+                                       TextWrapping="Wrap"
+                                       TextTrimming="CharacterEllipsis"
                                        FontSize="19"
                                        FontWeight="SemiBold"
                                        Text="Bağlantı kapalı" />
@@ -728,7 +731,7 @@
                                VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource SecondaryTextBrush}"
-                               Text="v2.0.16" />
+                               Text="v2.0.17" />
 
                     <Button Grid.Column="5"
                             x:Name="AutoUpdateButton"

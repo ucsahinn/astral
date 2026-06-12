@@ -14,4 +14,8 @@ public interface IVerifiedDownloader
 public sealed record DownloadProgress(
     long BytesReceived,
     long? TotalBytes,
-    double? Percent);
+    double? Percent,
+    string? Message = null,
+    int? Attempt = null,
+    int? MaxAttempts = null,
+    bool IsRetry = false);
