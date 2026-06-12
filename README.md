@@ -1,219 +1,128 @@
 # Discorder
 
-🟣 **Discorder**, Windows üzerinde Discord uygulamasını WireSock VPN Client ve Cloudflare WARP üzerinden çalıştıran tek tuşlu bir VPN aracıdır. Discord web için desteklenen tarayıcı modu ayrıca açılabilir.
+<p align="center">
+  <img src="src/Discorder.App/Assets/discorder-logo.png" alt="Discorder logosu" width="132">
+</p>
 
-Amaç basit: **Bağlan** düğmesine basınca Discord uygulaması çalışsın, tarayıcı modu açılmışsa Discord web de desteklenen tarayıcılarla çalışsın, **Bağlantıyı Kes** düğmesine basınca Discorder bağlantıyı kapatsın. Oyunlar, yayın uygulamaları, sistem DNS'i ve eski DPI motorları Discorder kapsamına girmez.
+<p align="center">
+  <strong>Windows için sade, portable ve güvenli Discord bağlantı yöneticisi.</strong>
+</p>
 
-## 🎯 Ürün Sözü
+<p align="center">
+  <a href="https://github.com/ucsahinn/discorder/releases"><img alt="GitHub release" src="https://img.shields.io/github/v/release/ucsahinn/discorder?display_name=tag&style=for-the-badge"></a>
+  <img alt="Windows" src="https://img.shields.io/badge/Windows-10%2B-2f81f7?style=for-the-badge&logo=windows">
+  <img alt=".NET" src="https://img.shields.io/badge/.NET-8-7c3aed?style=for-the-badge&logo=dotnet">
+  <img alt="Portable ZIP" src="https://img.shields.io/badge/Portable-ZIP-22c55e?style=for-the-badge">
+</p>
 
-- ✅ Varsayılan kapsam: Discord, Discord PTB, Discord Canary ve Discord Development.
-- ✅ İsteğe bağlı tarayıcı modu: Chrome, Edge, Firefox, Brave, Opera ve Vivaldi.
-- ✅ Tarayıcı modu kapalıyken bağlantı açık olsa bile desteklenen tarayıcılar için geçici Discord web engeli uygulanır; tarayıcı modu açıksa Discord uygulaması ve desteklenen tarayıcılar birlikte kapsama alınır.
-- ✅ Sistem DNS, DoH, proxy, görev zamanlayıcı ve kalıcı servis ayarı değiştirilmez.
-- ✅ Discorder kapalıyken yönetilen Discord bağlantı koruması aktif kalır: hosts kaydı alan adlarını kapatır, Windows Firewall kuralı policy izin verirse çözülen IP'leri de bloklar.
-- ✅ Eski DPI aşma motorları, oyun yönlendirmeleri ve paket filtre sürücüleri yoktur.
-- ✅ WireSock ve wgcf ikili dosyaları repoya gömülmez; ilk kullanımda resmi kaynaklardan indirilip doğrulanır.
-- ✅ WireSock kurucusu SHA-256, Authenticode imzası, yayıncı ve sürüm bilgisiyle doğrulanır.
-- ✅ Yerel profil ve tanılama dosyaları `%LOCALAPPDATA%\Discorder` altında tutulur.
-- ✅ Premium arka plan videosu arayüz sahnesinin sabit parçasıdır; yayın paketinde yerel dosya olarak gelir ve kullanıcı tarafından kapatılıp görsel düzen bozulmaz.
-- ✅ İlk kurulum ve bağlantı adımları ana ekrandaki süreç çubuğunda izlenir.
-- ✅ **Onar** işlemi ayarları, WireSock kurulumunu ve tanılama kayıtlarını koruyup profil, wgcf ve kurucu önbelleğini yeniden üretilecek hale getirir.
-- ✅ **Tanılama** JSONL olay akışı, sağlık raporu, okunabilir özet ve aktif WireSock loglarını kilitlenmeden tek zip içinde hazırlar.
-- ✅ İsteğe bağlı arka plan modu pencere kapansa bile Discorder'ı bildirim alanında çalıştırır.
-- ✅ İsteğe bağlı başlangıç ayarı Discorder'ı oturum açılışında başlatır.
-- ✅ **Uygulamayı kaldır** işlemi Discorder bağlantı korumasını, başlangıç kaydını, yerel veriyi ve Discorder'ın kurduğu WireSock VPN Client kurulumunu geri alır.
+<p align="center">
+  <a href="https://github.com/ucsahinn/discorder/releases">İndir</a>
+  · <a href="docs/kullanim.md">Kullanım</a>
+  · <a href="docs/guncelleme.md">Güncelleme</a>
+  · <a href="docs/guvenlik.md">Güvenlik</a>
+  · <a href="docs/sorun-giderme.md">Sorun giderme</a>
+</p>
 
-## 🧭 Kapsam Dışı
+Discorder, Windows'ta Discord bağlantı sorunu yaşayan kullanıcılar için geliştirilmiş portable bir masaüstü uygulamasıdır. Discord uygulamasının bağlantısını tek ekrandan yönetir.
 
-Discorder şunları bilinçli olarak yapmaz:
+Sistem DNS'ini kalıcı değiştirmez, genel cihaz VPN'i gibi davranmaz ve indirdiği üçüncü taraf bileşenleri hash/imza kontrolleriyle doğrular.
 
-- ❌ Roblox, Steam, Spotify, IPTV veya özel uygulama tünelleme.
-- ❌ Genel cihaz VPN'i.
-- ❌ DNS değiştirme.
-- ❌ GoodbyeDPI, ByeDPI, Zapret, ProxiFyre, WinDivert veya benzeri motorları çalıştırma.
-- ❌ Discord kurma, onarma veya güncelleme.
-- ❌ WireSock lisansını atlatma veya üçüncü taraf koşullarını gizleme.
+Discorder resmi bir Discord, Cloudflare veya WireSock ürünü değildir. Amaç, kullanıcının neyin çalıştığını net gördüğü, kısa ve güven veren bir bağlantı deneyimi sunmaktır.
 
-## 🖥️ Uygulama Akışı
+## Ekran Görüntüleri
 
-1. Discorder açılır.
-2. **Bağlan** düğmesine basılır.
-3. WireSock yüklü değilse resmi WireSock VPN Client x64 MSI kurucusu indirilir.
-4. Kurucu doğrulanır ve Windows yönetici onayıyla başlatılır.
-5. Cloudflare WARP profili `wgcf` ile üretilir.
-6. Profil varsayılan olarak Discord uygulamalarını içerir; tarayıcı modu açıksa desteklenen tarayıcı süreçleri de eklenir.
-7. WireSock VPN Client `discord.conf` dosyasını `run -config` modeliyle çalıştırır.
-8. Bağlanırken Discorder bağlantı koruması kaldırılır.
-9. **Bağlantıyı Kes** düğmesi çalışan WireSock sürecini kapatır.
-10. Kapanışta Discord alan adları yönetilen hosts kaydıyla, policy izin verirse Windows Firewall IP kuralıyla tekrar korunur.
+**Ana ekran**
 
-> Tarayıcı modu varsayılan olarak kapalıdır. Açıldığında WireSock kapsamı süreç bazlı çalışır: desteklenen tarayıcıdan Discord web'e girebilirsiniz; aynı tarayıcı sürecindeki diğer sekmeler de tarayıcı süreci üzerinden çalışır. Discorder kapalıyken VPN süreci çalışmaz ve Discorder'a ait yönetilen bağlantı koruması Discord alan adlarını kapalı tutar.
+![Discorder Windows ana ekranı ve Discord bağlantı durumu](docs/assets/screenshots/discorder-windows-ana-ekran.png)
 
-## ⚙️ Gereksinimler
+**İlk kurulum**
 
-- Windows 10 1809 veya üzeri.
-- x64 sistem.
-- İlk kurulumda internet bağlantısı.
-- Discorder açılırken ve ilk WireSock kurulumunda Windows yönetici onayı.
-- Ticari veya kurumsal kullanımda geçerli WireSock lisansı.
+![Discorder ilk kurulum ve WireSock onay ekranı](docs/assets/screenshots/discorder-ilk-kurulum-ekrani.png)
 
-> Discorder taşınabilir çalışır; kendi başına sürücü, servis veya kurucu paketlemez. WireSock VPN Client ayrı bir üçüncü taraf ürünüdür ve sürücüye erişmek için yönetici yetkisi ister.
+## Discorder Nedir?
 
-## 🚀 Kullanım
+Discorder, Discord uygulaması için hazırlanan dar kapsamlı bir bağlantı aracıdır. Varsayılan kullanımda sadece Discord masaüstü uygulamasına odaklanır. İsteyen kullanıcı Tarayıcı moduyla desteklenen tarayıcıları da bağlantı kapsamına alabilir.
 
-1. Yayın arşivinden `Discorder-2.0.12-win-x64.zip` dosyasını indirin.
-2. Zip içeriğini istediğiniz klasöre çıkarın.
-3. `Discorder.exe` dosyasını çalıştırın ve Windows UAC onayını verin.
-4. Discord web kullanacaksanız ana ekrandaki **Tarayıcı modu** seçeneğini açın.
-5. Pencere kapansa bile çalışmasını istiyorsanız **Arka planda çalış** seçeneğini açın.
-6. Windows oturumu açılınca başlamasını istiyorsanız **Windows açılışında çalıştır** seçeneğini açın.
-7. **Bağlan** düğmesine basın.
-8. İlk kurulum penceresinde WireSock ve Cloudflare WARP koşullarını okuyup onaylayın.
-9. Windows UAC penceresi gelirse resmi WireSock kurulumuna izin verin.
-10. Durum **BAĞLI** olduğunda seçilen kapsam tünellenir.
+Bu repo, uygulamanın kaynak kodunu, doğrulama betiklerini, güvenlik sınırlarını, release notlarını ve kullanım dokümanlarını içerir.
 
-## 🛠️ Onar
+## Ne İşe Yarar?
 
-Ana ekrandaki **Onar** düğmesi profil bozulması, eksik `wgcf` çıktısı veya yarım kalan kurucu önbelleği gibi durumlar için ayarları kaybetmeden temiz başlangıç sağlar:
+| Özellik | Kullanıcıya etkisi |
+| --- | --- |
+| Tek tuşla bağlantı | Discord bağlantısını açıp kapatmayı kolaylaştırır. |
+| Tarayıcı modu | Discord Web kullanılıyorsa desteklenen tarayıcıları isteğe bağlı kapsama alır. |
+| Canlı durum kartları | DNS, bağlantı durumu ve uygulama kapsamı gibi bilgileri sade biçimde gösterir. |
+| Tanılama paketi | Bağlantı sorunlarını incelemek için paylaşılabilir rapor hazırlar. |
+| Portable kullanım | Kurulum sihirbazı olmadan ZIP içinden çalışır. |
+| Güncelleme akışı | Önce yeni sürümü denetler, sonra kullanıcı isterse yükler. |
 
-- Çalışan Discorder bağlantısını kapatır.
-- Discorder bağlantı korumasını güvenli kapalı duruma alır.
-- `%LOCALAPPDATA%\Discorder\profiles`, `tools` ve `installers` klasörlerini temizler.
-- Tarayıcı modu, arka planda çalışma, başlangıç, WireSock onayı, WireSock kurulum izi ve tanılama kayıtlarını korur.
-- Sonraki **Bağlan** işleminde profil ve `wgcf` dosyaları yeniden üretilir.
+## Neden Güvenli?
 
-## ⟳ Güncelleme
+- Sistem DNS ayarını kalıcı değiştirmez.
+- WireSock ve wgcf ikili dosyalarını repoya gömmez.
+- WireSock kurucusunu SHA-256, Authenticode imzası, yayıncı ve sürüm bilgisiyle doğrular.
+- Otomatik güncelleme paketini GitHub release asset bilgisi, `.sha256.txt`, manifest ve imza kontrolleriyle eşleştirir.
+- Discord dışı uygulamaları bilinçli olarak kapsam dışı bırakır.
+- Gizli profil, hesap ve log dosyalarını repoya veya release arşivine eklemez.
 
-Ana ekrandaki **Güncelle** düğmesi önce yalnızca yeni sürüm olup olmadığını denetler. Yeni sürüm bulunursa ayrı **Yükle** düğmesi görünür.
+Daha teknik sınırlar için [güvenlik dokümanına](docs/guvenlik.md) ve [SECURITY.md](SECURITY.md) dosyasına bakın.
 
-- Güncelleme ZIP'i GitHub release asset adı, HTTPS GitHub yolu, asset durumu, asset boyutu, GitHub `sha256:` digest bilgisi ve `.sha256.txt` dosyasıyla eşleştirilir.
-- Paket `%PROGRAMDATA%\Discorder\updates` altında yöneticiye özel staging klasörüne indirilir.
-- ZIP içeriği `discorder.update-manifest.json` ile doğrulanır; manifest sürümü bulunan release sürümüyle eşleşmelidir.
-- Discorder yayınları güvenli otomatik güncelleme için Authenticode imzalı olmalıdır; imza yoksa güncelleme uygulanmaz.
-- **Yükle** aynı çıkarılmış portable Discorder klasörünü günceller, mevcut uygulamayı kapatır ve `Discorder.exe` dosyasını yeniden başlatır.
-- Uygulama dosyaları değiştirilmeden önce yedeklenir; uygulama sırasında hata olursa önceki dosyalar geri taşınır.
+## Hızlı Başlangıç
 
-## 🧾 Tanılama
+1. [GitHub Releases](https://github.com/ucsahinn/discorder/releases) sayfasından en güncel `Discorder-*-win-x64.zip` arşivini indirin.
+2. ZIP içeriğini istediğiniz klasöre çıkarın.
+3. `Discorder.exe` dosyasını çalıştırın.
+4. İlk kullanım ekranında WireSock ve WARP koşullarını okuyup onaylayın.
+5. Ana ekranda **Bağlan** düğmesine basın.
 
-Ana ekrandaki **Tanılama** düğmesi devops incelemesi için şu dosyaları üretir ve oluşan paketin klasörünü açar:
+Release sayfasındaki ZIP paketini manuel indirdiğinizde yanında verilen SHA-256 dosyasıyla kontrol etmeniz önerilir. Uygulama içi otomatik güncelleme zinciri daha sıkıdır: imzasız veya doğrulanamayan paketleri uygulamaz.
 
-- `%LOCALAPPDATA%\Discorder\logs\events.jsonl`: uygulama, UI, koruma, profil ve bağlantı olayları.
-- `%LOCALAPPDATA%\Discorder\logs\health.json`: son bilinen durum, sürüm, ortam ve redakte edilmiş path bilgisi.
-- `%LOCALAPPDATA%\Discorder\logs\diagnostics.md`: okunabilir tanılama özeti.
-- `%LOCALAPPDATA%\Discorder\logs\tunnel.log`: WireSock süreç çıktısı.
-- `%LOCALAPPDATA%\Discorder\diagnostic-bundles\discorder-diagnostics-*.zip`: paylaşılabilir tanılama paketi.
+Kullanım adımları, portable klasör önerileri ve ilk kurulum notları için [kullanım rehberini](docs/kullanim.md) okuyun.
 
-Paket oluşturulurken loglar önce güvenli bir geçici kopyaya alınır. WireSock açıkken `tunnel.log` yazılıyor olsa bile paket üretimi beklenmeyen hata penceresine düşmez; okunamayan dosya varsa pakete `bundle-warnings.txt` eklenir.
+## Güncelleme Nasıl Çalışır?
 
-## 🧹 Uygulamayı Kaldır
+Discorder'da güncelleme iki aşamalıdır:
 
-Ana ekrandaki **Uygulamayı kaldır** düğmesi Discorder'ı taşınabilir uygulama mantığıyla sıfırlar:
+1. **Güncelle** düğmesi yalnızca yeni sürüm olup olmadığını denetler.
+2. Yeni sürüm bulunursa ayrı ve belirgin **Yükle** düğmesi görünür.
 
-- Çalışan Discorder bağlantısını kapatır.
-- Discorder'ın hosts dosyasına eklediği yönetilen Discord bağlantı korumasını kaldırır.
-- `Discorder.BlockDiscordDomains` Windows Firewall kuralını siler.
-- Discorder'ın kurduğu WireSock VPN Client genel Windows kurulumunu settings ve marker izi üzerinden kaldırır.
-- Discorder'a ait Windows başlangıç kaydını siler.
-- `%LOCALAPPDATA%\Discorder` altındaki ayar, profil, wgcf, kurucu, marker, tanılama paketi ve log dosyalarını siler.
-- İşlem bitince uygulamayı kapatır.
+Yükleme, denetlenen sürümle eşleşen paketi kullanır. Paket önce staging alanına indirilir, doğrulanır, mevcut portable klasör yedeklenir ve ardından `Discorder.exe` yeniden başlatılır. İmzasız veya doğrulanamayan paket uygulanmaz. Ayrıntılı akış için [güncelleme dokümanına](docs/guncelleme.md) bakın.
 
-WireSock VPN Client Discorder'dan önce sistemde zaten kuruluysa korunur; Discorder yalnızca kendi ilk kurulumda başlattığı WireSock kurulumunu kaldırır.
+## Doküman Haritası
 
-## 🪪 Kod İmzalama ve SmartScreen
+| Konu | Bağlantı |
+| --- | --- |
+| Kullanım ve ilk çalıştırma | [docs/kullanim.md](docs/kullanim.md) |
+| Güncelleme ve portable ZIP davranışı | [docs/guncelleme.md](docs/guncelleme.md) |
+| Güvenlik sınırları | [docs/guvenlik.md](docs/guvenlik.md) |
+| Sorun giderme | [docs/sorun-giderme.md](docs/sorun-giderme.md) |
+| Mimari | [docs/mimari.md](docs/mimari.md) |
+| Kaynak sorun denetimi | [docs/kaynak-sorun-denetimi.md](docs/kaynak-sorun-denetimi.md) |
+| v2.0.12 release notu taslağı | [docs/releases/v2.0.12.md](docs/releases/v2.0.12.md) |
 
-Windows SmartScreen'de **Publisher: Unknown publisher** uyarısının kalkması için `Discorder.exe` güvenilir bir Authenticode kod imzalama sertifikasıyla imzalanmalıdır. Manifest, ikon, uygulama adı veya repo ayarı bu publisher bilgisini tek başına düzeltemez.
-
-Release workflow'u imzalamaya hazırdır:
-
-- `DISCORDER_CODESIGN_PFX_B64`: OV/EV ya da kurumsal güvenilir kod imzalama sertifikasının PFX dosyası, Base64 olarak.
-- `DISCORDER_CODESIGN_PFX_PASSWORD`: PFX parolası.
-
-Bu secret'lar GitHub `release` environment altında tutulmalıdır. Environment için onaylı reviewer, self-review kapalı, `v*` tag koruması ve yalnızca release yetkililerinin workflow çalıştırabilmesi beklenir.
-
-Tag yayını sırasında `Discorder.exe` ve yayın klasöründeki `.dll` dosyaları SHA-256 timestamp ile imzalanır. Public auto-update yayını için kod imzalama zorunludur; release workflow'u PFX secret yoksa bilinçli olarak durur.
-
-Self-signed sertifika yalnızca yerel test içindir; public kullanıcılarda SmartScreen güveni sağlamaz.
-
-## 🔐 Güvenlik Modeli
-
-- WireSock kurucusu sabit SHA-256 değeriyle doğrulanır.
-- Windows Authenticode zinciri ve yayıncı adı kontrol edilir.
-- Beklenen WireSock sürümü: `1.4.7.1`.
-- Beklenen yayıncı: `IP SMIRNOV VADIM VALERIEVICH`.
-- TLS doğrulaması devre dışı bırakılmaz.
-- Discord uygulaması ve isteğe bağlı tarayıcı kapsamı `AllowedApps` satırında testlerle korunur.
-- Tarayıcı modu kapalı bağlantılarda desteklenen tarayıcıların Discord alan adlarına düz internetten çıkmasını azaltmak için bağlantı süresince geçici `Discorder.TunnelScope.Browsers` Windows Firewall kuralları yönetilir.
-- Geniş uygulama adları, satır enjeksiyonu ve `Update.exe` gibi riskli kapsamlar reddedilir.
-- Kapalı durum bağlantı koruması Discorder'ın marker bloğuyla hosts dosyasında, policy izin verirse `Discorder.BlockDiscordDomains` adlı Windows Firewall kuralında yönetilir.
-
-## 🧪 Geliştirme
+## Geliştirme
 
 ```powershell
 dotnet build Discorder.sln --configuration Release
 dotnet run --project tests\Discorder.Core.Tests --configuration Release
 dotnet run --project tests\Discorder.Windows.Tests --configuration Release
-dotnet run --project src\Discorder.App
-```
-
-Tam doğrulama:
-
-```powershell
 .\scripts\verify.ps1
 ```
 
-Yayın paketi:
+Release paketi yerel olarak hazırlanacaksa:
 
 ```powershell
 .\scripts\build-release.ps1
 ```
 
-Kapalı durumdaki Discord bağlantı korumasını canlı Windows üzerinde doğrulamak
-için PowerShell'i yönetici olarak açıp şunu çalıştırın:
+Public otomatik güncelleme için kod imzalama gizli bilgileri gerekir. İmzasız paketler manuel indirme olarak sunulabilir, ancak uygulama içi otomatik güncelleme zincirinde kabul edilmez.
 
-```powershell
-.\scripts\verify-firewall-lock.ps1
-```
+## Destek ve Güvenlik
 
-İsteğe bağlı ağ probu da isterseniz:
+Hata bildirirken Discorder sürümünü, Windows sürümünü, Discord kullanım yolunu ve redakte edilmiş tanılama paketini ekleyin. Özel anahtar, token, cookie, `wgcf-account.toml`, tam WireGuard profili veya kişisel veri paylaşmayın.
 
-```powershell
-.\scripts\verify-firewall-lock.ps1 -ProbeNetwork
-```
+Güvenlik açığı bildirmek için [GitHub Security Advisory](https://github.com/ucsahinn/discorder/security/advisories/new) kullanın.
 
-Yayın exe'siyle canlı app + web kabul testi için PowerShell'i yönetici
-olarak açıp şunu çalıştırın:
+## Lisans ve Üçüncü Taraf Notu
 
-```powershell
-.\scripts\smoke-live-connect.ps1
-```
-
-## 📦 Yayın İçeriği
-
-Yayın arşivi yalnızca Discorder uygulamasını ve .NET bağımsız çalışma dosyalarını içerir. Şunlar bilerek pakete dahil edilmez:
-
-- WireSock kurucusu veya WireSock ikili dosyaları.
-- wgcf ikili dosyası.
-- DPI aşma araçları.
-- Üçüncü taraf sürücüler.
-- Log, profil, hesap veya kullanıcı ayar dosyaları.
-
-## 🧯 Sorun Bildirme
-
-Ana forkta açık kalan issue sınıflarının Discorder'da nasıl ele alındığını görmek için [kaynak sorun denetimi](docs/kaynak-sorun-denetimi.md) sayfasına bakın.
-
-Hata bildirirken şunları ekleyin:
-
-- Discorder sürümü.
-- Discord kullanım yolu: uygulama mı, tarayıcı mı.
-- Windows sürümü.
-- Discord kanalı: Stable, PTB, Canary veya Development.
-- WireSock sürümü.
-- İnternet sağlayıcısı.
-- Tekrar üretme adımları.
-- `%LOCALAPPDATA%\Discorder\logs` altındaki redakte edilmiş tanılama çıktısı.
-
-Özel anahtar, `wgcf-account.toml`, WireGuard profil içeriği, token veya kişisel veri paylaşmayın.
-
-## ⚖️ Üçüncü Taraf Notu
-
-Discorder; Discord, Cloudflare veya WireSock tarafından üretilen, onaylanan ya da desteklenen resmi bir ürün değildir. İsimler ve markalar ilgili sahiplerine aittir.
+Discorder kaynak kodu bu repodaki [LICENSE](LICENSE) koşullarıyla yayınlanır. WireSock, Cloudflare WARP, Discord ve diğer marka/adlar kendi sahiplerine aittir. Üçüncü taraf sınırları için [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) dosyasına bakın.
