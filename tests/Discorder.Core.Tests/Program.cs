@@ -652,12 +652,19 @@ static async Task AppUpdatePreparesVerifiedReleaseAsync()
             latestUri,
             requireUpdateAuthenticode: false);
         await WriteUpdaterHelperAsync(root);
+        var progressEvents = new List<AppUpdateProgress>();
+        var progress = new ImmediateProgress<AppUpdateProgress>(
+            progressEvents.Add);
 
-        var update = await service.PrepareLatestUpdateAsync(
+        var check = await service.CheckLatestUpdateAsync(
             new Version(2, 0, 12, 0),
+            CancellationToken.None);
+        var update = await service.PrepareCheckedUpdateAsync(
+            check,
             root,
             "Discorder.exe",
-            CancellationToken.None);
+            CancellationToken.None,
+            progress);
 
         Assert(update.Status == AppUpdatePreparationStatus.Prepared);
         Assert(downloader.DownloadCount == 1);
@@ -671,7 +678,17 @@ static async Task AppUpdatePreparesVerifiedReleaseAsync()
             UpdatePackageValidator.ManifestFileName)));
         Assert(File.Exists(update.ApplicatorPath));
         Assert(Path.GetFileName(update.ApplicatorPath!) == "Discorder.Updater.exe");
+        Assert(File.Exists(Path.Combine(
+            Path.GetDirectoryName(update.ApplicatorPath!)!,
+            "runtimes",
+            "win",
+            "native",
+            "helper.dll")));
         Assert(update.ExpectedSignerThumbprint is null);
+        Assert(progressEvents.Any(item => item.Message.Contains(
+            "indiriliyor",
+            StringComparison.OrdinalIgnoreCase)));
+        Assert(progressEvents.Any(item => item.Percent >= 90));
     }
     finally
     {
@@ -1911,6 +1928,11 @@ static async Task WriteUpdaterHelperAsync(string root)
     await File.WriteAllTextAsync(
         Path.Combine(root, "Discorder.Core.dll"),
         "core");
+    var runtimeDirectory = Path.Combine(root, "runtimes", "win", "native");
+    Directory.CreateDirectory(runtimeDirectory);
+    await File.WriteAllTextAsync(
+        Path.Combine(runtimeDirectory, "helper.dll"),
+        "runtime");
 }
 
 static void Assert(bool condition)
@@ -2017,6 +2039,14 @@ file sealed class FakeDiscordAccessLock(Exception? disableException = null) : ID
         cancellationToken.ThrowIfCancellationRequested();
         RemoveCount++;
         return Task.CompletedTask;
+    }
+}
+
+file sealed class ImmediateProgress<T>(Action<T> callback) : IProgress<T>
+{
+    public void Report(T value)
+    {
+        callback(value);
     }
 }
 
@@ -2196,7 +2226,8 @@ file sealed class CapturingVerifiedDownloader(byte[] payload) : IVerifiedDownloa
         string destination,
         string expectedSha256,
         CancellationToken cancellationToken,
-        long? maxBytes = null)
+        long? maxBytes = null,
+        IProgress<DownloadProgress>? progress = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         DownloadCount++;
@@ -2204,7 +2235,9 @@ file sealed class CapturingVerifiedDownloader(byte[] payload) : IVerifiedDownloa
         LastExpectedSha256 = expectedSha256;
         LastMaxBytes = maxBytes;
         Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+        progress?.Report(new DownloadProgress(0, payload.Length, 0));
         await File.WriteAllBytesAsync(destination, payload, cancellationToken);
+        progress?.Report(new DownloadProgress(payload.Length, payload.Length, 100));
     }
 }
 
@@ -2217,14 +2250,17 @@ file sealed class FakeVerifiedDownloader : IVerifiedDownloader
         string destination,
         string expectedSha256,
         CancellationToken cancellationToken,
-        long? maxBytes = null)
+        long? maxBytes = null,
+        IProgress<DownloadProgress>? progress = null)
     {
         DownloadCount++;
         Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+        progress?.Report(new DownloadProgress(0, 20, 0));
         await File.WriteAllTextAsync(
             destination,
             "dogrulanmis-kurucu",
             cancellationToken);
+        progress?.Report(new DownloadProgress(20, 20, 100));
     }
 }
 

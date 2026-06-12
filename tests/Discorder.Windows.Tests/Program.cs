@@ -387,7 +387,8 @@ file sealed class FakeVerifiedDownloader : IVerifiedDownloader
         string destination,
         string expectedSha256,
         CancellationToken cancellationToken,
-        long? maxBytes = null)
+        long? maxBytes = null,
+        IProgress<DownloadProgress>? progress = null)
     {
         throw new NotSupportedException();
     }

@@ -34,7 +34,8 @@ public sealed class VerifiedDownloader : IVerifiedDownloader
         string destination,
         string expectedSha256,
         CancellationToken cancellationToken,
-        long? maxBytes = null)
+        long? maxBytes = null,
+        IProgress<DownloadProgress>? progress = null)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentException.ThrowIfNullOrWhiteSpace(destination);
@@ -63,7 +64,8 @@ public sealed class VerifiedDownloader : IVerifiedDownloader
                         destination,
                         expectedSha256,
                         maxBytes,
-                        cancellationToken);
+                        cancellationToken,
+                        progress);
                     return;
                 }
                 catch (Exception exception) when (
@@ -87,7 +89,8 @@ public sealed class VerifiedDownloader : IVerifiedDownloader
         string destination,
         string expectedSha256,
         long? maxBytes,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IProgress<DownloadProgress>? progress)
     {
         using var response = await _httpClient.GetAsync(
             source,
@@ -110,6 +113,12 @@ public sealed class VerifiedDownloader : IVerifiedDownloader
                 $"{source.Host} dosyası beklenenden büyük.");
         }
 
+        var totalBytes = response.Content.Headers.ContentLength is > 0
+            ? response.Content.Headers.ContentLength.Value
+            : maxBytes;
+
+        progress?.Report(new DownloadProgress(0, totalBytes, 0));
+
         await using (var sourceStream = await response.Content.ReadAsStreamAsync(
                          cancellationToken))
         await using (var destinationStream = new FileStream(
@@ -124,6 +133,8 @@ public sealed class VerifiedDownloader : IVerifiedDownloader
                 sourceStream,
                 destinationStream,
                 maxBytes,
+                totalBytes,
+                progress,
                 cancellationToken);
         }
 
@@ -143,10 +154,12 @@ public sealed class VerifiedDownloader : IVerifiedDownloader
         Stream source,
         Stream destination,
         long? maxBytes,
+        long? expectedBytes,
+        IProgress<DownloadProgress>? progress,
         CancellationToken cancellationToken)
     {
         var buffer = new byte[128 * 1024];
-        var totalBytes = 0L;
+        var bytesReceived = 0L;
         while (true)
         {
             var bytesRead = await source.ReadAsync(buffer, cancellationToken);
@@ -155,8 +168,8 @@ public sealed class VerifiedDownloader : IVerifiedDownloader
                 return;
             }
 
-            totalBytes += bytesRead;
-            if (maxBytes is not null && totalBytes > maxBytes.Value)
+            bytesReceived += bytesRead;
+            if (maxBytes is not null && bytesReceived > maxBytes.Value)
             {
                 throw new InvalidDataException(
                     "İndirilen dosya beklenenden büyük.");
@@ -165,6 +178,20 @@ public sealed class VerifiedDownloader : IVerifiedDownloader
             await destination.WriteAsync(
                 buffer.AsMemory(0, bytesRead),
                 cancellationToken);
+
+            double? percent = null;
+            if (expectedBytes is > 0)
+            {
+                percent = Math.Clamp(
+                    bytesReceived * 100d / expectedBytes.Value,
+                    0,
+                    100);
+            }
+
+            progress?.Report(new DownloadProgress(
+                bytesReceived,
+                expectedBytes,
+                percent));
         }
     }
 

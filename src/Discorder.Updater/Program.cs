@@ -1,14 +1,20 @@
 using System.Diagnostics;
+using System.Drawing;
 using System.Globalization;
+using System.Windows.Forms;
 using Discorder.Core.Updates;
 
-return await DiscorderUpdater.RunAsync(args);
+using var progress = UpdateProgressPresenter.Start();
+return await DiscorderUpdater.RunAsync(args, progress);
 
 internal static class DiscorderUpdater
 {
     private static readonly TimeSpan ProcessExitTimeout = TimeSpan.FromSeconds(90);
+    private static readonly TimeSpan FailureWindowTimeout = TimeSpan.FromMinutes(10);
 
-    public static async Task<int> RunAsync(string[] args)
+    public static async Task<int> RunAsync(
+        string[] args,
+        UpdateProgressPresenter progress)
     {
         UpdateOptions options;
         try
@@ -17,16 +23,28 @@ internal static class DiscorderUpdater
         }
         catch (Exception exception)
         {
+            progress.Fail(
+                "Güncelleme başlatılamadı",
+                exception.Message);
             Console.Error.WriteLine(exception.Message);
+            progress.WaitForClose(FailureWindowTimeout);
             return 2;
         }
 
         var log = new UpdateLog(options.LogPath);
         try
         {
+            progress.Report(
+                4,
+                "Güncelleme başlatılıyor",
+                "Discorder'ın kapanması bekleniyor.");
             log.Write("Update helper started.");
             await WaitForDiscorderToExitAsync(options.ProcessId, log);
 
+            progress.Report(
+                18,
+                "Paket doğrulanıyor",
+                "İndirilen ZIP dosyası kontrol ediliyor.");
             var packageHash = UpdatePackageValidator.ComputeSha256(options.PackagePath);
             if (!string.Equals(
                     packageHash,
@@ -37,6 +55,10 @@ internal static class DiscorderUpdater
                     "Update package hash changed before apply.");
             }
 
+            progress.Report(
+                32,
+                "Paket açılıyor",
+                "Dosyalar güvenli staging alanında hazırlanıyor.");
             var updateRoot = Path.GetDirectoryName(options.PackagePath)
                 ?? Path.GetTempPath();
             var applyPayload = Path.Combine(
@@ -49,6 +71,10 @@ internal static class DiscorderUpdater
                 options.ExpectedVersion,
                 options.ExpectedSignerThumbprint,
                 options.ExpectedSha256);
+            progress.Report(
+                48,
+                "Yeni sürüm doğrulanıyor",
+                "Manifest ve dosya hashleri kontrol ediliyor.");
             var newManifest = UpdatePackageValidator.ValidatePayload(
                 applyPayload,
                 options.ExecutableName,
@@ -62,7 +88,8 @@ internal static class DiscorderUpdater
                 options.ExecutableName,
                 options.ExpectedVersion,
                 options.ExpectedSignerThumbprint,
-                log);
+                log,
+                progress);
 
             var executablePath = Path.Combine(
                 options.TargetDirectory,
@@ -74,6 +101,10 @@ internal static class DiscorderUpdater
                     executablePath);
             }
 
+            progress.Report(
+                94,
+                "Discorder yeniden açılıyor",
+                "Yeni sürüm başlatılıyor.");
             log.Write("Starting updated Discorder.");
             Process.Start(new ProcessStartInfo
             {
@@ -83,11 +114,19 @@ internal static class DiscorderUpdater
             });
 
             log.Write("Update completed.");
+            progress.Succeed(
+                "Güncelleme tamamlandı",
+                "Discorder yeni sürümle açılıyor.");
+            await Task.Delay(1400);
             return 0;
         }
         catch (Exception exception)
         {
             log.Write("Update failed: " + exception.Message);
+            progress.Fail(
+                "Güncelleme tamamlanamadı",
+                "Mevcut sürüm korundu. " + exception.Message);
+            progress.WaitForClose(FailureWindowTimeout);
             Console.Error.WriteLine(exception.Message);
             return 1;
         }
@@ -130,13 +169,15 @@ internal static class DiscorderUpdater
         string executableName,
         string expectedVersion,
         string? expectedSignerThumbprint,
-        UpdateLog log)
+        UpdateLog log,
+        UpdateProgressPresenter progress)
     {
         var targetRoot = Path.GetFullPath(targetDirectory);
         if (!Directory.Exists(targetRoot))
         {
             throw new DirectoryNotFoundException(targetRoot);
         }
+        RejectReparsePointsInExistingTree(targetRoot);
 
         var backupRoot = Path.Combine(
             Path.GetDirectoryName(payloadDirectory) ?? Path.GetTempPath(),
@@ -165,8 +206,16 @@ internal static class DiscorderUpdater
                 BackupTargetFile(targetRoot, backupRoot, relativePath, backups);
             }
 
+            var installIndex = 0;
+            var installCount = Math.Max(1, newManifest.Files.Count);
             foreach (var file in newManifest.Files)
             {
+                installIndex++;
+                var installPercent = 58 + (installIndex * 28d / installCount);
+                progress.Report(
+                    Math.Min(86, installPercent),
+                    "Dosyalar güncelleniyor",
+                    FormatInstallDetail(file.Path, installIndex, installCount));
                 var relativePath = UpdatePackageValidator.NormalizeRelativePath(file.Path);
                 var source = UpdatePackageValidator.GetSafePath(
                     payloadDirectory,
@@ -175,6 +224,7 @@ internal static class DiscorderUpdater
                     targetRoot,
                     relativePath);
                 Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+                RejectReparsePointsInExistingAncestors(targetRoot, destination);
                 if (!backups.ContainsKey(destination))
                 {
                     copiedWithoutBackup.Add(destination);
@@ -183,6 +233,10 @@ internal static class DiscorderUpdater
                 File.Copy(source, destination, overwrite: true);
             }
 
+            progress.Report(
+                88,
+                "Son kontrol yapılıyor",
+                "Yeni dosyalar doğrulanıyor.");
             CopyManifest(
                 targetRoot,
                 newManifest,
@@ -248,11 +302,96 @@ internal static class DiscorderUpdater
         {
             return;
         }
+        RejectReparsePoint(source);
 
         var backup = UpdatePackageValidator.GetSafePath(backupRoot, relativePath);
         Directory.CreateDirectory(Path.GetDirectoryName(backup)!);
         File.Move(source, backup, overwrite: true);
         backups[source] = backup;
+    }
+
+    private static string FormatInstallDetail(
+        string path,
+        int index,
+        int total)
+    {
+        var fileName = Path.GetFileName(path);
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            fileName = path;
+        }
+
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"{index}/{total} {fileName}");
+    }
+
+    private static void RejectReparsePointsInExistingTree(string rootDirectory)
+    {
+        RejectReparsePoint(rootDirectory);
+        var pending = new Stack<string>();
+        pending.Push(rootDirectory);
+        while (pending.Count > 0)
+        {
+            var current = pending.Pop();
+            foreach (var file in Directory.EnumerateFiles(
+                         current,
+                         "*",
+                         SearchOption.TopDirectoryOnly))
+            {
+                RejectReparsePoint(file);
+            }
+
+            foreach (var directory in Directory.EnumerateDirectories(
+                         current,
+                         "*",
+                         SearchOption.TopDirectoryOnly))
+            {
+                RejectReparsePoint(directory);
+                pending.Push(directory);
+            }
+        }
+    }
+
+    private static void RejectReparsePointsInExistingAncestors(
+        string rootDirectory,
+        string path)
+    {
+        var root = Path.GetFullPath(rootDirectory).TrimEnd(
+            Path.DirectorySeparatorChar,
+            Path.AltDirectorySeparatorChar);
+        var current = Directory.Exists(path)
+            ? Path.GetFullPath(path)
+            : Path.GetDirectoryName(Path.GetFullPath(path));
+
+        while (!string.IsNullOrWhiteSpace(current)
+            && current.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+        {
+            if (Directory.Exists(current))
+            {
+                RejectReparsePoint(current);
+            }
+
+            if (string.Equals(
+                    current.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                    root,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                break;
+            }
+
+            current = Path.GetDirectoryName(current);
+        }
+    }
+
+    private static void RejectReparsePoint(string path)
+    {
+        var info = File.GetAttributes(path);
+        if (info.HasFlag(FileAttributes.ReparsePoint))
+        {
+            throw new InvalidOperationException(
+                "Güncelleme hedefinde junction veya symlink bulunamaz.");
+        }
     }
 
     private static void RestoreBackup(
@@ -368,5 +507,256 @@ internal sealed class UpdateLog
             System.Globalization.CultureInfo.InvariantCulture,
             $"{DateTimeOffset.Now:O} {message}");
         File.AppendAllText(_path, line + Environment.NewLine);
+    }
+}
+
+internal sealed class UpdateProgressPresenter : IDisposable
+{
+    private readonly ManualResetEventSlim _ready = new();
+    private readonly Thread _thread;
+    private UpdateProgressForm? _form;
+    private bool _disposed;
+
+    private UpdateProgressPresenter()
+    {
+        _thread = new Thread(RunWindow)
+        {
+            IsBackground = false,
+            Name = "Discorder update progress"
+        };
+        _thread.SetApartmentState(ApartmentState.STA);
+        _thread.Start();
+        _ready.Wait(TimeSpan.FromSeconds(5));
+    }
+
+    public static UpdateProgressPresenter Start() => new();
+
+    public void Report(
+        double percent,
+        string message,
+        string? detail = null)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        Post(form => form.SetProgress(percent, message, detail, failed: false));
+    }
+
+    public void Succeed(string message, string detail)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        Post(form => form.SetProgress(100, message, detail, failed: false));
+    }
+
+    public void Fail(string message, string detail)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        Post(form => form.SetProgress(100, message, detail, failed: true));
+    }
+
+    public void WaitForClose(TimeSpan timeout)
+    {
+        if (_thread.IsAlive && !_thread.Join(timeout))
+        {
+            Dispose();
+        }
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        Post(form => form.CloseFromPresenter());
+        if (_thread.IsAlive)
+        {
+            _thread.Join(TimeSpan.FromSeconds(2));
+        }
+
+        _ready.Dispose();
+    }
+
+    private void RunWindow()
+    {
+        Application.EnableVisualStyles();
+        Application.SetCompatibleTextRenderingDefault(false);
+        using var form = new UpdateProgressForm();
+        _form = form;
+        _ready.Set();
+        Application.Run(form);
+    }
+
+    private void Post(Action<UpdateProgressForm> action)
+    {
+        if (!_ready.IsSet)
+        {
+            return;
+        }
+
+        var form = _form;
+        if (form is null || form.IsDisposed)
+        {
+            return;
+        }
+
+        try
+        {
+            if (form.InvokeRequired)
+            {
+                form.BeginInvoke(new Action(() => action(form)));
+            }
+            else
+            {
+                action(form);
+            }
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+        catch (InvalidOperationException)
+        {
+        }
+    }
+}
+
+internal sealed class UpdateProgressForm : Form
+{
+    private readonly Label _title;
+    private readonly Label _message;
+    private readonly Label _detail;
+    private readonly ProgressBar _progress;
+    private readonly Button _closeButton;
+    private bool _canClose;
+
+    public UpdateProgressForm()
+    {
+        Text = "Discorder güncelleme";
+        StartPosition = FormStartPosition.CenterScreen;
+        FormBorderStyle = FormBorderStyle.FixedDialog;
+        ControlBox = false;
+        MaximizeBox = false;
+        MinimizeBox = false;
+        ClientSize = new Size(440, 212);
+        BackColor = Color.FromArgb(16, 24, 38);
+        ForeColor = Color.White;
+        Font = new Font("Segoe UI", 9f, FontStyle.Regular);
+
+        _title = new Label
+        {
+            AutoSize = false,
+            Text = "Discorder güncelleniyor",
+            Font = new Font("Segoe UI Semibold", 14f, FontStyle.Bold),
+            ForeColor = Color.White,
+            Location = new Point(24, 22),
+            Size = new Size(392, 30)
+        };
+
+        _message = new Label
+        {
+            AutoSize = false,
+            Text = "Hazırlanıyor",
+            Font = new Font("Segoe UI Semibold", 10f, FontStyle.Bold),
+            ForeColor = Color.FromArgb(112, 232, 255),
+            Location = new Point(24, 70),
+            Size = new Size(392, 24)
+        };
+
+        _detail = new Label
+        {
+            AutoSize = false,
+            Text = "Lütfen bu pencere kapanana kadar bekleyin.",
+            ForeColor = Color.FromArgb(205, 215, 230),
+            Location = new Point(24, 98),
+            Size = new Size(392, 40)
+        };
+
+        _progress = new ProgressBar
+        {
+            Location = new Point(24, 146),
+            Size = new Size(392, 16),
+            Minimum = 0,
+            Maximum = 100,
+            Value = 0,
+            Style = ProgressBarStyle.Continuous
+        };
+
+        _closeButton = new Button
+        {
+            Text = "Kapat",
+            Location = new Point(326, 174),
+            Size = new Size(90, 28),
+            Visible = false
+        };
+        _closeButton.Click += (_, _) => CloseFromPresenter();
+
+        Controls.AddRange([
+            _title,
+            _message,
+            _detail,
+            _progress,
+            _closeButton
+        ]);
+    }
+
+    public void SetProgress(
+        double percent,
+        string message,
+        string? detail,
+        bool failed)
+    {
+        var value = (int)Math.Clamp(Math.Round(percent), 0, 100);
+        _progress.Value = value;
+        _message.Text = message;
+        _message.ForeColor = failed
+            ? Color.FromArgb(255, 102, 130)
+            : Color.FromArgb(112, 232, 255);
+        _detail.Text = string.IsNullOrWhiteSpace(detail)
+            ? "Lütfen bu pencere kapanana kadar bekleyin."
+            : SanitizeDisplayText(detail);
+        _closeButton.Visible = failed;
+    }
+
+    public void CloseFromPresenter()
+    {
+        _canClose = true;
+        Close();
+    }
+
+    protected override void OnFormClosing(FormClosingEventArgs e)
+    {
+        if (!_canClose)
+        {
+            e.Cancel = true;
+            return;
+        }
+
+        base.OnFormClosing(e);
+    }
+
+    private static string SanitizeDisplayText(string text)
+    {
+        var clean = new string(text
+            .Where(character => !char.IsControl(character) || char.IsWhiteSpace(character))
+            .ToArray())
+            .ReplaceLineEndings(" ")
+            .Trim();
+
+        const int maxLength = 150;
+        return clean.Length <= maxLength
+            ? clean
+            : clean[..(maxLength - 1)] + "…";
     }
 }

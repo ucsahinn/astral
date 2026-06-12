@@ -12,6 +12,11 @@ public enum AppUpdatePreparationStatus
     Prepared
 }
 
+public sealed record AppUpdateProgress(
+    double Percent,
+    string Message,
+    string? Detail = null);
+
 public sealed record AppUpdateCheckResult(
     AppUpdateCheckStatus Status,
     Version CurrentVersion,

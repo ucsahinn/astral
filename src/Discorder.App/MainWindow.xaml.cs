@@ -46,6 +46,7 @@ public partial class MainWindow : Window, IDisposable
     private bool _isRunInBackgroundEnabled;
     private bool _isToggleOperationRunning;
     private bool _isUpdateOperationRunning;
+    private bool _isUpdateProgressPinned;
     private AppUpdateCheckResult? _pendingUpdate;
     private bool _backgroundVideoRemoteFallbackTried;
     private Forms.NotifyIcon? _trayIcon;
@@ -166,6 +167,11 @@ public partial class MainWindow : Window, IDisposable
 
     private void ApplySnapshot(TunnelSnapshot snapshot)
     {
+        if (!_isUpdateOperationRunning && snapshot.IsBusy)
+        {
+            _isUpdateProgressPinned = false;
+        }
+
         ToggleButton.IsEnabled = !_isToggleOperationRunning && !snapshot.IsBusy;
         RepairButton.IsEnabled = !snapshot.IsBusy;
         ApplyUpdateControls(snapshot.IsBusy);
@@ -226,7 +232,10 @@ public partial class MainWindow : Window, IDisposable
             coreGlow.Stroke = visual.PowerBrush;
         }
 
-        ApplyProgress(snapshot, visual.StatusBrush);
+        if (!_isUpdateProgressPinned)
+        {
+            ApplyProgress(snapshot, visual.StatusBrush);
+        }
     }
 
     private void RefreshLiveStatusCards(TunnelSnapshot snapshot)
@@ -848,6 +857,12 @@ public partial class MainWindow : Window, IDisposable
         StageProgressPercent.Text = $"{value:0}%";
     }
 
+    private void SetUpdateStageProgress(double value, string label)
+    {
+        _isUpdateProgressPinned = true;
+        SetMaintenanceProgress(value, label);
+    }
+
     private void BackgroundVideo_Loaded(object sender, RoutedEventArgs e)
     {
         StartBackgroundVideo();
@@ -1138,6 +1153,7 @@ public partial class MainWindow : Window, IDisposable
         {
             _diagnostics.Info("ui.update.check", "Güncelleme denetimi istendi.");
             DiagnosticsStatus.Text = "Güncelleme denetleniyor…";
+            SetUpdateStageProgress(12, "Güncelleme denetleniyor");
             using var timeoutSource = new CancellationTokenSource(
                 TimeSpan.FromMinutes(3));
             var update = await _updateService.CheckLatestUpdateAsync(
@@ -1148,6 +1164,7 @@ public partial class MainWindow : Window, IDisposable
             {
                 _pendingUpdate = null;
                 DiagnosticsStatus.Text = "Discorder güncel.";
+                SetUpdateStageProgress(100, "Discorder güncel");
                 MessageBox.Show(
                     $"Discorder güncel.\n\nKurulu sürüm: v{AppUpdateService.FormatVersion(update.CurrentVersion)}",
                     "Discorder güncelleme",
@@ -1158,7 +1175,8 @@ public partial class MainWindow : Window, IDisposable
 
             _pendingUpdate = update;
             DiagnosticsStatus.Text =
-                $"v{AppUpdateService.FormatVersion(update.LatestVersion)} bulundu. Yükle bu klasöre kurar.";
+                $"v{AppUpdateService.FormatVersion(update.LatestVersion)} bulundu. Yükle, bu Discorder klasörünü günceller.";
+            SetUpdateStageProgress(100, "Güncelleme bulundu");
             _diagnostics.Info(
                 "ui.update.available",
                 "Güncelleme bulundu.",
@@ -1171,11 +1189,13 @@ public partial class MainWindow : Window, IDisposable
         catch (OperationCanceledException)
         {
             DiagnosticsStatus.Text = "Güncelleme denetimi iptal edildi.";
+            SetUpdateStageProgress(100, "Denetim iptal edildi");
         }
         catch (Exception exception)
         {
             _pendingUpdate = null;
             DiagnosticsStatus.Text = "Güncelleme denetlenemedi. Mevcut sürüm kullanılabilir.";
+            SetUpdateStageProgress(100, "Denetim tamamlanamadı");
             _diagnostics.Failure(
                 "ui.update",
                 "Güncelleme denetimi tamamlanamadı.",
@@ -1233,6 +1253,7 @@ public partial class MainWindow : Window, IDisposable
             if (_controller.Snapshot.IsConnected)
             {
                 DiagnosticsStatus.Text = "Bağlantı kapatılıyor. Ardından güncelleme yüklenecek.";
+                SetUpdateStageProgress(8, "Bağlantı kapatılıyor");
                 await _controller.DisconnectAsync(CancellationToken.None);
             }
 
@@ -1241,21 +1262,27 @@ public partial class MainWindow : Window, IDisposable
             var executableName = GetExecutableName();
             DiagnosticsStatus.Text =
                 $"v{AppUpdateService.FormatVersion(_pendingUpdate.LatestVersion)} indiriliyor ve doğrulanıyor…";
+            SetUpdateStageProgress(18, "Güncelleme hazırlanıyor");
+            var progress = new Progress<AppUpdateProgress>(
+                value => SetUpdateProgress(value));
             var update = await _updateService.PrepareCheckedUpdateAsync(
                 _pendingUpdate,
                 AppContext.BaseDirectory,
                 executableName,
-                timeoutSource.Token);
+                timeoutSource.Token,
+                progress);
 
             if (update.Status == AppUpdatePreparationStatus.UpToDate)
             {
                 _pendingUpdate = null;
                 DiagnosticsStatus.Text = "Discorder güncel.";
+                SetUpdateStageProgress(100, "Discorder güncel");
                 return;
             }
 
             DiagnosticsStatus.Text =
                 "Güncelleme hazır. Discorder kapanıp yeni sürümle açılacak.";
+            SetUpdateStageProgress(96, "Yükleme penceresi açılıyor");
             _diagnostics.Info(
                 "ui.update.prepared",
                 "Güncelleme paketi hazırlandı.",
@@ -1267,17 +1294,23 @@ public partial class MainWindow : Window, IDisposable
                     ["expectedSha256"] = update.ExpectedSha256
                 });
 
-            StartUpdateApplicator(update, executableName);
+            await StartUpdateApplicatorAsync(
+                update,
+                executableName,
+                timeoutSource.Token);
+            SetUpdateStageProgress(100, "Discorder yeniden başlatılıyor");
             _allowClose = true;
             System.Windows.Application.Current.Shutdown();
         }
         catch (OperationCanceledException)
         {
-            DiagnosticsStatus.Text = "Güncelleme yükleme iptal edildi.";
+            DiagnosticsStatus.Text = "Güncelleme yüklemesi iptal edildi.";
+            SetUpdateStageProgress(100, "Yükleme iptal edildi");
         }
         catch (Exception exception)
         {
             DiagnosticsStatus.Text = "Güncelleme yüklenemedi. Mevcut sürüm kullanılabilir.";
+            SetUpdateStageProgress(100, "Güncelleme başarısız");
             _diagnostics.Failure(
                 "ui.update.install",
                 "Güncelleme yükleme tamamlanamadı.",
@@ -1299,9 +1332,10 @@ public partial class MainWindow : Window, IDisposable
         }
     }
 
-    private void StartUpdateApplicator(
+    private async Task StartUpdateApplicatorAsync(
         AppUpdatePreparation update,
-        string executableName)
+        string executableName,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(update.ApplicatorPath)
             || string.IsNullOrWhiteSpace(update.PackagePath)
@@ -1316,8 +1350,8 @@ public partial class MainWindow : Window, IDisposable
             FileName = update.ApplicatorPath,
             WorkingDirectory = Path.GetDirectoryName(update.ApplicatorPath),
             UseShellExecute = false,
-            CreateNoWindow = true,
-            WindowStyle = ProcessWindowStyle.Hidden
+            CreateNoWindow = false,
+            WindowStyle = ProcessWindowStyle.Normal
         };
         startInfo.ArgumentList.Add("--process-id");
         startInfo.ArgumentList.Add(Environment.ProcessId.ToString(
@@ -1340,11 +1374,33 @@ public partial class MainWindow : Window, IDisposable
         startInfo.ArgumentList.Add("--log");
         startInfo.ArgumentList.Add(Path.Combine(_paths.LogDirectory, "update.log"));
 
-        if (Process.Start(startInfo) is null)
+        var process = Process.Start(startInfo)
+            ?? throw new InvalidOperationException(
+                "Güncelleme uygulayıcısı başlatılamadı.");
+        await Task.WhenAny(
+            process.WaitForExitAsync(cancellationToken),
+            Task.Delay(TimeSpan.FromMilliseconds(900), cancellationToken));
+        if (process.HasExited)
         {
             throw new InvalidOperationException(
-                "Güncelleme uygulayıcısı başlatılamadı.");
+                $"Güncelleme uygulayıcısı erken kapandı. Çıkış kodu: {process.ExitCode}.");
         }
+    }
+
+    private void SetUpdateProgress(AppUpdateProgress progress)
+    {
+        SetUpdateStageProgress(progress.Percent, progress.Message);
+        DiagnosticsStatus.Text = string.IsNullOrWhiteSpace(progress.Detail)
+            ? progress.Message
+            : $"{progress.Message}. {progress.Detail}";
+        _diagnostics.Info(
+            "ui.update.progress",
+            progress.Message,
+            new Dictionary<string, string?>
+            {
+                ["percent"] = progress.Percent.ToString("0", CultureInfo.InvariantCulture),
+                ["detail"] = progress.Detail
+            });
     }
 
     private static Version GetCurrentVersion()

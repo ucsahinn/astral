@@ -108,7 +108,8 @@ public sealed class AppUpdateService
         AppUpdateCheckResult check,
         string applicationDirectory,
         string executableName,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IProgress<AppUpdateProgress>? progress = null)
     {
         ArgumentNullException.ThrowIfNull(check);
         ArgumentException.ThrowIfNullOrWhiteSpace(applicationDirectory);
@@ -150,6 +151,10 @@ public sealed class AppUpdateService
         }
 
         var versionText = FormatVersion(check.LatestVersion);
+        progress?.Report(new AppUpdateProgress(
+            10,
+            $"v{versionText} hazırlanıyor",
+            "Paket bilgileri doğrulandı."));
         var expectedSignerThumbprint = _requireUpdateAuthenticode
             ? AuthenticodeSignatureVerifier.GetRequiredSignerThumbprint(
                 Path.Combine(applicationDirectory, executableName))
@@ -160,12 +165,23 @@ public sealed class AppUpdateService
             _paths.ProtectUpdateStaging);
 
         var packagePath = Path.Combine(updateDirectory, packageFileName);
+        var downloadProgress = new DirectProgress<DownloadProgress>(download =>
+        {
+            var percent = download.Percent is null
+                ? 30
+                : 20 + (download.Percent.Value * 0.45);
+            progress?.Report(new AppUpdateProgress(
+                Math.Clamp(percent, 20, 65),
+                $"v{versionText} indiriliyor",
+                FormatDownloadDetail(download)));
+        });
         await _downloader.DownloadAsync(
             packageUri,
             packagePath,
             expectedSha256,
             cancellationToken,
-            check.PackageSizeBytes.Value);
+            check.PackageSizeBytes.Value,
+            downloadProgress);
 
         var downloadedPackage = new FileInfo(packagePath);
         if (!downloadedPackage.Exists || downloadedPackage.Length != check.PackageSizeBytes.Value)
@@ -183,11 +199,19 @@ public sealed class AppUpdateService
                 "Güncelleme paketi indirme sonrasında doğrulanamadı.");
         }
 
+        progress?.Report(new AppUpdateProgress(
+            70,
+            "Paket doğrulanıyor",
+            "SHA-256 ve GitHub digest eşleşti."));
         UpdatePackageValidator.ValidateArchive(
             packagePath,
             executableName,
             versionText);
 
+        progress?.Report(new AppUpdateProgress(
+            82,
+            "Dosyalar hazırlanıyor",
+            "Paket güvenli staging alanına açılıyor."));
         var extractionDirectory = Path.Combine(
             updateDirectory,
             "payload-" + DateTimeOffset.UtcNow.ToString(
@@ -204,6 +228,10 @@ public sealed class AppUpdateService
         var applicatorPath = CopyApplicator(
             applicationDirectory,
             updateDirectory);
+        progress?.Report(new AppUpdateProgress(
+            94,
+            "Yükleme yardımcısı hazırlanıyor",
+            "Discorder birazdan kapanıp yeni sürümle açılacak."));
 
         return AppUpdatePreparation.Prepared(
             check.CurrentVersion,
@@ -614,20 +642,18 @@ public sealed class AppUpdateService
             "applicator-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(applicatorDirectory);
 
-        var updaterFiles = Directory
-            .EnumerateFiles(sourceDirectory, "Discorder.Updater*", SearchOption.TopDirectoryOnly)
-            .Concat(Directory.EnumerateFiles(
-                sourceDirectory,
-                "Discorder.Core.dll",
-                SearchOption.TopDirectoryOnly))
+        var updaterFiles = EnumerateApplicatorFiles(sourceDirectory)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
         foreach (var source in updaterFiles)
         {
+            var relativePath = Path.GetRelativePath(sourceDirectory, source);
+            var destination = Path.Combine(applicatorDirectory, relativePath);
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
             File.Copy(
                 source,
-                Path.Combine(applicatorDirectory, Path.GetFileName(source)),
+                destination,
                 overwrite: true);
         }
 
@@ -644,6 +670,34 @@ public sealed class AppUpdateService
         return applicatorPath;
     }
 
+    private static IEnumerable<string> EnumerateApplicatorFiles(string sourceDirectory)
+    {
+        foreach (var path in Directory.EnumerateFiles(
+                     sourceDirectory,
+                     "*",
+                     SearchOption.TopDirectoryOnly))
+        {
+            yield return path;
+        }
+
+        foreach (var directoryName in new[] { "runtimes" })
+        {
+            var directory = Path.Combine(sourceDirectory, directoryName);
+            if (!Directory.Exists(directory))
+            {
+                continue;
+            }
+
+            foreach (var path in Directory.EnumerateFiles(
+                         directory,
+                         "*",
+                         SearchOption.AllDirectories))
+            {
+                yield return path;
+            }
+        }
+    }
+
     private static string Require(string? value, string name)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -653,6 +707,47 @@ public sealed class AppUpdateService
         }
 
         return value;
+    }
+
+    private static string FormatDownloadDetail(DownloadProgress progress)
+    {
+        if (progress.TotalBytes is null or <= 0)
+        {
+            return $"{FormatBytes(progress.BytesReceived)} indirildi.";
+        }
+
+        return $"{FormatBytes(progress.BytesReceived)} / {FormatBytes(progress.TotalBytes.Value)} indirildi.";
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        string[] units = ["B", "KB", "MB", "GB"];
+        var value = (double)Math.Max(0, bytes);
+        var unitIndex = 0;
+        while (value >= 1024 && unitIndex < units.Length - 1)
+        {
+            value /= 1024;
+            unitIndex++;
+        }
+
+        return unitIndex == 0
+            ? string.Create(CultureInfo.InvariantCulture, $"{value:0} {units[unitIndex]}")
+            : string.Create(CultureInfo.InvariantCulture, $"{value:0.0} {units[unitIndex]}");
+    }
+
+    private sealed class DirectProgress<T> : IProgress<T>
+    {
+        private readonly Action<T> _handler;
+
+        public DirectProgress(Action<T> handler)
+        {
+            _handler = handler ?? throw new ArgumentNullException(nameof(handler));
+        }
+
+        public void Report(T value)
+        {
+            _handler(value);
+        }
     }
 
     private sealed record GitHubRelease(
