@@ -42,7 +42,7 @@ jobs:
           $signArgs = @()
           $certificatePath = Join-Path $env:RUNNER_TEMP 'discorder-codesign.pfx'
           if ([string]::IsNullOrWhiteSpace($env:DISCORDER_CODESIGN_PFX_B64)) {
-            throw 'Discorder auto-update yayını için DISCORDER_CODESIGN_PFX_B64 secret zorunludur.'
+            throw 'Discorder otomatik güncelleme yayını için DISCORDER_CODESIGN_PFX_B64 secret zorunludur.'
           }
 
           try {
@@ -93,31 +93,73 @@ jobs:
             $signingText = 'Kod imzalama: Authenticode imzalı paket.'
           }
           else {
-            $signingText = 'Kod imzalama: imzasız paket. Windows SmartScreen Unknown publisher uyarısı gösterebilir.'
+            throw 'Public otomatik güncelleme yayını imzalı paket gerektirir.'
           }
 
+          $releaseDate = Get-Date -Format 'yyyy-MM-dd'
           $notesPath = Join-Path 'artifacts' "release-notes-$tag.md"
           $notes = @"
-          # Discorder $version
+          # Discorder $tag - Portable Windows Discord bağlantı yöneticisi
 
-          Discorder $version, güncelleme deneyimi ve Türkçe arayüz metinleri için güvenli düzeltme yayınıdır.
+          Tarih: $releaseDate
 
-          ## Öne çıkanlar
+          Discorder $version, Windows'ta Discord bağlantısını sade ve güvenli bir arayüzle yönetmek için hazırlanan portable masaüstü uygulamasının güncel sürümüdür.
 
-          - Güncelleme düğmesi artık önce yalnızca yeni sürümü denetler.
+          ## Kısa özet
+
+          Bu sürüm; güncelleme deneyimini, portable ZIP davranışını, Türkçe arayüz metinlerini ve public güven sınırlarını netleştirir.
+
+          ## Neler değişti?
+
+          - Güncelleme düğmesi önce yalnızca yeni sürüm denetler.
           - Yeni sürüm bulunursa ayrı ve belirgin `Yükle` düğmesi görünür.
-          - `Yükle`, denetimde bulunan aynı sürümü indirir, SHA-256 ile doğrular ve portable Discorder klasörüne uygular.
-          - Güncelleme paketi içeriği `discorder.update-manifest.json` ile doğrulanır.
+          - `Yükle`, denetimde bulunan aynı sürümü indirir ve doğrular.
+          - Güncelleme paketi `discorder.update-manifest.json` ile eşleştirilir.
           - Otomatik güncelleme yayını Authenticode imzalı paket gerektirir.
+          - Portable güncelleme mevcut çıkarılmış Discorder klasörünü hedefler.
           - Güncelleme helper'ı mevcut uygulama kapandıktan sonra dosyaları yedekleyerek değiştirir; hata olursa önceki dosyaları geri taşır.
-          - Önemli düğmelere kısa ve anlaşılır Türkçe tooltip eklendi.
-          - Arayüz metinleri daha kısa, sakin ve kullanıcı odaklı hale getirildi.
+          - UI metinleri kısa, sakin ve kullanıcı odaklı hale getirildi.
+          - Önemli düğmelere doğal Türkçe tooltip'ler eklendi.
 
-          ## İndirme
+          ## Neden önemli?
+
+          Kullanıcı artık önce güncellemeyi denetler, sonra isterse bulunan sürümü yükler. Böylece kontrol edilmemiş veya farklı bir paket kurulmaz. Portable kullanımda hangi klasörün güncelleneceği ve hangi `Discorder.exe` dosyasının yeniden çalışacağı nettir.
+
+          ## Kurulum
 
           - $($archive.Name) dosyasını indirin.
-          - Zip'i çıkarın ve Discorder.exe dosyasını çalıştırın.
-          - Güncelleme akışı aynı çıkarılmış Discorder klasörünü günceller ve Discorder.exe dosyasını yeniden başlatır.
+          - Yanındaki SHA-256 dosyasıyla arşivi kontrol edin.
+          - ZIP'i kalıcı bir klasöre çıkarın.
+          - `Discorder.exe` dosyasını çalıştırın.
+
+          ## Uygulama içi güncelleme
+
+          - **Güncelle** önce yeni sürüm olup olmadığını denetler.
+          - Yeni sürüm varsa **Yükle** düğmesi görünür.
+          - Paket staging alanına indirilir, doğrulanır ve mevcut portable klasöre uygulanır.
+          - Başarılı olursa yeni `Discorder.exe` yeniden başlatılır.
+
+          ## Portable ZIP notu
+
+          Discorder hangi çıkarılmış klasörden çalışıyorsa güncelleme hedefi o klasördür. Mevcut kısayollar ve Windows başlangıç kaydı aynı executable yolunu kullanmaya devam eder.
+
+          ## Güvenlik ve güven sınırları
+
+          - Manuel ZIP indirmesinde SHA-256 dosyasını kontrol edin.
+          - Uygulama içi otomatik güncelleme imzasız veya doğrulanamayan paketi uygulamaz.
+          - Discorder sistem DNS ayarını kalıcı değiştirmez.
+          - Discorder resmi Discord, Cloudflare veya WireSock ürünü değildir.
+
+          ## Bilinen sınırlar
+
+          - GitHub'a erişilemeyen ağlarda güncelleme denetimi başarısız olabilir.
+          - Yavaş bağlantılarda indirme zaman aşımı yaşanırsa mevcut sürüm çalışmaya devam eder.
+          - İlk WireSock kurulumu Windows yönetici onayı isteyebilir.
+
+          ## Asset listesi
+
+          - $($archive.Name)
+          - $(Split-Path -Leaf $shaPath)
           - SHA-256: $hash
           - $signingText
 
@@ -145,8 +187,8 @@ jobs:
           RELEASE_NOTES: ${{ steps.package.outputs.notes }}
         run: |
           $tag = $env:RELEASE_TAG
-          $version = $tag.TrimStart('v')
           $repo = $env:RELEASE_REPOSITORY
+          $releaseTitle = "Discorder $tag - Portable Windows Discord bağlantı yöneticisi"
           gh release view $tag --repo $repo *> $null
           if ($LASTEXITCODE -eq 0) {
             $existingAssetNames = gh release view $tag --repo $repo --json assets --jq '.assets[].name'
@@ -162,7 +204,7 @@ jobs:
               --repo $repo
             gh release edit $tag `
               --repo $repo `
-              --title "Discorder $version" `
+              --title $releaseTitle `
               --notes-file $env:RELEASE_NOTES `
               --latest
           }
@@ -171,7 +213,7 @@ jobs:
               $env:RELEASE_ARCHIVE `
               $env:RELEASE_SHA `
               --repo $repo `
-              --title "Discorder $version" `
+              --title $releaseTitle `
               --notes-file $env:RELEASE_NOTES `
               --latest
           }
