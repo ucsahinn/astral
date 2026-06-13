@@ -125,7 +125,7 @@ static void RenderMainWindow()
     {
         Environment.SetEnvironmentVariable(
             "DISCORDER_DISABLE_BACKGROUND_VIDEO",
-            "1");
+            null);
 
         var bootstrapper = new FakeWireSockBootstrapper();
         var paths = new AppPaths(root);
@@ -154,6 +154,10 @@ static void RenderMainWindow()
                 requireUpdateAuthenticode: false));
         window.Show();
         window.UpdateLayout();
+
+        var backgroundVideo = FindVisualChildren<MediaElement>(window).Single();
+        Assert(backgroundVideo.Visibility == Visibility.Collapsed);
+        Assert(backgroundVideo.Source is null);
 
         var text = string.Join(
             "\n",

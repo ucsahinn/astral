@@ -13,14 +13,15 @@
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"
         Loaded="Window_Loaded"
-        Closing="Window_Closing">
+        Closing="Window_Closing"
+        StateChanged="Window_StateChanged">
     <Grid ClipToBounds="True">
         <MediaElement x:Name="BackgroundVideo"
                       LoadedBehavior="Manual"
-                      UnloadedBehavior="Stop"
+                      UnloadedBehavior="Close"
                       Stretch="UniformToFill"
                       Volume="0"
-                      Opacity="0.88"
+                      Opacity="0.80"
                       IsHitTestVisible="False"
                       Loaded="BackgroundVideo_Loaded"
                       MediaEnded="BackgroundVideo_MediaEnded"
@@ -120,10 +121,10 @@
                     </Grid.ColumnDefinitions>
 
                     <Border Grid.Column="0"
-                            Width="54"
-                            Height="54"
-                            Margin="0,0,16,0"
-                            CornerRadius="8"
+                            Width="62"
+                            Height="62"
+                            Margin="0,0,18,0"
+                            CornerRadius="16"
                             BorderBrush="#B77DEBFF"
                             BorderThickness="1"
                             RenderTransformOrigin="0.5,0.5"
@@ -178,20 +179,20 @@
                                                  GradientOrigin="0.32,0.24"
                                                  RadiusX="0.85"
                                                  RadiusY="0.85">
-                                <GradientStop Color="#5A7DEBFF" Offset="0" />
-                                <GradientStop Color="#2A5DFF92" Offset="0.45" />
-                                <GradientStop Color="#80101D31" Offset="1" />
+                                <GradientStop Color="#767DEBFF" Offset="0" />
+                                <GradientStop Color="#3D5DFF92" Offset="0.44" />
+                                <GradientStop Color="#A0101D31" Offset="1" />
                             </RadialGradientBrush>
                         </Border.Background>
                         <Border.Effect>
-                            <DropShadowEffect BlurRadius="20"
+                            <DropShadowEffect BlurRadius="26"
                                               Direction="270"
-                                              Opacity="0.58"
+                                              Opacity="0.72"
                                               ShadowDepth="0"
                                               Color="#7DEBFF" />
                         </Border.Effect>
-                        <Image Width="42"
-                               Height="42"
+                        <Image Width="50"
+                               Height="50"
                                Source="Assets/discorder-mark.png"
                                Stretch="Uniform"
                                RenderOptions.BitmapScalingMode="HighQuality" />
@@ -199,6 +200,7 @@
 
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                         <TextBlock FontSize="20"
+                                   LineHeight="24"
                                    FontWeight="SemiBold"
                                    Text="Discorder" />
                         <TextBlock Margin="0,3,0,0"
@@ -911,7 +913,7 @@
                                VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource SecondaryTextBrush}"
-                               Text="v2.0.20" />
+                               Text="v2.0.21" />
 
                     <Button Grid.Column="5"
                             x:Name="AutoUpdateButton"

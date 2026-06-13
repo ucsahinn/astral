@@ -25,6 +25,8 @@ namespace Discorder.App;
 
 public partial class MainWindow : Window, IDisposable
 {
+    private static readonly TimeSpan LiveDnsRefreshInterval = TimeSpan.FromSeconds(15);
+
     private static readonly Uri RepositoryUri = new(
         "https://github.com/ucsahinn/discorder");
     private static readonly Uri BackgroundVideoUri = new(
@@ -52,6 +54,9 @@ public partial class MainWindow : Window, IDisposable
     private int _lastLoggedUpdateProgressPercent = -1;
     private AppUpdateCheckResult? _pendingUpdate;
     private bool _backgroundVideoRemoteFallbackTried;
+    private bool _isBackgroundVideoStarted;
+    private DateTimeOffset _lastDnsRefreshUtc = DateTimeOffset.MinValue;
+    private (string Summary, string Detail) _cachedDnsStatus = ("Okunuyor", "Makinenin aldığı DNS");
     private Forms.NotifyIcon? _trayIcon;
     private bool _hasShownTrayNotice;
     private CancellationTokenSource? _operationCancellation;
@@ -157,6 +162,17 @@ public partial class MainWindow : Window, IDisposable
         }
     }
 
+    private void Window_StateChanged(object? sender, EventArgs e)
+    {
+        if (WindowState == WindowState.Minimized)
+        {
+            StopBackgroundVideo();
+            return;
+        }
+
+        UpdateBackgroundVideoForSnapshot(_controller.Snapshot);
+    }
+
     private void OnStatusChanged(object? sender, TunnelSnapshot snapshot)
     {
         if (!Dispatcher.CheckAccess())
@@ -184,6 +200,7 @@ public partial class MainWindow : Window, IDisposable
             _controller.IncludeBrowserAccess,
             snapshot.IsBusy || snapshot.IsConnected);
         RefreshLiveStatusCards(snapshot);
+        UpdateBackgroundVideoForSnapshot(snapshot);
 
         var templateLabel = ToggleButton.Template.FindName(
             "ToggleButtonLabel",
@@ -243,7 +260,7 @@ public partial class MainWindow : Window, IDisposable
 
     private void RefreshLiveStatusCards(TunnelSnapshot snapshot)
     {
-        var dns = GetDnsStatus();
+        var dns = GetCachedDnsStatus();
         DnsSummary.Text = dns.Summary;
         DnsDetail.Text = dns.Detail;
 
@@ -256,6 +273,19 @@ public partial class MainWindow : Window, IDisposable
         ScopeDetail.Text = _controller.IncludeBrowserAccess
             ? "Discord web bağlantıya dahil"
             : "Tarayıcı modu kapalı";
+    }
+
+    private (string Summary, string Detail) GetCachedDnsStatus()
+    {
+        var now = DateTimeOffset.UtcNow;
+        if (now - _lastDnsRefreshUtc < LiveDnsRefreshInterval)
+        {
+            return _cachedDnsStatus;
+        }
+
+        _cachedDnsStatus = GetDnsStatus();
+        _lastDnsRefreshUtc = now;
+        return _cachedDnsStatus;
     }
 
     private static (string Summary, string Detail) GetDnsStatus()
@@ -897,29 +927,39 @@ public partial class MainWindow : Window, IDisposable
 
     private void BackgroundVideo_Loaded(object sender, RoutedEventArgs e)
     {
-        StartBackgroundVideo();
+        UpdateBackgroundVideoForSnapshot(_controller.Snapshot);
     }
 
     private void BackgroundVideo_MediaEnded(object sender, RoutedEventArgs e)
     {
-        if (IsBackgroundVideoDisabled())
+        if (!ShouldPlayBackgroundVideo(_controller.Snapshot))
         {
+            StopBackgroundVideo();
             return;
         }
 
         BackgroundVideo.Position = TimeSpan.Zero;
         BackgroundVideo.Play();
+        _isBackgroundVideoStarted = true;
     }
 
     private void BackgroundVideo_MediaFailed(
         object sender,
         ExceptionRoutedEventArgs e)
     {
-        if (!_backgroundVideoRemoteFallbackTried
+        if (!ShouldPlayBackgroundVideo(_controller.Snapshot))
+        {
+            StopBackgroundVideo();
+            return;
+        }
+
+        if (IsBackgroundVideoRemoteFallbackEnabled()
+            && !_backgroundVideoRemoteFallbackTried
             && BackgroundVideo.Source is not null
             && BackgroundVideo.Source.IsFile)
         {
             _backgroundVideoRemoteFallbackTried = true;
+            _isBackgroundVideoStarted = false;
             _diagnostics.Warning(
                 "ui.backgroundVideo",
                 "Yerel arka plan videosu oynatılamadı, uzak video deneniyor.",
@@ -930,9 +970,11 @@ public partial class MainWindow : Window, IDisposable
                 });
             BackgroundVideo.Source = BackgroundVideoUri;
             BackgroundVideo.Play();
+            _isBackgroundVideoStarted = true;
             return;
         }
 
+        _isBackgroundVideoStarted = false;
         BackgroundVideo.Visibility = Visibility.Collapsed;
         _diagnostics.Warning(
             "ui.backgroundVideo",
@@ -951,16 +993,69 @@ public partial class MainWindow : Window, IDisposable
             StringComparison.Ordinal);
     }
 
+    private static bool IsBackgroundVideoAlwaysEnabled()
+    {
+        return string.Equals(
+            Environment.GetEnvironmentVariable("DISCORDER_BACKGROUND_VIDEO_ALWAYS"),
+            "1",
+            StringComparison.Ordinal);
+    }
+
+    private static bool IsBackgroundVideoRemoteFallbackEnabled()
+    {
+        return string.Equals(
+            Environment.GetEnvironmentVariable("DISCORDER_BACKGROUND_VIDEO_REMOTE_FALLBACK"),
+            "1",
+            StringComparison.Ordinal);
+    }
+
+    private bool ShouldPlayBackgroundVideo(TunnelSnapshot snapshot)
+    {
+        if (IsBackgroundVideoDisabled())
+        {
+            return false;
+        }
+
+        if (!IsVisible || WindowState == WindowState.Minimized)
+        {
+            return false;
+        }
+
+        return IsBackgroundVideoAlwaysEnabled()
+            || snapshot.IsBusy
+            || snapshot.IsConnected;
+    }
+
+    private void UpdateBackgroundVideoForSnapshot(TunnelSnapshot snapshot)
+    {
+        if (ShouldPlayBackgroundVideo(snapshot))
+        {
+            StartBackgroundVideo();
+            return;
+        }
+
+        StopBackgroundVideo();
+    }
+
     private void StopBackgroundVideo()
     {
+        if (!_isBackgroundVideoStarted
+            && BackgroundVideo.Source is null
+            && BackgroundVideo.Visibility == Visibility.Collapsed)
+        {
+            return;
+        }
+
         try
         {
             BackgroundVideo.Stop();
-            BackgroundVideo.Visibility = Visibility.Collapsed;
             BackgroundVideo.Source = null;
+            BackgroundVideo.Visibility = Visibility.Collapsed;
+            _isBackgroundVideoStarted = false;
         }
         catch (InvalidOperationException)
         {
+            _isBackgroundVideoStarted = false;
         }
     }
 
@@ -972,21 +1067,39 @@ public partial class MainWindow : Window, IDisposable
             return;
         }
 
+        if (_isBackgroundVideoStarted && BackgroundVideo.Source is not null)
+        {
+            return;
+        }
+
+        var videoUri = GetBackgroundVideoUri();
+        if (videoUri is null)
+        {
+            StopBackgroundVideo();
+            return;
+        }
+
         _backgroundVideoRemoteFallbackTried = false;
         BackgroundVideo.Visibility = Visibility.Visible;
-        BackgroundVideo.Source ??= GetBackgroundVideoUri();
+        BackgroundVideo.Source ??= videoUri;
 
         if (BackgroundVideo.IsLoaded)
         {
             BackgroundVideo.Play();
+            _isBackgroundVideoStarted = true;
         }
     }
 
-    private static Uri GetBackgroundVideoUri()
+    private static Uri? GetBackgroundVideoUri()
     {
-        return File.Exists(LocalBackgroundVideoPath)
-            ? new Uri(LocalBackgroundVideoPath, UriKind.Absolute)
-            : BackgroundVideoUri;
+        if (File.Exists(LocalBackgroundVideoPath))
+        {
+            return new Uri(LocalBackgroundVideoPath, UriKind.Absolute);
+        }
+
+        return IsBackgroundVideoRemoteFallbackEnabled()
+            ? BackgroundVideoUri
+            : null;
     }
 
     public void HideToTrayOnStartup()
@@ -1026,7 +1139,7 @@ public partial class MainWindow : Window, IDisposable
         }
 
         Activate();
-        StartBackgroundVideo();
+        UpdateBackgroundVideoForSnapshot(_controller.Snapshot);
         _diagnostics.Info("ui.tray", "Discorder penceresi geri açıldı.");
     }
 

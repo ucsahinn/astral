@@ -26,8 +26,8 @@
 
     <Style x:Key="CommandButtonStyle" TargetType="Button">
         <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}" />
-        <Setter Property="Background" Value="#64101D31" />
-        <Setter Property="BorderBrush" Value="#A79CD4FF" />
+        <Setter Property="Background" Value="#78101D31" />
+        <Setter Property="BorderBrush" Value="#C49CD4FF" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Padding" Value="17,10" />
         <Setter Property="FontSize" Value="13" />
@@ -43,9 +43,9 @@
                             CornerRadius="8"
                             Padding="{TemplateBinding Padding}">
                         <Border.Effect>
-                            <DropShadowEffect BlurRadius="24"
+                            <DropShadowEffect BlurRadius="28"
                                               Direction="270"
-                                              Opacity="0.34"
+                                              Opacity="0.42"
                                               ShadowDepth="0"
                                               Color="#73E8FF" />
                         </Border.Effect>
@@ -58,7 +58,7 @@
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="ButtonBorder"
                                     Property="Background"
-                                    Value="#8A193756" />
+                                    Value="#A31B3B58" />
                             <Setter TargetName="ButtonBorder"
                                     Property="BorderBrush"
                                     Value="{StaticResource AccentCyanBrush}" />
@@ -129,7 +129,7 @@
 
     <Style x:Key="DangerCommandButtonStyle" TargetType="Button">
         <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}" />
-        <Setter Property="Background" Value="#66241422" />
+        <Setter Property="Background" Value="#70241422" />
         <Setter Property="BorderBrush" Value="#C8FF6872" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Padding" Value="17,10" />
@@ -146,9 +146,9 @@
                             CornerRadius="8"
                             Padding="{TemplateBinding Padding}">
                         <Border.Effect>
-                            <DropShadowEffect BlurRadius="22"
+                            <DropShadowEffect BlurRadius="24"
                                               Direction="270"
-                                              Opacity="0.25"
+                                              Opacity="0.32"
                                               ShadowDepth="0"
                                               Color="#ED4245" />
                         </Border.Effect>
@@ -182,7 +182,7 @@
 
     <Style x:Key="InstallUpdateButtonStyle" TargetType="Button">
         <Setter Property="Foreground" Value="#06110C" />
-        <Setter Property="Background" Value="#F05DFF92" />
+        <Setter Property="Background" Value="#F65DFF92" />
         <Setter Property="BorderBrush" Value="#F97DEBFF" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Padding" Value="18,9" />
@@ -199,9 +199,9 @@
                             CornerRadius="8"
                             Padding="{TemplateBinding Padding}">
                         <Border.Effect>
-                            <DropShadowEffect BlurRadius="28"
+                            <DropShadowEffect BlurRadius="34"
                                               Direction="270"
-                                              Opacity="0.78"
+                                              Opacity="0.92"
                                               ShadowDepth="0"
                                               Color="#5DFF92" />
                         </Border.Effect>
@@ -214,7 +214,7 @@
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="ButtonBorder"
                                     Property="Background"
-                                    Value="#F77DEBFF" />
+                                    Value="#FC7DEBFF" />
                             <Setter TargetName="ButtonBorder"
                                     Property="BorderBrush"
                                     Value="#F5F7FB" />
@@ -277,8 +277,8 @@
                     <Grid Width="58" Height="32">
                         <Border x:Name="Track"
                                 CornerRadius="16"
-                                Background="#72101D31"
-                                BorderBrush="#A79CD4FF"
+                                Background="#80101D31"
+                                BorderBrush="#C49CD4FF"
                                 BorderThickness="1" />
                         <Ellipse x:Name="Knob"
                                  Width="24"

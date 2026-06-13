@@ -11,6 +11,8 @@ namespace Discorder.Core.Diagnostics;
 
 public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
 {
+    private static readonly TimeSpan DefaultSummaryWriteInterval = TimeSpan.FromSeconds(5);
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = false,
@@ -18,11 +20,18 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
     };
 
     private readonly AppPaths _paths;
+    private readonly TimeSpan _summaryWriteInterval;
     private readonly object _gate = new();
+    private DateTimeOffset _lastSummaryWriteUtc = DateTimeOffset.MinValue;
+    private string? _pendingSummaryStatus;
+    private bool _summaryFlushScheduled;
 
-    public DiscorderDiagnostics(AppPaths paths)
+    public DiscorderDiagnostics(
+        AppPaths paths,
+        TimeSpan? summaryWriteInterval = null)
     {
         _paths = paths ?? throw new ArgumentNullException(nameof(paths));
+        _summaryWriteInterval = summaryWriteInterval ?? DefaultSummaryWriteInterval;
     }
 
     public void Info(
@@ -70,6 +79,7 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
                     ["is64BitOperatingSystem"] = Environment.Is64BitOperatingSystem,
                     ["dataDirectory"] = Redact(_paths.DataDirectory),
                     ["logDirectory"] = Redact(_paths.LogDirectory),
+                    ["runtime"] = CaptureRuntimeMetrics().ToReport(),
                     ["details"] = RedactDetails(details)
                 };
 
@@ -121,6 +131,8 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
             try
             {
                 var warnings = CopyLogFilesToStaging(stagingDirectory);
+                WriteRuntimeSnapshotToStaging(stagingDirectory);
+
                 if (warnings.Count > 0)
                 {
                     File.WriteAllLines(
@@ -161,14 +173,25 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
     {
         var warnings = new List<string>();
 
-        foreach (var file in Directory.EnumerateFiles(_paths.LogDirectory)
-                     .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
+        foreach (var file in EnumerateExpectedLogFiles())
         {
+            if (!File.Exists(file))
+            {
+                continue;
+            }
+
             var fileName = Path.GetFileName(file);
             var destination = Path.Combine(stagingDirectory, fileName);
 
             try
             {
+                var attributes = File.GetAttributes(file);
+                if ((attributes & FileAttributes.ReparsePoint) != 0)
+                {
+                    warnings.Add($"{fileName}: reparse point olduğu için pakete alınmadı");
+                    continue;
+                }
+
                 using var source = new FileStream(
                     file,
                     FileMode.Open,
@@ -190,6 +213,24 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
         }
 
         return warnings;
+    }
+
+    private IEnumerable<string> EnumerateExpectedLogFiles()
+    {
+        yield return _paths.EventLog;
+        yield return _paths.ErrorLog;
+        yield return _paths.HealthReport;
+        yield return _paths.DiagnosticSummary;
+        yield return _paths.TunnelLog;
+        yield return Path.Combine(_paths.LogDirectory, "update.log");
+    }
+
+    private static void WriteRuntimeSnapshotToStaging(string stagingDirectory)
+    {
+        File.WriteAllText(
+            Path.Combine(stagingDirectory, "runtime.json"),
+            JsonSerializer.Serialize(CaptureRuntimeMetrics().ToReport(), JsonOptions),
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
     }
 
     private void WriteEvent(
@@ -229,7 +270,61 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
                     _paths.EventLog,
                     JsonSerializer.Serialize(record, JsonOptions) + Environment.NewLine,
                     new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-                WriteSummaryLocked(message);
+                MaybeWriteSummaryLocked(
+                    message,
+                    force: !string.Equals(level, "info", StringComparison.Ordinal));
+            }
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
+    }
+
+    private void MaybeWriteSummaryLocked(string lastStatus, bool force)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var elapsed = now - _lastSummaryWriteUtc;
+        if (force || elapsed >= _summaryWriteInterval)
+        {
+            _pendingSummaryStatus = null;
+            WriteSummaryLocked(lastStatus);
+            return;
+        }
+
+        _pendingSummaryStatus = lastStatus;
+        if (_summaryFlushScheduled)
+        {
+            return;
+        }
+
+        _summaryFlushScheduled = true;
+        var delay = _summaryWriteInterval - elapsed;
+        _ = FlushPendingSummaryAfterDelayAsync(delay);
+    }
+
+    private async Task FlushPendingSummaryAfterDelayAsync(TimeSpan delay)
+    {
+        if (delay > TimeSpan.Zero)
+        {
+            await Task.Delay(delay).ConfigureAwait(false);
+        }
+
+        try
+        {
+            lock (_gate)
+            {
+                _summaryFlushScheduled = false;
+                if (string.IsNullOrWhiteSpace(_pendingSummaryStatus))
+                {
+                    return;
+                }
+
+                var status = _pendingSummaryStatus;
+                _pendingSummaryStatus = null;
+                WriteSummaryLocked(status);
             }
         }
         catch (IOException)
@@ -242,6 +337,7 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
 
     private void WriteSummaryLocked(string lastStatus)
     {
+        var runtime = CaptureRuntimeMetrics();
         var builder = new StringBuilder();
         builder.AppendLine("# Discorder tanılama özeti");
         builder.AppendLine();
@@ -264,9 +360,28 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
         builder.AppendLine(FormattableString.Invariant(
             $"- Log klasörü: {Redact(_paths.LogDirectory)}"));
         builder.AppendLine();
+        builder.AppendLine("## Performans");
+        builder.AppendLine(FormattableString.Invariant(
+            $"- Working set: {runtime.WorkingSetMegabytes:0.0} MB"));
+        builder.AppendLine(FormattableString.Invariant(
+            $"- Private memory: {runtime.PrivateMemoryMegabytes:0.0} MB"));
+        builder.AppendLine(FormattableString.Invariant(
+            $"- GC heap: {runtime.GcHeapMegabytes:0.0} MB"));
+        builder.AppendLine(FormattableString.Invariant(
+            $"- Managed memory: {runtime.ManagedMemoryMegabytes:0.0} MB"));
+        builder.AppendLine(FormattableString.Invariant(
+            $"- Handle/thread: {runtime.HandleCount}/{runtime.ThreadCount}"));
+        if (runtime.UptimeSeconds is not null)
+        {
+            builder.AppendLine(FormattableString.Invariant(
+                $"- Çalışma süresi: {runtime.UptimeSeconds:0} saniye"));
+        }
+
+        builder.AppendLine();
         builder.AppendLine("## Log dosyaları");
 
-        foreach (var file in Directory.EnumerateFiles(_paths.LogDirectory)
+        foreach (var file in EnumerateExpectedLogFiles()
+                     .Where(File.Exists)
                      .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
         {
             var info = new FileInfo(file);
@@ -278,6 +393,8 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
             _paths.DiagnosticSummary,
             builder.ToString(),
             new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        _pendingSummaryStatus = null;
+        _lastSummaryWriteUtc = DateTimeOffset.UtcNow;
     }
 
     private static Dictionary<string, string?> RedactDetails(
@@ -328,5 +445,100 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
         return Assembly.GetEntryAssembly()?.GetName().Version?.ToString()
             ?? Assembly.GetExecutingAssembly().GetName().Version?.ToString()
             ?? "bilinmiyor";
+    }
+
+    private static RuntimeMetrics CaptureRuntimeMetrics()
+    {
+        try
+        {
+            using var process = Process.GetCurrentProcess();
+            process.Refresh();
+
+            var gcInfo = GC.GetGCMemoryInfo();
+            var managedMemoryBytes = GC.GetTotalMemory(forceFullCollection: false);
+            double? uptimeSeconds = null;
+
+            try
+            {
+                uptimeSeconds = (DateTimeOffset.Now - process.StartTime).TotalSeconds;
+            }
+            catch (Exception exception)
+                when (exception is InvalidOperationException
+                    or NotSupportedException
+                    or System.ComponentModel.Win32Exception)
+            {
+            }
+
+            return new RuntimeMetrics(
+                process.WorkingSet64,
+                process.PrivateMemorySize64,
+                managedMemoryBytes,
+                gcInfo.HeapSizeBytes,
+                gcInfo.FragmentedBytes,
+                process.HandleCount,
+                process.Threads.Count,
+                uptimeSeconds);
+        }
+        catch (Exception exception)
+            when (exception is InvalidOperationException
+                or NotSupportedException
+                or System.ComponentModel.Win32Exception)
+        {
+            return RuntimeMetrics.Empty;
+        }
+    }
+
+    private sealed record RuntimeMetrics(
+        long WorkingSetBytes,
+        long PrivateMemoryBytes,
+        long ManagedMemoryBytes,
+        long GcHeapBytes,
+        long GcFragmentedBytes,
+        int HandleCount,
+        int ThreadCount,
+        double? UptimeSeconds)
+    {
+        public static RuntimeMetrics Empty { get; } = new(
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            null);
+
+        public double WorkingSetMegabytes => ToMegabytes(WorkingSetBytes);
+
+        public double PrivateMemoryMegabytes => ToMegabytes(PrivateMemoryBytes);
+
+        public double ManagedMemoryMegabytes => ToMegabytes(ManagedMemoryBytes);
+
+        public double GcHeapMegabytes => ToMegabytes(GcHeapBytes);
+
+        public Dictionary<string, object?> ToReport()
+        {
+            return new Dictionary<string, object?>
+            {
+                ["workingSetBytes"] = WorkingSetBytes,
+                ["workingSetMb"] = WorkingSetMegabytes,
+                ["privateMemoryBytes"] = PrivateMemoryBytes,
+                ["privateMemoryMb"] = PrivateMemoryMegabytes,
+                ["managedMemoryBytes"] = ManagedMemoryBytes,
+                ["managedMemoryMb"] = ManagedMemoryMegabytes,
+                ["gcHeapBytes"] = GcHeapBytes,
+                ["gcHeapMb"] = GcHeapMegabytes,
+                ["gcFragmentedBytes"] = GcFragmentedBytes,
+                ["gcFragmentedMb"] = ToMegabytes(GcFragmentedBytes),
+                ["handleCount"] = HandleCount,
+                ["threadCount"] = ThreadCount,
+                ["uptimeSeconds"] = UptimeSeconds
+            };
+        }
+
+        private static double ToMegabytes(long bytes)
+        {
+            return Math.Round(bytes / 1024d / 1024d, 1);
+        }
     }
 }

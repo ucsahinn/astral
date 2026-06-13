@@ -46,10 +46,15 @@ Tanılama paketi kullanıcıya görünen bağlantı durumunu ve teknik olayları
 Paket genellikle şunları içerir:
 
 - `events.jsonl`
+- `errors.log`
 - `health.json`
 - `diagnostics.md`
+- `runtime.json`
 - `tunnel.log`
+- `update.log`
 - varsa `bundle-warnings.txt`
+
+`runtime.json`; RAM, GC heap, handle, thread ve calisma suresi gibi sayisal performans metriklerini icerir. Token, sertifika, gizli anahtar veya ozel hesap bilgisi yazmaz. Yine de paketi paylasmadan once dosyalari gozden gecirin.
 
 ## Kapsam Dışı
 

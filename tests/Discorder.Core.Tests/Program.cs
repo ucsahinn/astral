@@ -70,7 +70,8 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Windows Firewall koruması Discord alan adı kuralını yönetir", WindowsFirewallAccessLockBuildsExpectedCommandsAsync),
     ("Onarım ayarları ve logları koruyup üretilen veriyi yeniler", CleanupServiceRepairsGeneratedStateAsync),
     ("Uygulamayı kaldırma Discorder verisini ve korumayı siler", CleanupServiceRemovesDiscorderStateAsync),
-    ("Tanılama logları devops paketi üretir", DiagnosticsWritesDevOpsBundleAsync)
+    ("Tanılama logları devops paketi üretir", DiagnosticsWritesDevOpsBundleAsync),
+    ("Tanılama özeti son bilgi durumunu gecikmeli yazar", DiagnosticsFlushesDebouncedSummaryAsync)
 };
 
 var failures = new List<string>();
@@ -2182,6 +2183,9 @@ static async Task DiagnosticsWritesDevOpsBundleAsync()
             {
                 ["state"] = "ready"
             });
+        await File.WriteAllTextAsync(
+            Path.Combine(paths.LogDirectory, "unexpected.tmp"),
+            "pakete alinmamali");
 
         var bundlePath = diagnostics.CreateBundle();
 
@@ -2196,7 +2200,9 @@ static async Task DiagnosticsWritesDevOpsBundleAsync()
 
         Assert(events.Contains("\"source\":\"test.start\"", StringComparison.Ordinal));
         Assert(health.Contains("test sağlıklı", StringComparison.Ordinal));
+        Assert(health.Contains("\"runtime\"", StringComparison.Ordinal));
         Assert(summary.Contains("Discorder tanılama özeti", StringComparison.Ordinal));
+        Assert(summary.Contains("Performans", StringComparison.Ordinal));
         Assert(!events.Contains(Environment.UserName, StringComparison.OrdinalIgnoreCase));
 
         using var archive = ZipFile.OpenRead(bundlePath);
@@ -2206,6 +2212,49 @@ static async Task DiagnosticsWritesDevOpsBundleAsync()
             entry.FullName.Equals("health.json", StringComparison.OrdinalIgnoreCase)));
         Assert(archive.Entries.Any(entry =>
             entry.FullName.Equals("diagnostics.md", StringComparison.OrdinalIgnoreCase)));
+        Assert(archive.Entries.Any(entry =>
+            entry.FullName.Equals("runtime.json", StringComparison.OrdinalIgnoreCase)));
+        Assert(!archive.Entries.Any(entry =>
+            entry.FullName.Equals("unexpected.tmp", StringComparison.OrdinalIgnoreCase)));
+        var bundledSummary = archive.GetEntry("diagnostics.md")
+            ?? throw new InvalidOperationException("diagnostics.md pakette yok.");
+        await using var bundledSummaryStream = bundledSummary.Open();
+        using var bundledSummaryReader = new StreamReader(bundledSummaryStream);
+        var bundledSummaryText = await bundledSummaryReader.ReadToEndAsync();
+        Assert(!bundledSummaryText.Contains("unexpected.tmp", StringComparison.OrdinalIgnoreCase));
+    }
+    finally
+    {
+        if (Directory.Exists(root))
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+}
+
+static async Task DiagnosticsFlushesDebouncedSummaryAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var paths = new AppPaths(root);
+    var diagnostics = new DiscorderDiagnostics(
+        paths,
+        TimeSpan.FromMilliseconds(50));
+
+    try
+    {
+        diagnostics.Info("test.first", "ilk durum");
+        diagnostics.Info("test.second", "son durum");
+
+        await WaitForConditionAsync(async () =>
+        {
+            if (!File.Exists(paths.DiagnosticSummary))
+            {
+                return false;
+            }
+
+            var summary = await File.ReadAllTextAsync(paths.DiagnosticSummary);
+            return summary.Contains("son durum", StringComparison.Ordinal);
+        });
     }
     finally
     {
@@ -2224,6 +2273,24 @@ static string CreateTemporaryDirectory()
         Guid.NewGuid().ToString("N"));
     Directory.CreateDirectory(path);
     return path;
+}
+
+static async Task WaitForConditionAsync(Func<Task<bool>> condition)
+{
+    using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+
+    while (!timeout.IsCancellationRequested)
+    {
+        if (await condition())
+        {
+            return;
+        }
+
+        await Task.Delay(TimeSpan.FromMilliseconds(25), timeout.Token)
+            .ContinueWith(_ => { }, TaskScheduler.Default);
+    }
+
+    throw new InvalidOperationException("Koşul beklenen sürede gerçekleşmedi.");
 }
 
 static byte[] CreateUpdatePackage(
