@@ -172,13 +172,89 @@ jobs:
           $tag = $env:RELEASE_TAG
           $repo = $env:RELEASE_REPOSITORY
           $releaseTitle = "Discorder $tag - Portable Windows Discord bağlantı yöneticisi"
+          if (Test-Path -LiteralPath $env:RELEASE_NOTES) {
+            $firstHeading = Get-Content -LiteralPath $env:RELEASE_NOTES |
+              Where-Object { $_ -match '^#\s+' } |
+              Select-Object -First 1
+            if (-not [string]::IsNullOrWhiteSpace($firstHeading)) {
+              $releaseTitle = $firstHeading -replace '^#\s+', ''
+            }
+          }
+
+          function Get-AssetByName($assets, [string] $name) {
+            $matches = @($assets | Where-Object { $_.name -eq $name })
+            if ($matches.Count -gt 1) {
+              throw "Release $tag içinde $name için birden fazla asset var."
+            }
+
+            if ($matches.Count -eq 0) {
+              return $null
+            }
+
+            return $matches[0]
+          }
+
           gh release view $tag --repo $repo *> $null
           if ($LASTEXITCODE -eq 0) {
-            $existingAssetNames = gh release view $tag --repo $repo --json assets --jq '.assets[].name'
+            $release = gh release view $tag --repo $repo --json assets,isDraft,isPrerelease,targetCommitish |
+              ConvertFrom-Json
             $archiveName = [IO.Path]::GetFileName($env:RELEASE_ARCHIVE)
             $shaName = [IO.Path]::GetFileName($env:RELEASE_SHA)
-            if ($existingAssetNames -contains $archiveName -or $existingAssetNames -contains $shaName) {
-              throw "Release $tag zaten bu asset adlarını içeriyor. Güvenli yayın için clobber kullanılmıyor."
+            $archiveAsset = Get-AssetByName $release.assets $archiveName
+            $shaAsset = Get-AssetByName $release.assets $shaName
+
+            if ($release.isDraft -or $release.isPrerelease) {
+              throw "Release $tag draft veya prerelease durumda; otomatik latest yayına çevrilmiyor."
+            }
+
+            $headCommit = (git rev-parse HEAD).Trim()
+            if ($release.targetCommitish -ne $headCommit) {
+              throw "Release $tag farklı commit'e bağlı. release=$($release.targetCommitish) head=$headCommit"
+            }
+
+            if ($archiveAsset -or $shaAsset) {
+              if (-not ($archiveAsset -and $shaAsset)) {
+                throw "Release $tag eksik asset içeriyor. Güvenli yayın için manuel kontrol gerekiyor."
+              }
+
+              if ([string]::IsNullOrWhiteSpace($archiveAsset.digest) -or
+                  [string]::IsNullOrWhiteSpace($shaAsset.digest)) {
+                throw "Release $tag asset digest bilgisi içermiyor. Güvenli yayın doğrulanamadı."
+              }
+
+              $assetCheckDir = Join-Path $env:RUNNER_TEMP "discorder-release-asset-check-$tag"
+              if (Test-Path -LiteralPath $assetCheckDir) {
+                Remove-Item -LiteralPath $assetCheckDir -Recurse -Force
+              }
+              New-Item -ItemType Directory -Path $assetCheckDir | Out-Null
+              gh release download $tag `
+                --repo $repo `
+                --pattern $shaName `
+                --dir $assetCheckDir `
+                --clobber
+
+              $downloadedShaPath = Join-Path $assetCheckDir $shaName
+              $shaAssetHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $downloadedShaPath).Hash.ToLowerInvariant()
+              if ($shaAsset.digest.ToLowerInvariant() -ne "sha256:$shaAssetHash") {
+                throw "Release $tag SHA asset digest'i indirilen dosyayla eşleşmiyor."
+              }
+
+              $declaredArchiveHash = ((Get-Content -Raw -LiteralPath $downloadedShaPath) -split '\s+')[0].ToLowerInvariant()
+              if ($declaredArchiveHash -notmatch '^[a-f0-9]{64}$') {
+                throw "Release $tag SHA dosyası geçerli SHA-256 içermiyor."
+              }
+
+              if ($archiveAsset.digest.ToLowerInvariant() -ne "sha256:$declaredArchiveHash") {
+                throw "Release $tag ZIP asset digest'i SHA dosyasıyla eşleşmiyor."
+              }
+
+              gh release edit $tag `
+                --repo $repo `
+                --title $releaseTitle `
+                --notes-file $env:RELEASE_NOTES `
+                --latest
+              Write-Host "Release $tag zaten doğrulanmış asset'leri içeriyor; metadata güncellendi."
+              return
             }
 
             gh release upload $tag `
