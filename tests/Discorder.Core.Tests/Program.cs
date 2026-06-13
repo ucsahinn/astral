@@ -2356,6 +2356,15 @@ static async Task DiagnosticsWritesDevOpsBundleAsync()
         Assert(summary.Contains("Discorder tanılama özeti", StringComparison.Ordinal));
         Assert(summary.Contains("Performans", StringComparison.Ordinal));
         Assert(!events.Contains(Environment.UserName, StringComparison.OrdinalIgnoreCase));
+        using (var healthDocument = JsonDocument.Parse(health))
+        {
+            var runtime = healthDocument.RootElement.GetProperty("runtime");
+            AssertRuntimeMetricIsNonNegative(runtime, "workingSetBytes");
+            AssertRuntimeMetricIsNonNegative(runtime, "privateMemoryBytes");
+            AssertRuntimeMetricIsNonNegative(runtime, "managedMemoryBytes");
+            AssertRuntimeMetricIsNonNegative(runtime, "gcHeapBytes");
+            AssertRuntimeMetricIsNonNegative(runtime, "gcFragmentedBytes");
+        }
 
         using var archive = ZipFile.OpenRead(bundlePath);
         Assert(archive.Entries.Any(entry =>
@@ -2374,6 +2383,28 @@ static async Task DiagnosticsWritesDevOpsBundleAsync()
         using var bundledSummaryReader = new StreamReader(bundledSummaryStream);
         var bundledSummaryText = await bundledSummaryReader.ReadToEndAsync();
         Assert(!bundledSummaryText.Contains("unexpected.tmp", StringComparison.OrdinalIgnoreCase));
+
+        var bundledRuntime = archive.GetEntry("runtime.json")
+            ?? throw new InvalidOperationException("runtime.json pakette yok.");
+        await using (var bundledRuntimeStream = bundledRuntime.Open())
+        using (var bundledRuntimeDocument = await JsonDocument.ParseAsync(bundledRuntimeStream))
+        {
+            AssertRuntimeMetricIsNonNegative(
+                bundledRuntimeDocument.RootElement,
+                "workingSetBytes");
+            AssertRuntimeMetricIsNonNegative(
+                bundledRuntimeDocument.RootElement,
+                "privateMemoryBytes");
+            AssertRuntimeMetricIsNonNegative(
+                bundledRuntimeDocument.RootElement,
+                "managedMemoryBytes");
+            AssertRuntimeMetricIsNonNegative(
+                bundledRuntimeDocument.RootElement,
+                "gcHeapBytes");
+            AssertRuntimeMetricIsNonNegative(
+                bundledRuntimeDocument.RootElement,
+                "gcFragmentedBytes");
+        }
 
         var bundledErrors = archive.GetEntry("errors.log")
             ?? throw new InvalidOperationException("errors.log pakette yok.");
@@ -2400,6 +2431,14 @@ static async Task DiagnosticsWritesDevOpsBundleAsync()
             Directory.Delete(root, recursive: true);
         }
     }
+}
+
+static void AssertRuntimeMetricIsNonNegative(
+    JsonElement runtime,
+    string propertyName)
+{
+    var value = runtime.GetProperty(propertyName).GetInt64();
+    Assert(value >= 0);
 }
 
 static async Task DiagnosticsFlushesDebouncedSummaryAsync()

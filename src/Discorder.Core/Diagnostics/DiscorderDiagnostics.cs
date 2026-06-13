@@ -500,7 +500,8 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
             process.Refresh();
 
             var gcInfo = GC.GetGCMemoryInfo();
-            var managedMemoryBytes = GC.GetTotalMemory(forceFullCollection: false);
+            var managedMemoryBytes = ClampMetric(
+                GC.GetTotalMemory(forceFullCollection: false));
             double? uptimeSeconds = null;
 
             try
@@ -515,11 +516,11 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
             }
 
             return new RuntimeMetrics(
-                process.WorkingSet64,
-                process.PrivateMemorySize64,
+                ClampMetric(process.WorkingSet64),
+                ClampMetric(process.PrivateMemorySize64),
                 managedMemoryBytes,
-                gcInfo.HeapSizeBytes,
-                gcInfo.FragmentedBytes,
+                ClampMetric(gcInfo.HeapSizeBytes),
+                ClampMetric(gcInfo.FragmentedBytes),
                 process.HandleCount,
                 process.Threads.Count,
                 uptimeSeconds);
@@ -532,6 +533,8 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
             return RuntimeMetrics.Empty;
         }
     }
+
+    private static long ClampMetric(long value) => Math.Max(0, value);
 
     private sealed record RuntimeMetrics(
         long WorkingSetBytes,
