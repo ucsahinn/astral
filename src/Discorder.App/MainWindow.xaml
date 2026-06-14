@@ -206,7 +206,7 @@
                         <TextBlock Margin="0,3,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
-                                   Text="Çalışma modu hazır. Tarayıcı modu açık." />
+                                   Text="Çalışma modu hazır. Tarayıcı modu isteğe bağlı." />
                     </StackPanel>
 
                     <Border Grid.Column="2"
@@ -917,7 +917,7 @@
                                VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource SecondaryTextBrush}"
-                               Text="v2.0.29" />
+                               Text="v2.0.30" />
 
                     <Button Grid.Column="5"
                             x:Name="AutoUpdateButton"

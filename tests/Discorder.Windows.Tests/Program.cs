@@ -175,7 +175,7 @@ static void RenderMainWindow()
             toggle.Name == "RunInBackgroundToggle");
         var startupSwitch = switches.Single(toggle =>
             toggle.Name == "StartupToggle");
-        Assert(browserSwitch.IsChecked == true);
+        Assert(browserSwitch.IsChecked == false);
         Assert(runInBackgroundSwitch.IsChecked == false);
         Assert(startupSwitch.IsChecked == false);
         Assert(FindVisualChildren<ProgressBar>(window).Any());
@@ -465,9 +465,15 @@ file sealed class FakeProcessLauncher : IProcessLauncher
 
 file sealed class FakeManagedProcess : IManagedProcess
 {
+    public int ProcessId { get; } = 1;
+
+    public DateTimeOffset? StartTime { get; } = DateTimeOffset.Now;
+
     public event EventHandler? Exited;
 
     public bool HasExited { get; private set; }
+
+    public bool ExitConfirmed => HasExited;
 
     public int? ExitCode => HasExited ? 0 : null;
 

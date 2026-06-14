@@ -214,6 +214,8 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
         }
     }
 
+    public static string? RedactForLog(string? value) => Redact(value);
+
     private List<string> CopyLogFilesToStaging(string stagingDirectory)
     {
         var warnings = new List<string>();
@@ -328,6 +330,14 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
                     _paths.EventLog,
                     JsonSerializer.Serialize(record, JsonOptions) + Environment.NewLine,
                     new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+                if (!string.Equals(level, "info", StringComparison.OrdinalIgnoreCase))
+                {
+                    File.AppendAllText(
+                        _paths.ErrorLog,
+                        JsonSerializer.Serialize(record, JsonOptions) + Environment.NewLine,
+                        new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+                }
+
                 MaybeWriteSummaryLocked(
                     message,
                     force: !string.Equals(level, "info", StringComparison.Ordinal));

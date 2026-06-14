@@ -85,7 +85,7 @@ public partial class App : System.Windows.Application, IDisposable
             Timeout = TimeSpan.FromMinutes(10)
         };
         _httpClient.DefaultRequestHeaders.UserAgent.Add(
-            new ProductInfoHeaderValue("Discorder", "2.0.29"));
+            new ProductInfoHeaderValue("Discorder", "2.0.30"));
 
         var downloader = new VerifiedDownloader(_httpClient, maxAttempts: 5);
         var wireSockLocator = new WireSockLocator();
@@ -222,7 +222,7 @@ public partial class App : System.Windows.Application, IDisposable
             File.AppendAllText(
                 _paths.ErrorLog,
                 $"{DateTimeOffset.Now:O}{Environment.NewLine}" +
-                $"{exception}{Environment.NewLine}{Environment.NewLine}");
+                $"{DiscorderDiagnostics.RedactForLog(exception.ToString())}{Environment.NewLine}{Environment.NewLine}");
         }
         catch (Exception logException)
         {

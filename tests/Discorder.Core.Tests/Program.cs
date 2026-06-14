@@ -61,6 +61,8 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Denetleyici temiz kapanışta firewall scriptini tekrar çalıştırmaz", ControllerDisposeSkipsDisconnectedCleanupAsync),
     ("Denetleyici kilit doğrulanmadan kapanışta kilidi yeniler", ControllerDisposeRefreshesUnconfirmedDisconnectedLockAsync),
     ("Denetleyici aktif bağlantıyı kapanışta güvenle temizler", ControllerDisposeCleansActiveConnectionAsync),
+    ("Denetleyici WireSock kapanışı doğrulanmazsa süreç işaretini korur", ControllerKeepsWireSockMarkerWhenExitIsUnconfirmedAsync),
+    ("Denetleyici yanlış WireSock süreç işaretini temizler", ControllerDeletesMismatchedWireSockMarkerAsync),
     ("Denetleyici bağlantı kapanınca Discord'u kapatmayı dener", ControllerClosesDiscordOnDisconnectAsync),
     ("Denetleyici web kapsamını bağlıyken kilitler", ControllerLocksBrowserScopeWhileConnectedAsync),
     ("Denetleyici bağlantıyı Discord oturumu sanmadan doğrular", ControllerVerifiesTunnelWithoutClaimingDiscordSessionAsync),
@@ -84,6 +86,8 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Uygulamayı kaldırma beklenmeyen veri kökünü reddeder", CleanupServiceRejectsUnexpectedDataRootAsync),
     ("Uygulamayı kaldırma salt okunur Discorder dosyalarını siler", CleanupServiceDeletesReadOnlyFilesAsync),
     ("Tanılama logları devops paketi üretir", DiagnosticsWritesDevOpsBundleAsync),
+    ("Tanılama kalıcı hata loglarını redakte eder", DiagnosticsRedactsPersistentErrorLogAsync),
+    ("WireSock süreç logları yazılırken redakte edilir", ProcessLauncherRedactsTunnelLogAndConfirmsExitAsync),
     ("Tanılama özeti son bilgi durumunu gecikmeli yazar", DiagnosticsFlushesDebouncedSummaryAsync)
 };
 
@@ -182,11 +186,13 @@ static Task DiscordScopeIncludesBrowsersWhenEnabledAsync()
         var apps = new DiscordAppScope(root, root, root)
             .GetAllowedApplications(includeBrowserAccess: true);
 
-        Assert(apps.Any(app => app.Equals("chrome.exe", StringComparison.OrdinalIgnoreCase)));
-        Assert(apps.Any(app => app.Equals("chromium.exe", StringComparison.OrdinalIgnoreCase)));
-        Assert(apps.Any(app => app.Equals("msedge.exe", StringComparison.OrdinalIgnoreCase)));
-        Assert(apps.Any(app => app.Equals("firefox.exe", StringComparison.OrdinalIgnoreCase)));
-        Assert(apps.Any(app => app.Equals("opera.exe", StringComparison.OrdinalIgnoreCase)));
+        Assert(apps.All(app => !app.Equals("brave.exe", StringComparison.OrdinalIgnoreCase)));
+        Assert(apps.All(app => !app.Equals("chrome.exe", StringComparison.OrdinalIgnoreCase)));
+        Assert(apps.All(app => !app.Equals("chromium.exe", StringComparison.OrdinalIgnoreCase)));
+        Assert(apps.All(app => !app.Equals("msedge.exe", StringComparison.OrdinalIgnoreCase)));
+        Assert(apps.All(app => !app.Equals("firefox.exe", StringComparison.OrdinalIgnoreCase)));
+        Assert(apps.All(app => !app.Equals("opera.exe", StringComparison.OrdinalIgnoreCase)));
+        Assert(apps.All(app => !app.Equals("vivaldi.exe", StringComparison.OrdinalIgnoreCase)));
         Assert(apps.Any(app => app.Equals("Discord.exe", StringComparison.OrdinalIgnoreCase)));
         Assert(apps.Any(app => app.Equals(
             Path.Combine(root, "Discord"),
@@ -1305,7 +1311,7 @@ static async Task SettingsPersistConsentAsync()
         var paths = new AppPaths(root);
         var firstStore = new AppSettingsStore(paths);
         Assert(!firstStore.IsSetupConsentAccepted(WireSockPackage.Version));
-        Assert(firstStore.IsBrowserAccessEnabled());
+        Assert(!firstStore.IsBrowserAccessEnabled());
         Assert(!firstStore.IsRunInBackgroundOnCloseEnabled());
         Assert(!firstStore.IsStartWithWindowsEnabled());
         Assert(!firstStore.IsWireSockInstalledByDiscorder());
@@ -1342,7 +1348,7 @@ static async Task SettingsPersistConsentAsync()
             """);
         var legacyStore = new AppSettingsStore(paths);
         Assert(legacyStore.IsSetupConsentAccepted(WireSockPackage.Version));
-        Assert(legacyStore.IsBrowserAccessEnabled());
+        Assert(!legacyStore.IsBrowserAccessEnabled());
         Assert(!legacyStore.IsRunInBackgroundOnCloseEnabled());
         Assert(!legacyStore.IsStartWithWindowsEnabled());
         Assert(!legacyStore.IsWireSockInstalledByDiscorder());
@@ -1599,6 +1605,19 @@ static async Task ControllerLifecycleAsync()
     var accessLock = new FakeDiscordAccessLock();
     var profileProvisioner = new FakeProfileProvisioner(
         Path.Combine(root, "discord.conf"));
+    var chromePath = Path.Combine(root, "Google", "Chrome", "Application", "chrome.exe");
+    var edgePath = Path.Combine(root, "Microsoft", "Edge", "Application", "msedge.exe");
+    var pathChromePath = Path.Combine(root, "PathBrowsers", "chrome.exe");
+    Directory.CreateDirectory(Path.GetDirectoryName(chromePath)!);
+    Directory.CreateDirectory(Path.GetDirectoryName(edgePath)!);
+    Directory.CreateDirectory(Path.GetDirectoryName(pathChromePath)!);
+    File.WriteAllText(chromePath, "chrome");
+    File.WriteAllText(edgePath, "edge");
+    File.WriteAllText(pathChromePath, "chrome");
+    var originalPath = Environment.GetEnvironmentVariable("PATH");
+    Environment.SetEnvironmentVariable(
+        "PATH",
+        Path.GetDirectoryName(pathChromePath) + Path.PathSeparator + originalPath);
     var wireSockExecutable = Path.Combine(
         root,
         "WireSock VPN Client",
@@ -1630,9 +1649,15 @@ static async Task ControllerLifecycleAsync()
         Assert(profileProvisioner.LastAllowedApplications.Any(app =>
             app.Equals("Discord.exe", StringComparison.OrdinalIgnoreCase)));
         Assert(profileProvisioner.LastAllowedApplications.Any(app =>
-            app.Equals("chrome.exe", StringComparison.OrdinalIgnoreCase)));
+            app.Equals(chromePath, StringComparison.OrdinalIgnoreCase)));
         Assert(profileProvisioner.LastAllowedApplications.Any(app =>
-            app.Equals("msedge.exe", StringComparison.OrdinalIgnoreCase)));
+            app.Equals(edgePath, StringComparison.OrdinalIgnoreCase)));
+        Assert(profileProvisioner.LastAllowedApplications.Any(app =>
+            app.Equals(pathChromePath, StringComparison.OrdinalIgnoreCase)));
+        Assert(profileProvisioner.LastAllowedApplications.All(app =>
+            !app.Equals("chrome.exe", StringComparison.OrdinalIgnoreCase)));
+        Assert(profileProvisioner.LastAllowedApplications.All(app =>
+            !app.Equals("msedge.exe", StringComparison.OrdinalIgnoreCase)));
         Assert(profileProvisioner.LastAllowedApplications.All(app =>
             !app.Contains("roblox", StringComparison.OrdinalIgnoreCase)));
         Assert(processLauncher.LastExecutable == wireSockExecutable);
@@ -1662,6 +1687,7 @@ static async Task ControllerLifecycleAsync()
     }
     finally
     {
+        Environment.SetEnvironmentVariable("PATH", originalPath);
         await controller.DisposeAsync();
         Directory.Delete(root, recursive: true);
     }
@@ -1757,6 +1783,95 @@ static async Task ControllerDisposeCleansActiveConnectionAsync()
     }
     finally
     {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task ControllerKeepsWireSockMarkerWhenExitIsUnconfirmedAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var process = new FakeManagedProcess(
+        exitOnStop: false,
+        exitOnDispose: false);
+    var accessLock = new FakeDiscordAccessLock();
+    var paths = new AppPaths(root);
+    var diagnostics = new DiscorderDiagnostics(
+        paths,
+        TimeSpan.Zero);
+    var controller = new DiscordTunnelController(
+        paths,
+        new DiscordAppScope(root, root, root),
+        new FakeWireSockBootstrapper(Path.Combine(
+            root,
+            "WireSock VPN Client",
+            "bin",
+            WireSockPackage.CliExecutableFileName)),
+        new FakeProfileProvisioner(Path.Combine(root, "discord.conf")),
+        new FakeProcessLauncher(process),
+        TimeSpan.Zero,
+        accessLock,
+        diagnostics);
+
+    try
+    {
+        await controller.ConnectAsync();
+        Assert(File.Exists(paths.WireSockProcessMarker));
+
+        await controller.DisposeAsync();
+
+        Assert(File.Exists(paths.WireSockProcessMarker));
+        var events = await File.ReadAllTextAsync(paths.EventLog);
+        Assert(events.Contains(
+            "WireSock kapanışı doğrulanamadı",
+            StringComparison.Ordinal));
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task ControllerDeletesMismatchedWireSockMarkerAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var paths = new AppPaths(root);
+    var accessLock = new FakeDiscordAccessLock();
+    var controller = new DiscordTunnelController(
+        paths,
+        new DiscordAppScope(root, root, root),
+        new FakeWireSockBootstrapper(Path.Combine(
+            root,
+            "WireSock VPN Client",
+            "bin",
+            WireSockPackage.CliExecutableFileName)),
+        new FakeProfileProvisioner(Path.Combine(root, "discord.conf")),
+        new FakeProcessLauncher(new FakeManagedProcess()),
+        TimeSpan.Zero,
+        accessLock,
+        new DiscorderDiagnostics(paths, TimeSpan.Zero));
+
+    try
+    {
+        paths.EnsureDirectories();
+        using var currentProcess = System.Diagnostics.Process.GetCurrentProcess();
+        var marker = new
+        {
+            ProcessId = currentProcess.Id,
+            StartTime = new DateTimeOffset(currentProcess.StartTime),
+            ProfilePath = paths.DiscordProfile
+        };
+        await File.WriteAllTextAsync(
+            paths.WireSockProcessMarker,
+            JsonSerializer.Serialize(marker));
+
+        await controller.EnsureDisconnectedLockAsync();
+
+        Assert(!File.Exists(paths.WireSockProcessMarker));
+        Assert(accessLock.EnableCount == 1);
+    }
+    finally
+    {
+        await controller.DisposeAsync();
         Directory.Delete(root, recursive: true);
     }
 }
@@ -3090,6 +3205,88 @@ static void AssertRedactedKnownFolder(
     Assert(content.Contains(marker, StringComparison.Ordinal));
 }
 
+static async Task DiagnosticsRedactsPersistentErrorLogAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var paths = new AppPaths(root);
+    var diagnostics = new DiscorderDiagnostics(paths);
+
+    try
+    {
+        diagnostics.Failure(
+            "test.secret",
+            "PrivateKey = fake-private-key",
+            new InvalidOperationException("Authorization: Bearer fake-token-value"),
+            new Dictionary<string, string?>
+            {
+                ["access_token"] = "access_token = fake-access-token"
+            });
+
+        var eventLog = await File.ReadAllTextAsync(paths.EventLog);
+        var errorLog = await File.ReadAllTextAsync(paths.ErrorLog);
+
+        foreach (var text in new[] { eventLog, errorLog })
+        {
+            Assert(!text.Contains("fake-private-key", StringComparison.Ordinal));
+            Assert(!text.Contains("fake-token-value", StringComparison.Ordinal));
+            Assert(!text.Contains("fake-access-token", StringComparison.Ordinal));
+            Assert(text.Contains("[REDACTED]", StringComparison.Ordinal));
+        }
+    }
+    finally
+    {
+        if (Directory.Exists(root))
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+}
+
+static async Task ProcessLauncherRedactsTunnelLogAndConfirmsExitAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var logPath = Path.Combine(root, "logs", "tunnel.log");
+    var systemDirectory = Environment.GetFolderPath(Environment.SpecialFolder.System);
+    var commandShell = Environment.GetEnvironmentVariable("ComSpec");
+    if (string.IsNullOrWhiteSpace(commandShell))
+    {
+        commandShell = Path.Combine(systemDirectory, "cmd.exe");
+    }
+
+    try
+    {
+        Assert(File.Exists(commandShell));
+        var launcher = new ProcessLauncher();
+        await using var process = launcher.Start(
+            commandShell,
+            [
+                "/c",
+                "echo access_token = fake-access-token && echo PrivateKey = fake-private-key"
+            ],
+            Path.GetDirectoryName(commandShell)!,
+            logPath);
+
+        for (var index = 0; index < 50 && !process.HasExited; index++)
+        {
+            await Task.Delay(50);
+        }
+
+        Assert(process.HasExited);
+        await process.DisposeAsync();
+        Assert(process.ExitConfirmed);
+
+        var text = await File.ReadAllTextAsync(logPath);
+        Assert(!text.Contains("fake-access-token", StringComparison.Ordinal));
+        Assert(!text.Contains("fake-private-key", StringComparison.Ordinal));
+        Assert(text.Contains("access_token = [REDACTED]", StringComparison.Ordinal));
+        Assert(text.Contains("PrivateKey = [REDACTED]", StringComparison.Ordinal));
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
 static async Task DiagnosticsFlushesDebouncedSummaryAsync()
 {
     var root = CreateTemporaryDirectory();
@@ -3934,6 +4131,8 @@ file sealed class FakeProfileProvisioner(
             return Task.FromException<string>(exception);
         }
 
+        Directory.CreateDirectory(Path.GetDirectoryName(profilePath)!);
+        File.WriteAllText(profilePath, "test-profile");
         return Task.FromResult(profilePath);
     }
 }
@@ -3997,25 +4196,53 @@ file sealed class SequencedProcessLauncher(params FakeManagedProcess[] processes
 
 file sealed class FakeManagedProcess : IManagedProcess
 {
+    private static int _nextProcessId = 1000;
+    private readonly bool _exitOnStop;
+    private readonly bool _exitOnDispose;
+
     public event EventHandler? Exited;
+
+    public FakeManagedProcess(
+        bool exitOnStop = true,
+        bool exitOnDispose = true)
+    {
+        _exitOnStop = exitOnStop;
+        _exitOnDispose = exitOnDispose;
+        ProcessId = Interlocked.Increment(ref _nextProcessId);
+        StartTime = DateTimeOffset.Now;
+    }
 
     public bool HasExited { get; private set; }
 
+    public bool ExitConfirmed => HasExited;
+
     public int? ExitCode => HasExited ? 0 : null;
+
+    public int ProcessId { get; }
+
+    public DateTimeOffset? StartTime { get; }
 
     public int StopCount { get; private set; }
 
     public Task StopAsync(TimeSpan timeout, CancellationToken cancellationToken)
     {
         StopCount++;
-        HasExited = true;
-        Exited?.Invoke(this, EventArgs.Empty);
+        if (_exitOnStop)
+        {
+            HasExited = true;
+            Exited?.Invoke(this, EventArgs.Empty);
+        }
+
         return Task.CompletedTask;
     }
 
     public ValueTask DisposeAsync()
     {
-        HasExited = true;
+        if (_exitOnDispose)
+        {
+            HasExited = true;
+        }
+
         return ValueTask.CompletedTask;
     }
 }

@@ -108,7 +108,7 @@ Desteklenen tarayıcı süreçleri:
 - Opera: `opera.exe`
 - Vivaldi: `vivaldi.exe`
 
-Tarayıcı modu yeni kurulumda varsayılan açık gelir. Açıkken Discord uygulaması ve desteklenen tarayıcı süreçleri birlikte tünellenir. Kapalıyken Discord uygulaması tünellenir ve desteklenen tarayıcıların Discord web'e düz internetten çıkmasını azaltan geçici firewall kapsamı uygulanır. WireSock süreç bazlı filtreleme kullandığı için tarayıcı içinde yalnızca tek bir sekmeyi ayırmak yerine desteklenen tarayıcı sürecini tüneller. Bu karar Discord web erişimini çalıştırmak için bilinçli olarak alınır; oyunlar, sistem DNS'i, kalıcı servisler ve eski DPI motorları yine kapsam dışındadır.
+Tarayıcı modu yeni kurulumda varsayılan kapalı gelir. Kapalıyken Discord uygulaması tünellenir; desteklenen tarayıcılar WireSock profiline eklenmez ve Discord web'e düz internetten çıkmasını azaltan geçici firewall kapsamı uygulanır. Açıkken Discord uygulaması ve bulunan desteklenen tarayıcı executable path'leri birlikte tünellenir. WireSock süreç bazlı filtreleme kullandığı için tarayıcı içinde yalnızca tek bir sekmeyi ayırmak yerine desteklenen tarayıcı sürecini tüneller. Bu karar Discord web erişimini çalıştırmak için bilinçli olarak alınır; oyunlar, sistem DNS'i, kalıcı servisler ve eski DPI motorları yine kapsam dışındadır.
 
 ## Yayın Modeli
 

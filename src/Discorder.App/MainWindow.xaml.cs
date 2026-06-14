@@ -630,6 +630,7 @@ public partial class MainWindow : Window, IDisposable
                 ? "Discord web kapsamı açıldı."
                 : "Discord web kapsamı kapatıldı.");
         ApplyBrowserAccessView(enabled, locked: false);
+        RefreshLiveStatusCards(_controller.Snapshot);
     }
 
     private void ApplyBrowserAccessSetting(bool enabled)
@@ -663,7 +664,6 @@ public partial class MainWindow : Window, IDisposable
             _isApplyingSettings = false;
         }
 
-        RefreshLiveStatusCards(_controller.Snapshot);
     }
 
     private void RunInBackgroundToggle_Changed(object sender, RoutedEventArgs e)

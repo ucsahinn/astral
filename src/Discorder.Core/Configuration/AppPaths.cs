@@ -34,6 +34,7 @@ public sealed class AppPaths
         DiagnosticBundleDirectory = Path.Combine(DataDirectory, "diagnostic-bundles");
         SettingsFile = Path.Combine(DataDirectory, "settings.json");
         WireSockInstallMarker = Path.Combine(DataDirectory, "wiresock-installed-by-discorder.marker");
+        WireSockProcessMarker = Path.Combine(DataDirectory, "wiresock-process.json");
         WgcfExecutable = Path.Combine(ToolsDirectory, "wgcf.exe");
         WgcfAccount = Path.Combine(ProfileDirectory, "wgcf-account.toml");
         WgcfBaseProfile = Path.Combine(ProfileDirectory, "wgcf-profile.conf");
@@ -70,6 +71,8 @@ public sealed class AppPaths
     public string SettingsFile { get; }
 
     public string WireSockInstallMarker { get; }
+
+    public string WireSockProcessMarker { get; }
 
     public string WgcfExecutable { get; }
 

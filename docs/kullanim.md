@@ -26,7 +26,7 @@ Portable klasörü geçici indirme klasöründe bırakmamak daha sağlıklıdır
 ## Ana Ekran
 
 - **Bağlan**: Discord bağlantısını başlatır.
-- **Tarayıcı modu**: Varsayılan açık gelir; Discord web gerekiyorsa desteklenen tarayıcıları da kapsama alır.
+- **Tarayıcı modu**: Varsayılan kapalı gelir; Discord web gerekiyorsa kullanıcı açar ve bulunan desteklenen tarayıcı executable path'leri kapsama alınır.
 - **Arka planda çalıştır**: Pencere kapanınca uygulamanın bildirim alanında açık kalmasını sağlar.
 - **Windows açılışında çalıştır**: Windows oturumu açıldığında Discorder'ı başlatır.
 - **Tanılama**: Bağlantı sorunlarını incelemek için rapor hazırlar.
@@ -35,9 +35,9 @@ Portable klasörü geçici indirme klasöründe bırakmamak daha sağlıklıdır
 
 ## Tarayıcı Modu
 
-Tarayıcı modu yeni kurulumda açık gelir. Böylece Discord web kullanan tarayıcılar da bağlantı kapsamına dahil olur.
+Tarayıcı modu yeni kurulumda kapalı gelir. Böylece ilk bağlantıda yalnızca Discord masaüstü uygulaması kapsama alınır.
 
-Tarayıcı modu kapatılırsa Discorder yalnızca Discord masaüstü uygulamasına odaklanır. Tarayıcı süreci kapsamlı çalıştığı için açık modda aynı tarayıcıdaki diğer sekmelerin davranışı da tarayıcı sürecinden etkilenebilir.
+Tarayıcı modu açılırsa Discorder, Discord Web için bulunan desteklenen tarayıcı executable path'lerini de WireSock kapsamına alır. WireSock süreç bazlı çalıştığı için açık modda aynı tarayıcı sürecindeki diğer sekmeler de bu süreç kapsamından etkilenebilir.
 
 ## Tanılama Paketi
 

@@ -1,6 +1,6 @@
 # Discorder Release ve Tag Denetimi
 
-> 2026-06-14 guncellemesi: aktif patch hedefi `v2.0.29` olarak belirlendi. Bu surum, `v2.0.28` uzerine Discord recovery sonrasi ikinci yeniden baslatma dongusunu kaldirir. Eski release/tag silme islemi yapilmadi; cleanup icin yine ayrica `APPROVED - CLEAN RELEASES` gerekir.
+> 2026-06-14 guncellemesi: aktif patch hedefi `v2.0.30` olarak belirlendi. Bu surum, `v2.0.29` uzerine Discord-only routing varsayilanini daraltir, Tarayici modunu opt-in yapar, WireSock owned-process cleanup ve tanilama redaction/summary alanlarini guclendirir. Eski release/tag silme islemi yapilmadi; cleanup icin yine ayrica `APPROVED - CLEAN RELEASES` gerekir.
 
 Bu tablo, v2.0.20 public yüzeyi hazırlanırken çıkarılan non-destructive release temizliği planıdır. GitHub Release veya tag silme işlemi yapılmadı. Silme/cleanup için ayrıca `APPROVED - CLEAN RELEASES` onayı gerekir.
 
@@ -17,7 +17,8 @@ Aşağıdaki kararlar, erişilebilen tag ve artifact kanıtına göre hazırlanm
 
 | Release/tag | Öneri | Gerekçe | Risk | Komut/API aksiyonu |
 | --- | --- | --- | --- | --- |
-| `v2.0.29` | Oluştur / latest yap | Discord normal agda toparlandiktan sonra tunel altinda ikinci kez kapatilip updater ekranina dusme dongusu engellenir. | Authenticode yoksa kullanıcı Windows SmartScreen uyarısı görebilir. | GitHub Release workflow veya `gh release create v2.0.29 ... --latest`. |
+| `v2.0.30` | Olustur / latest yap | Discord-only varsayilan kapsam daraltilir; Tarayici modu opt-in olur; WireSock owned-process cleanup, routing summary ve kalici log redaction eklenir. | Authenticode yoksa kullanici Windows SmartScreen uyarisi gorebilir. | GitHub Release workflow veya `gh release create v2.0.30 ... --latest`. |
+| `v2.0.29` | Koru | Discord normal agda toparlandiktan sonra tunel altinda ikinci kez kapatilip updater ekranina dusme dongusu engellenir. | Latest olarak kalirsa v2.0.30'daki Discord-only varsayilan ve tanilama iyilestirmeleri kullaniciya ulasmaz. | v2.0.30 yayinlaninca latest guncellenir. |
 | `v2.0.28` | Koru | Discord'un kendi updater ekraninda kalma durumu ayri taninir; Discorder WireSock'u gecici durdurup Discord update kontrolunu normal agda tamamlatir. | Latest olarak kalırsa ikinci restart hotfix'i kullanıcıya ulaşmaz. | v2.0.29 yayınlanınca latest güncellenir. |
 | `v2.0.27` | Koru | Uygulama kaldırma, Discorder'ın kendi kilidini, ayarlarını, loglarını ve veri klasörlerini temizledikten sonra tanılama yazımını durdurur; LocalAppData/ProgramData Discorder klasörleri `app.exit` loguyla geri oluşmaz; salt okunur dosyalar temizlenir; Discord açılışı updater penceresinde takılmasın diye imzalı gerçek `Discord.exe` üzerinden yapılır. | Latest olarak kalırsa updater recovery kullanıcıya ulaşmaz. | v2.0.29 yayınlanınca latest güncellenir. |
 | `v2.0.26` | Koru | Discord kapalıyken uygulamayı Squirrel `Update.exe --processStart` yolu ile açmayı dener; restart sonrası görünür Discord ana penceresi doğrulanmazsa kullanıcıya "bağlantı hazır" denmez; diagnostic artık görünmeyen pencereyi açıkça raporlar. | Latest olarak kalırsa sonraki hotfix'ler kullanıcıya ulaşmaz. | v2.0.29 yayınlanınca latest güncellenir. |
@@ -50,7 +51,7 @@ Aşağıdaki kararlar, erişilebilen tag ve artifact kanıtına göre hazırlanm
 
 ## Sürüm Kararı
 
-Bu public yüzey için anlamlı SemVer sürümü `v2.0.29` olarak belirlendi.
+Bu public yüzey için anlamlı SemVer sürümü `v2.0.30` olarak belirlendi.
 
 Neden patch?
 
@@ -60,11 +61,11 @@ Neden patch?
 
 ## Yayın Kapısı
 
-v2.0.29 GitHub Release yayınlanmadan önce şu koşullar gerekir:
+v2.0.30 GitHub Release yayınlanmadan önce şu koşullar gerekir:
 
 - GitHub yayın yetkisi geçerli olmalı.
-- `v2.0.29` tag'i doğru commit'e işaret etmeli.
-- Release workflow veya local build `Discorder-2.0.29-win-x64.zip` ve manuel kullanım için `Discorder-win-x64.zip` üretmeli.
+- `v2.0.30` tag'i doğru commit'e işaret etmeli.
+- Release workflow veya local build `Discorder-2.0.30-win-x64.zip` ve manuel kullanım için `Discorder-win-x64.zip` üretmeli.
 - `.sha256.txt` dosyası ZIP ile eşleşmeli.
 - Secret scan temiz olmalı.
-- Release body `docs/releases/v2.0.29.md` ile uyumlu olmalı.
+- Release body `docs/releases/v2.0.30.md` ile uyumlu olmalı.

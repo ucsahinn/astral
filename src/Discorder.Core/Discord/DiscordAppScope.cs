@@ -1,3 +1,7 @@
+using System.Diagnostics;
+using System.Runtime.Versioning;
+using Microsoft.Win32;
+
 namespace Discorder.Core.Discord;
 
 public sealed class DiscordAppScope
@@ -91,8 +95,7 @@ public sealed class DiscordAppScope
         {
             foreach (var browser in BrowserDefinitions)
             {
-                allowed.Add(browser.ProcessName);
-                AddKnownBrowserPaths(allowed, browser);
+                AddDiscoveredBrowserPaths(allowed, browser);
             }
         }
 
@@ -126,7 +129,7 @@ public sealed class DiscordAppScope
         return executableFound;
     }
 
-    private int AddKnownBrowserPaths(
+    private int AddDiscoveredBrowserPaths(
         SortedSet<string> allowed,
         BrowserDefinition browser)
     {
@@ -142,7 +145,140 @@ public sealed class DiscordAppScope
             }
         }
 
+        foreach (var candidate in EnumeratePathCandidates(browser.ProcessName))
+        {
+            if (AddFileIfExists(allowed, candidate))
+            {
+                count++;
+            }
+        }
+
+        foreach (var candidate in EnumerateRunningProcessPaths(browser.ProcessName))
+        {
+            if (AddFileIfExists(allowed, candidate))
+            {
+                count++;
+            }
+        }
+
+        foreach (var candidate in EnumerateWindowsAppPathCandidates(browser.ProcessName))
+        {
+            if (AddFileIfExists(allowed, candidate))
+            {
+                count++;
+            }
+        }
+
         return count;
+    }
+
+    private static IEnumerable<string> EnumeratePathCandidates(string processName)
+    {
+        var pathValue = Environment.GetEnvironmentVariable("PATH");
+        if (string.IsNullOrWhiteSpace(pathValue))
+        {
+            yield break;
+        }
+
+        foreach (var entry in pathValue.Split(
+                     Path.PathSeparator,
+                     StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            yield return Path.Combine(entry, processName);
+        }
+    }
+
+    private static IEnumerable<string> EnumerateRunningProcessPaths(string processName)
+    {
+        var processNameWithoutExtension = Path.GetFileNameWithoutExtension(processName);
+        if (string.IsNullOrWhiteSpace(processNameWithoutExtension))
+        {
+            yield break;
+        }
+
+        Process[] processes;
+        try
+        {
+            processes = Process.GetProcessesByName(processNameWithoutExtension);
+        }
+        catch (Exception exception)
+            when (exception is InvalidOperationException
+                or System.ComponentModel.Win32Exception)
+        {
+            yield break;
+        }
+
+        foreach (var process in processes)
+        {
+            using (process)
+            {
+                string? fileName;
+                try
+                {
+                    fileName = process.MainModule?.FileName;
+                }
+                catch (Exception exception)
+                    when (exception is InvalidOperationException
+                        or System.ComponentModel.Win32Exception
+                        or NotSupportedException)
+                {
+                    continue;
+                }
+
+                if (!string.IsNullOrWhiteSpace(fileName))
+                {
+                    yield return fileName;
+                }
+            }
+        }
+    }
+
+    private static List<string> EnumerateWindowsAppPathCandidates(string processName)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return [];
+        }
+
+        return EnumerateWindowsAppPathCandidatesCore(processName);
+    }
+
+    [SupportedOSPlatform("windows")]
+    private static List<string> EnumerateWindowsAppPathCandidatesCore(string processName)
+    {
+        var candidates = new List<string>();
+        foreach (var (hive, subKey) in new (RegistryKey Hive, string SubKey)[]
+                 {
+                     (
+                         Registry.CurrentUser,
+                         @"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\" + processName),
+                     (
+                         Registry.LocalMachine,
+                         @"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\" + processName),
+                     (
+                         Registry.LocalMachine,
+                         @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\App Paths\" + processName)
+                 })
+        {
+            try
+            {
+                using var key = hive.OpenSubKey(subKey);
+                if (key?.GetValue(string.Empty) is string value
+                    && !string.IsNullOrWhiteSpace(value))
+                {
+                    candidates.Add(value);
+                }
+            }
+            catch (Exception exception)
+                when (exception is IOException
+                    or UnauthorizedAccessException
+                    or System.Security.SecurityException
+                    or ObjectDisposedException)
+            {
+            }
+        }
+
+        return candidates;
     }
 
     private IEnumerable<string> EnumerateProgramRoots()

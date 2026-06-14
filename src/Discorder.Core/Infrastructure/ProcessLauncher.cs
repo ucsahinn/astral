@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
+using Discorder.Core.Diagnostics;
 
 namespace Discorder.Core.Infrastructure;
 
@@ -55,6 +56,7 @@ public sealed class ProcessLauncher : IProcessLauncher
         private readonly Task _stdoutPump;
         private readonly Task _stderrPump;
         private bool _disposed;
+        private bool _exitConfirmed;
 
         public ManagedProcess(Process process, string logPath)
         {
@@ -81,16 +83,71 @@ public sealed class ProcessLauncher : IProcessLauncher
             {
                 try
                 {
-                    return _process.HasExited;
+                    if (_process.HasExited)
+                    {
+                        _exitConfirmed = true;
+                        return true;
+                    }
+
+                    return false;
+                }
+                catch (ObjectDisposedException)
+                {
+                    return _exitConfirmed;
                 }
                 catch (InvalidOperationException)
                 {
+                    _exitConfirmed = true;
                     return true;
                 }
             }
         }
 
-        public int? ExitCode => HasExited ? _process.ExitCode : null;
+        public bool ExitConfirmed => _exitConfirmed || HasExited;
+
+        public int? ExitCode
+        {
+            get
+            {
+                if (!HasExited)
+                {
+                    return null;
+                }
+
+                try
+                {
+                    return _process.ExitCode;
+                }
+                catch (ObjectDisposedException)
+                {
+                    return null;
+                }
+                catch (InvalidOperationException)
+                {
+                    return null;
+                }
+            }
+        }
+
+        public int ProcessId => _process.Id;
+
+        public DateTimeOffset? StartTime
+        {
+            get
+            {
+                try
+                {
+                    return new DateTimeOffset(_process.StartTime);
+                }
+                catch (Exception exception)
+                    when (exception is InvalidOperationException
+                        or NotSupportedException
+                        or System.ComponentModel.Win32Exception)
+                {
+                    return null;
+                }
+            }
+        }
 
         public async Task StopAsync(TimeSpan timeout, CancellationToken cancellationToken)
         {
@@ -106,6 +163,7 @@ public sealed class ProcessLauncher : IProcessLauncher
                 {
                     _process.Kill(entireProcessTree: true);
                     await _process.WaitForExitAsync(cancellationToken);
+                    _exitConfirmed = true;
                     return;
                 }
 
@@ -114,6 +172,7 @@ public sealed class ProcessLauncher : IProcessLauncher
                     cancellationToken,
                     timeoutSource.Token);
                 await _process.WaitForExitAsync(linkedSource.Token);
+                _exitConfirmed = true;
             }
             catch (OperationCanceledException)
             {
@@ -121,6 +180,7 @@ public sealed class ProcessLauncher : IProcessLauncher
                 {
                     _process.Kill(entireProcessTree: true);
                     await _process.WaitForExitAsync(cancellationToken);
+                    _exitConfirmed = true;
                 }
             }
         }
@@ -137,22 +197,59 @@ public sealed class ProcessLauncher : IProcessLauncher
 
             if (!HasExited)
             {
-                _process.Kill(entireProcessTree: true);
+                try
+                {
+                    _process.Kill(entireProcessTree: true);
+                    using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                    await _process.WaitForExitAsync(timeout.Token);
+                    _exitConfirmed = true;
+                }
+                catch (OperationCanceledException)
+                {
+                    WriteLog("SYS", "WireSock süreci kapanma bekleme süresini aştı.");
+                }
+                catch (InvalidOperationException)
+                {
+                    _exitConfirmed = true;
+                }
+            }
+            else
+            {
+                _exitConfirmed = true;
             }
 
-            await Task.WhenAll(_stdoutPump, _stderrPump);
+            try
+            {
+                await Task.WhenAll(_stdoutPump, _stderrPump)
+                    .WaitAsync(TimeSpan.FromSeconds(2));
+            }
+            catch (TimeoutException)
+            {
+                WriteLog("SYS", "WireSock log akışı kapanma bekleme süresini aştı.");
+            }
             WriteLog(
                 "SYS",
                 $"WireSock süreci kapandı. Kod={ExitCode?.ToString(CultureInfo.InvariantCulture) ?? "bilinmiyor"}");
+            _exitConfirmed = _exitConfirmed || HasExited;
             await _log.DisposeAsync();
             _process.Dispose();
         }
 
         private async Task PumpAsync(StreamReader reader, string channel)
         {
-            while (await reader.ReadLineAsync() is { } line)
+            try
             {
-                WriteLog(channel, line);
+                while (await reader.ReadLineAsync() is { } line)
+                {
+                    WriteLog(channel, line);
+                }
+            }
+            catch (Exception exception)
+                when (exception is IOException
+                    or ObjectDisposedException
+                    or InvalidOperationException)
+            {
+                // Process shutdown can close the pipe while the async pump is still unwinding.
             }
         }
 
@@ -163,10 +260,20 @@ public sealed class ProcessLauncher : IProcessLauncher
 
         private void WriteLog(string channel, string message)
         {
+            var redactedMessage = DiscorderDiagnostics.RedactForLog(message)
+                ?? string.Empty;
             lock (_log)
             {
-                _log.WriteLine(
-                    $"{DateTimeOffset.Now:O} [{channel}] {message.ReplaceLineEndings(" ")}");
+                try
+                {
+                    _log.WriteLine(
+                        $"{DateTimeOffset.Now:O} [{channel}] {redactedMessage.ReplaceLineEndings(" ")}");
+                }
+                catch (Exception exception)
+                    when (exception is IOException
+                        or ObjectDisposedException)
+                {
+                }
             }
         }
     }

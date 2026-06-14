@@ -5,9 +5,12 @@ using Discorder.Core.Firewall;
 using Discorder.Core.Infrastructure;
 using Discorder.Core.Provisioning;
 using Discorder.Core.WireSock;
+using System.Diagnostics;
 using System.Globalization;
 using System.Net.Http;
 using System.Net.Sockets;
+using System.Security.Cryptography;
+using System.Text.Json;
 
 namespace Discorder.Core.Connection;
 
@@ -34,8 +37,11 @@ public sealed class DiscordTunnelController : IAsyncDisposable
     private bool _accessLockConfirmed;
     private DiscordProcessSnapshot _lastDiscordProcessSnapshot = new(0, []);
     private string? _lastProfilePath;
+    private string? _lastProfileSha256;
     private string? _lastNextAction;
     private string? _lastDiscordRestartStatus;
+    private IReadOnlyDictionary<string, string?> _lastRoutingSummary =
+        new Dictionary<string, string?>();
 
     public DiscordTunnelController(
         AppPaths paths,
@@ -115,6 +121,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             }
 
             _diagnostics.Info("controller.lock", "Discord bağlantı koruması etkinleştiriliyor.");
+            await StopOwnedOrphanWireSockProcessAsync(cancellationToken);
             await _accessLock.EnableAsync(cancellationToken);
             _accessLockConfirmed = true;
             SetStatus(TunnelState.Disconnected, "Discorder Bağlı Değil");
@@ -169,7 +176,10 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             ["nextAction"] = _lastNextAction,
             ["discordRestartStatus"] = _lastDiscordRestartStatus,
             ["profilePath"] = _lastProfilePath,
-            ["tunnelLog"] = _paths.TunnelLog
+            ["profileSha256"] = _lastProfileSha256,
+            ["tunnelLog"] = _paths.TunnelLog,
+            ["routingScope"] = CreateRoutingScopeDescription(IncludeBrowserAccess),
+            ["routingSummary"] = FormatRoutingSummary(_lastRoutingSummary)
         };
     }
 
@@ -214,20 +224,28 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
             var allowedApplications = _discordScope.GetAllowedApplications(
                 IncludeBrowserAccess);
+            _lastRoutingSummary = CreateAllowedApplicationDiagnostics(
+                allowedApplications,
+                IncludeBrowserAccess);
             var profilePath = await _provisioner.EnsureProfileAsync(
                 allowedApplications,
                 progress,
                 cancellationToken);
             _lastProfilePath = profilePath;
+            var profileHash = await ComputeFileSha256Async(
+                profilePath,
+                cancellationToken);
+            _lastProfileSha256 = profileHash;
             _diagnostics.Info(
                 "controller.profile",
                 "Discord profili hazırlandı.",
                 new Dictionary<string, string?>
                 {
                     ["profilePath"] = profilePath,
-                    ["allowedApplicationCount"] =
-                        allowedApplications.Count.ToString(CultureInfo.InvariantCulture)
-                });
+                    ["profileSha256"] = profileHash,
+                    ["routingScope"] = CreateRoutingScopeDescription(IncludeBrowserAccess)
+                }.Concat(_lastRoutingSummary)
+                    .ToDictionary(pair => pair.Key, pair => pair.Value));
 
             await StartWireSockProcessAsync(
                 wireSockExecutable,
@@ -315,6 +333,8 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 new Dictionary<string, string?>
                 {
                     ["browserAccess"] = IncludeBrowserAccess.ToString(),
+                    ["routingScope"] = CreateRoutingScopeDescription(IncludeBrowserAccess),
+                    ["routingSummary"] = FormatRoutingSummary(_lastRoutingSummary),
                     ["discordRestartStatus"] = restartStatus,
                     ["discordProcessCount"] =
                         discordProcesses.RunningProcessCount.ToString(CultureInfo.InvariantCulture),
@@ -330,6 +350,8 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 new Dictionary<string, string?>
                 {
                     ["browserAccess"] = IncludeBrowserAccess.ToString(),
+                    ["routingScope"] = CreateRoutingScopeDescription(IncludeBrowserAccess),
+                    ["routingSummary"] = FormatRoutingSummary(_lastRoutingSummary),
                     ["discordRestartStatus"] = restartStatus,
                     ["discordProcessCount"] =
                         discordProcesses.RunningProcessCount.ToString(CultureInfo.InvariantCulture),
@@ -337,6 +359,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                         discordProcesses.KnownExecutablePathCount.ToString(CultureInfo.InvariantCulture),
                     ["nextAction"] = nextAction,
                     ["profilePath"] = profilePath,
+                    ["profileSha256"] = profileHash,
                     ["tunnelLog"] = _paths.TunnelLog,
                     ["wireSockRunning"] = "True"
                 });
@@ -399,6 +422,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             arguments,
             Path.GetDirectoryName(wireSockExecutable)!,
             _paths.TunnelLog);
+        WriteWireSockProcessMarker(profilePath);
         _wireSockProcess.Exited += OnWireSockExited;
 
         SetStatus(TunnelState.Verifying, "Bağlantı doğrulanıyor");
@@ -518,6 +542,317 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             "error"
         ]);
     }
+
+    private static async Task<string> ComputeFileSha256Async(
+        string path,
+        CancellationToken cancellationToken)
+    {
+        await using var stream = new FileStream(
+            path,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read);
+        return Convert.ToHexString(
+            await SHA256.HashDataAsync(stream, cancellationToken));
+    }
+
+    private void WriteWireSockProcessMarker(string profilePath)
+    {
+        if (_wireSockProcess is null)
+        {
+            return;
+        }
+
+        try
+        {
+            _paths.EnsureDirectories();
+            var marker = new WireSockProcessMarker(
+                _wireSockProcess.ProcessId,
+                _wireSockProcess.StartTime,
+                profilePath);
+            File.WriteAllText(
+                _paths.WireSockProcessMarker,
+                JsonSerializer.Serialize(marker));
+        }
+        catch (Exception exception)
+            when (exception is IOException
+                or UnauthorizedAccessException
+                or NotSupportedException)
+        {
+            _diagnostics.Warning(
+                "controller.wiresock.marker",
+                "WireSock süreç işareti yazılamadı.",
+                new Dictionary<string, string?>
+                {
+                    ["diagnostic"] = exception.Message
+                });
+        }
+    }
+
+    private async Task StopOwnedOrphanWireSockProcessAsync(
+        CancellationToken cancellationToken)
+    {
+        if (_wireSockProcess is not null
+            || !File.Exists(_paths.WireSockProcessMarker))
+        {
+            return;
+        }
+
+        WireSockProcessMarker? marker;
+        try
+        {
+            marker = JsonSerializer.Deserialize<WireSockProcessMarker>(
+                await File.ReadAllTextAsync(
+                    _paths.WireSockProcessMarker,
+                    cancellationToken));
+        }
+        catch (Exception exception)
+            when (exception is IOException
+                or UnauthorizedAccessException
+                or JsonException)
+        {
+            _diagnostics.Warning(
+                "controller.wiresock.orphan",
+                "Eski WireSock süreç işareti okunamadı.",
+                new Dictionary<string, string?>
+                {
+                    ["diagnostic"] = exception.Message
+                });
+            return;
+        }
+
+        if (marker is null || marker.ProcessId <= 0)
+        {
+            DeleteWireSockProcessMarker();
+            return;
+        }
+
+        var deleteMarker = false;
+        try
+        {
+            using var process = Process.GetProcessById(marker.ProcessId);
+            process.Refresh();
+            if (!string.Equals(
+                    process.ProcessName,
+                    "wiresock-client",
+                    StringComparison.OrdinalIgnoreCase)
+                || !IsSameProcessStart(process, marker.StartTime))
+            {
+                deleteMarker = true;
+                return;
+            }
+
+            if (!IsOwnedWireSockProfilePath(marker.ProfilePath))
+            {
+                _diagnostics.Warning(
+                    "controller.wiresock.orphan",
+                    "Eski WireSock süreç işareti beklenen Discorder profiline ait değil.",
+                    new Dictionary<string, string?>
+                    {
+                        ["processId"] = marker.ProcessId.ToString(CultureInfo.InvariantCulture),
+                        ["profilePath"] = marker.ProfilePath
+                    });
+                deleteMarker = true;
+                return;
+            }
+
+            _diagnostics.Warning(
+                "controller.wiresock.orphan",
+                "Önceki oturumdan kalan Discorder WireSock süreci kapatılıyor.",
+                new Dictionary<string, string?>
+                {
+                    ["processId"] = marker.ProcessId.ToString(CultureInfo.InvariantCulture),
+                    ["profilePath"] = marker.ProfilePath
+            });
+            process.Kill(entireProcessTree: true);
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken,
+                timeout.Token);
+            await process.WaitForExitAsync(linked.Token);
+            deleteMarker = true;
+        }
+        catch (ArgumentException)
+        {
+            deleteMarker = true;
+        }
+        catch (InvalidOperationException)
+        {
+            deleteMarker = true;
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            _diagnostics.Warning(
+                "controller.wiresock.orphan",
+                "Eski WireSock süreci kapatma zaman aşımına uğradı; sonraki açılışta tekrar denenecek.");
+        }
+        catch (System.ComponentModel.Win32Exception exception)
+        {
+            _diagnostics.Warning(
+                "controller.wiresock.orphan",
+                "Eski WireSock süreci otomatik kapatılamadı; sonraki açılışta tekrar denenecek.",
+                new Dictionary<string, string?>
+                {
+                    ["diagnostic"] = exception.Message
+                });
+        }
+        finally
+        {
+            if (deleteMarker)
+            {
+                DeleteWireSockProcessMarker();
+            }
+        }
+    }
+
+    private bool IsOwnedWireSockProfilePath(string? profilePath)
+    {
+        if (string.IsNullOrWhiteSpace(profilePath))
+        {
+            return false;
+        }
+
+        try
+        {
+            return string.Equals(
+                Path.GetFullPath(profilePath),
+                Path.GetFullPath(_paths.DiscordProfile),
+                StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception exception)
+            when (exception is ArgumentException
+                or IOException
+                or NotSupportedException
+                or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    private static bool IsSameProcessStart(
+        Process process,
+        DateTimeOffset? expectedStartTime)
+    {
+        if (expectedStartTime is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            var actual = new DateTimeOffset(process.StartTime);
+            return Math.Abs((actual - expectedStartTime.Value).TotalSeconds) < 2;
+        }
+        catch (Exception exception)
+            when (exception is InvalidOperationException
+                or NotSupportedException
+                or System.ComponentModel.Win32Exception)
+        {
+            return false;
+        }
+    }
+
+    private void DeleteWireSockProcessMarker()
+    {
+        try
+        {
+            if (File.Exists(_paths.WireSockProcessMarker))
+            {
+                File.Delete(_paths.WireSockProcessMarker);
+            }
+        }
+        catch (Exception exception)
+            when (exception is IOException or UnauthorizedAccessException)
+        {
+            _diagnostics.Warning(
+                "controller.wiresock.marker",
+                "WireSock süreç işareti silinemedi.",
+                new Dictionary<string, string?>
+                {
+                    ["diagnostic"] = exception.Message
+                });
+        }
+    }
+
+    private static Dictionary<string, string?> CreateAllowedApplicationDiagnostics(
+        IReadOnlyList<string> allowedApplications,
+        bool includeBrowserAccess)
+    {
+        var pathCount = allowedApplications.Count(Path.IsPathRooted);
+        var bareProcessCount = allowedApplications.Count(app => !Path.IsPathRooted(app));
+        var browserPathCount = allowedApplications.Count(IsBrowserExecutable);
+        var discordPathCount = allowedApplications.Count(IsDiscordExecutable);
+        var broadBrowserNameCount = allowedApplications.Count(app =>
+            !Path.IsPathRooted(app) && IsBrowserExecutable(app));
+
+        return new Dictionary<string, string?>
+        {
+            ["allowedApplicationCount"] =
+                allowedApplications.Count.ToString(CultureInfo.InvariantCulture),
+            ["allowedApplicationPathCount"] =
+                pathCount.ToString(CultureInfo.InvariantCulture),
+            ["allowedApplicationBareNameCount"] =
+                bareProcessCount.ToString(CultureInfo.InvariantCulture),
+            ["allowedDiscordApplicationCount"] =
+                discordPathCount.ToString(CultureInfo.InvariantCulture),
+            ["allowedBrowserApplicationCount"] =
+                browserPathCount.ToString(CultureInfo.InvariantCulture),
+            ["allowedBareBrowserNameCount"] =
+                broadBrowserNameCount.ToString(CultureInfo.InvariantCulture),
+            ["browserMode"] = includeBrowserAccess ? "included" : "excluded",
+            ["browserProcessScope"] = includeBrowserAccess
+                ? "known-browser-executable-paths"
+                : "excluded"
+        };
+    }
+
+    private static string CreateRoutingScopeDescription(bool includeBrowserAccess)
+    {
+        return includeBrowserAccess
+            ? "Discord uygulaması ve bulunan desteklenen tarayıcı executable path'leri kapsama alınır."
+            : "Yalnızca Discord uygulaması kapsama alınır; desteklenen tarayıcılar profile eklenmez.";
+    }
+
+    private static string FormatRoutingSummary(
+        IReadOnlyDictionary<string, string?> summary)
+    {
+        if (summary.Count == 0)
+        {
+            return "henüz profil hazırlanmadı";
+        }
+
+        return string.Join(
+            "; ",
+            summary
+                .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                .Select(pair => $"{pair.Key}={pair.Value}"));
+    }
+
+    private static bool IsBrowserExecutable(string value)
+    {
+        var name = Path.GetFileName(value);
+        return name.Equals("brave.exe", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("chrome.exe", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("chromium.exe", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("firefox.exe", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("msedge.exe", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("opera.exe", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("vivaldi.exe", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsDiscordExecutable(string value)
+    {
+        var name = Path.GetFileName(value);
+        return name.Equals("Discord.exe", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("DiscordPTB.exe", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("DiscordCanary.exe", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("DiscordDevelopment.exe", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private sealed record WireSockProcessMarker(
+        int ProcessId,
+        DateTimeOffset? StartTime,
+        string ProfilePath);
 
     public async Task DisconnectAsync(CancellationToken cancellationToken = default)
     {
@@ -723,8 +1058,19 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         }
 
         _wireSockProcess.Exited -= OnWireSockExited;
-        await _wireSockProcess.DisposeAsync();
+        var process = _wireSockProcess;
+        await process.DisposeAsync();
         _wireSockProcess = null;
+        if (process.ExitConfirmed)
+        {
+            DeleteWireSockProcessMarker();
+        }
+        else
+        {
+            _diagnostics.Warning(
+                "controller.wiresock.marker",
+                "WireSock kapanışı doğrulanamadı; süreç işareti sonraki açılış için korunuyor.");
+        }
     }
 
     private async Task TryEnableAccessLockAsync(string operation)
@@ -810,12 +1156,14 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
     private void WriteDiagnostic(string operation, string diagnostic)
     {
+        var redactedDiagnostic = DiscorderDiagnostics.RedactForLog(diagnostic)
+            ?? string.Empty;
         _diagnostics.Failure(
             "controller." + operation,
             "Denetleyici tanılaması yazıldı.",
             details: new Dictionary<string, string?>
             {
-                ["diagnostic"] = diagnostic
+                ["diagnostic"] = redactedDiagnostic
             });
 
         try
@@ -824,7 +1172,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             File.AppendAllText(
                 _paths.ErrorLog,
                 $"[{DateTimeOffset.Now:O}] {operation}{Environment.NewLine}" +
-                $"{diagnostic}{Environment.NewLine}{Environment.NewLine}");
+                $"{redactedDiagnostic}{Environment.NewLine}{Environment.NewLine}");
         }
         catch (IOException)
         {
