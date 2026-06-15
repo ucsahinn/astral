@@ -62,7 +62,7 @@ Neden `v2.1.0`?
 
 | Release | Canlı durum | Asset durumu | Karar | Gerekçe | Not |
 | --- | --- | --- | --- | --- | --- |
-| `v2.1.4` | Hazırlanıyor | 4 asset bekleniyor | Yayınla | Tooltip polish ve sağ tanılama paneli sadeleşmesi. | Yeni Latest hedefi. |
+| `v2.1.4` | Yayında | 4 asset | Koru | Tooltip polish ve sağ tanılama paneli sadeleşmesi. | Latest patch baseline. |
 | `v2.1.3` | Yayında | 4 asset | Koru | Tarayıcı modu path quoting hotfix'i, restart aksiyonu ve sürüm notları popup'ı. | Önceki patch baseline. |
 | `v2.1.2` | Yayında | 4 asset | Koru | Tek düğmeli güncelleme UX'i, tarayıcı kapsamı sertleştirme ve updater log güvenliği. | Önceki patch baseline. |
 | `v2.1.1` | Yayında | 4 asset | Koru | Bağlantı hazırlığı, tarayıcı modu ve Discord launch hotfix'i. | Önceki patch baseline. |
@@ -90,7 +90,7 @@ Aşağıdaki canlı release'i olmayan tag-only kalıntılar remote ve local tag 
 Uygulanan güvenli politika:
 
 - Public release yüzeyi anlamlı milestone sürümlerde tutuldu.
-- Cleanup sonrası Latest işareti milestone patch hattında tutulur; `v2.1.4` yayını tamamlanınca Latest hedefi v2.1.4'e taşınır.
+- Cleanup sonrası Latest işareti milestone patch hattında tutulur; güncel Latest hedefi v2.1.4'tür.
 - Ara hotfix ve deneme yayınları silindi.
 - Tag-only başarısız yayın kalıntıları silindi.
 - `docs/releases/` altında yalnızca canlı milestone release notları ve bu denetim dosyası tutulur.
@@ -100,15 +100,18 @@ Uygulanan güvenli politika:
 
 ## Yayın Kapısı
 
-`v2.1.4` yayını için hedeflenen koşullar:
+`v2.1.4` yayını tamamlandıktan sonra doğrulanan koşullar:
 
 - Proje ve updater sürümü `2.1.4` ile aynı.
-- `v2.1.4` tag'i remote'a pushlanır.
+- `v2.1.4` tag'i remote'a pushlandı.
+- GitHub Actions doğrulama ve yayın workflow'ları başarılı.
 - Release assetleri `Discorder-2.1.4-win-x64.zip`, `Discorder-2.1.4-win-x64.sha256.txt`, `Discorder-win-x64.zip`, `Discorder-win-x64.sha256.txt`.
-- Sürümlü ve sabit ZIP hash'leri eşleşir.
+- Sürümlü ve sabit ZIP hash'leri eşleşiyor.
 - ZIP içindeki manifest sürümü `2.1.4`.
 - ZIP içinde doğrulanmış yerel fallback için `installers/wiresock-vpn-client-x64-1.4.7.1.msi` bulunur.
-- `scripts\verify.ps1`, `git diff --check`, Gitleaks ve release packaging geçer.
+- Canonical workflow SHA-256: `7CE7BC07771B2E7B4CBC6DE99FE05438282D3B635542617B96799DF27783985C`.
+- Kod imzalama sertifikası yapılandırılmadığı için paket imzasızdır.
+- `scripts\verify.ps1`, `git diff --check`, Gitleaks, NuGet vulnerability audit ve release packaging geçti.
 
 `v2.1.0` yayını tamamlandıktan sonra doğrulanan koşullar:
 
