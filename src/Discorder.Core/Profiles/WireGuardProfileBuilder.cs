@@ -1,5 +1,3 @@
-using System.Text;
-
 namespace Discorder.Core.Profiles;
 
 public static class WireGuardProfileBuilder
@@ -15,6 +13,7 @@ public static class WireGuardProfileBuilder
             .Select(NormalizeApplication)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Order(StringComparer.OrdinalIgnoreCase)
+            .Select(FormatApplication)
             .ToArray();
 
         if (apps.Length == 0)
@@ -72,12 +71,22 @@ public static class WireGuardProfileBuilder
             throw new InvalidDataException("AllowedApps cannot contain an empty value.");
         }
 
-        if (normalized.IndexOfAny([',', '\r', '\n']) >= 0)
+        if (normalized.IndexOfAny([',', '"', '\r', '\n']) >= 0)
         {
             throw new InvalidDataException(
                 $"AllowedApps contains an unsafe value: {normalized}");
         }
 
         return normalized;
+    }
+
+    private static string FormatApplication(string value)
+    {
+        if (!value.Any(char.IsWhiteSpace))
+        {
+            return value;
+        }
+
+        return "\"" + value + "\"";
     }
 }

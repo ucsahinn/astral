@@ -1,6 +1,6 @@
 # Discorder Release ve Tag Denetimi
 
-Son denetim: 2026-06-14
+Son denetim: 2026-06-15
 Son cleanup: 2026-06-14
 
 Bu doküman, GitHub Releases yüzeyindeki sürüm karmaşasını güvenli şekilde sınıflandırır. `APPROVED - CLEAN RELEASES` onayı sonrası ara deneme/hotfix yayınları temizlendi ve public release yüzeyi anlamlı milestone sürümlere indirildi.
@@ -19,7 +19,15 @@ Release/tag/asset silme veya `--cleanup-tag` kullanımı yıkıcı işlem sayıl
 
 ## Sürüm Kararı
 
-Yeni patch hedef `v2.1.2` olarak belirlendi.
+Yeni patch hedef `v2.1.3` olarak belirlendi.
+
+Neden `v2.1.3`?
+
+- `v2.1.2` tek düğmeli güncelleme ve tarayıcı kapsamı sertleştirme sürümü olarak korunur.
+- Yeni değişiklikler geriye uyumlu hotfix niteliğindedir: boşluklu tarayıcı executable yollarının WireSock profilinde tırnaklanması, firewall cleanup timeout dayanıklılığı, uygulama içi sürüm notları ve yeniden başlatma aksiyonu.
+- Ana ürün amacı değişmedi; `BAĞLAN` yine Discord bağlantısını yönetir, tarayıcı kapsamı kullanıcı tercihine bağlıdır.
+
+Önceki patch hedef `v2.1.2` olarak belirlenmişti.
 
 Neden `v2.1.2`?
 
@@ -48,7 +56,8 @@ Neden `v2.1.0`?
 
 | Release | Canlı durum | Asset durumu | Karar | Gerekçe | Not |
 | --- | --- | --- | --- | --- | --- |
-| `v2.1.2` | Hazırlanıyor | 4 asset bekleniyor | Yayınla | Tek düğmeli güncelleme UX'i, tarayıcı kapsamı sertleştirme ve updater log güvenliği. | Yeni Latest hedefi. |
+| `v2.1.3` | Hazırlanıyor | 4 asset bekleniyor | Yayınla | Tarayıcı modu path quoting hotfix'i, restart aksiyonu ve sürüm notları popup'ı. | Yeni Latest hedefi. |
+| `v2.1.2` | Yayında | 4 asset | Koru | Tek düğmeli güncelleme UX'i, tarayıcı kapsamı sertleştirme ve updater log güvenliği. | Önceki patch baseline. |
 | `v2.1.1` | Yayında | 4 asset | Koru | Bağlantı hazırlığı, tarayıcı modu ve Discord launch hotfix'i. | Önceki patch baseline. |
 | `v2.1.0` | Yayında | 4 asset | Koru | Enterprise debug tanılama ve stabilizasyon minor sürümü. | Önceki minor baseline. |
 | `v2.0.30` | Yayında | 4 asset | Koru | Discord-only bağlantı stabilizasyonu ve varsayılan kapsam daraltma. | Başlık temizlendi. |
@@ -74,7 +83,7 @@ Aşağıdaki canlı release'i olmayan tag-only kalıntılar remote ve local tag 
 Uygulanan güvenli politika:
 
 - Public release yüzeyi 6 anlamlı milestone sürüme indirildi.
-- Cleanup sonrası Latest işareti `v2.1.1` üzerindeydi; `v2.1.2` yayını tamamlanınca Latest hedefi v2.1.2'ye taşınır.
+- Cleanup sonrası Latest işareti milestone patch hattında tutulur; `v2.1.3` yayını tamamlanınca Latest hedefi v2.1.3'e taşınır.
 - Ara hotfix ve deneme yayınları silindi.
 - Tag-only başarısız yayın kalıntıları silindi.
 - Kalan milestone release başlıkları okunur ve tutarlı hale getirildi.
@@ -83,13 +92,13 @@ Uygulanan güvenli politika:
 
 ## Yayın Kapısı
 
-`v2.1.2` yayını için hedeflenen koşullar:
+`v2.1.3` yayını için hedeflenen koşullar:
 
-- Proje ve updater sürümü `2.1.2` ile aynı.
-- `v2.1.2` tag'i remote'a pushlanır.
-- Release assetleri `Discorder-2.1.2-win-x64.zip`, `Discorder-2.1.2-win-x64.sha256.txt`, `Discorder-win-x64.zip`, `Discorder-win-x64.sha256.txt`.
+- Proje ve updater sürümü `2.1.3` ile aynı.
+- `v2.1.3` tag'i remote'a pushlanır.
+- Release assetleri `Discorder-2.1.3-win-x64.zip`, `Discorder-2.1.3-win-x64.sha256.txt`, `Discorder-win-x64.zip`, `Discorder-win-x64.sha256.txt`.
 - Sürümlü ve sabit ZIP hash'leri eşleşir.
-- ZIP içindeki manifest sürümü `2.1.2`.
+- ZIP içindeki manifest sürümü `2.1.3`.
 - ZIP içinde doğrulanmış yerel fallback için `installers/wiresock-vpn-client-x64-1.4.7.1.msi` bulunur.
 - `scripts\verify.ps1`, `git diff --check`, Gitleaks ve release packaging geçer.
 

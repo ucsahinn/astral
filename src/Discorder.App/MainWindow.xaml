@@ -466,7 +466,7 @@
                                     <TextBlock x:Name="StageStepLock"
                                                FontSize="11"
                                                Foreground="{StaticResource SecondaryTextBrush}"
-                                      Text="Bağlantı" />
+                                               Text="Hazırlık" />
                                     <TextBlock x:Name="StageStepSetup"
                                                FontSize="11"
                                                Foreground="{StaticResource SecondaryTextBrush}"
@@ -548,7 +548,7 @@
                                           VerticalAlignment="Top"
                                           Checked="BrowserAccessToggle_Changed"
                                           Unchecked="BrowserAccessToggle_Changed"
-                                          ToolTip="Discord web'i tarayıcıda da kullan"
+                                          ToolTip="Discord web bağlantısını tarayıcıda da kullan"
                                           AutomationProperties.Name="Tarayıcı modunu aç veya kapat" />
                             </Grid>
                         </StackPanel>
@@ -704,17 +704,15 @@
                                                LineHeight="17"
                                                Foreground="{StaticResource SecondaryTextBrush}"
                                                Text="Bağlantı sorunlarını incelemek için rapor hazırla" />
-                                    <Border Grid.Row="2"
+                                    <Button Grid.Row="2"
                                             HorizontalAlignment="Left"
+                                            MinWidth="116"
+                                            Height="32"
                                             Padding="12,6"
-                                            CornerRadius="6"
-                                            Background="#70305A65"
-                                            BorderBrush="{StaticResource PremiumLineBrush}"
-                                            BorderThickness="1">
-                                        <TextBlock FontSize="11"
-                                                   FontWeight="SemiBold"
-                                                   Text="Hazır" />
-                                    </Border>
+                                            Style="{StaticResource CommandButtonStyle}"
+                                            Click="OpenDiagnostics_Click"
+                                            Content="Rapor hazırla"
+                                            ToolTip="Tanı raporu oluştur" />
                                     <Grid Grid.Row="3"
                                           Margin="0,10,0,0">
                                         <Grid.ColumnDefinitions>
@@ -900,6 +898,8 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
                     <Button Grid.Column="0"
@@ -944,7 +944,7 @@
                                VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource SecondaryTextBrush}"
-                               Text="v2.1.2" />
+                               Text="v2.1.3" />
 
                     <Button Grid.Column="5"
                             x:Name="AutoUpdateButton"
@@ -960,6 +960,54 @@
                             AutomationProperties.Name="Güncellemeyi yükle" />
 
                     <Button Grid.Column="6"
+                            Margin="0,0,8,0"
+                            Width="68"
+                            Height="46"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource CommandButtonStyle}"
+                            Click="RestartDiscorder_Click"
+                            ToolTip="Discorder'ı yeniden başlat"
+                            AutomationProperties.Name="Discorder'ı yeniden başlat">
+                        <Viewbox Width="22"
+                                 Height="22"
+                                 Stretch="Uniform">
+                            <Canvas Width="24" Height="24">
+                                <Path Stroke="{StaticResource PrimaryTextBrush}"
+                                      StrokeThickness="1.9"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round"
+                                      Fill="Transparent"
+                                      Data="M20,11 A8,8 0 1 0 17.7,16.6 M20,11 L20,5 M20,11 L14,11" />
+                            </Canvas>
+                        </Viewbox>
+                    </Button>
+
+                    <Button Grid.Column="7"
+                            Margin="0,0,8,0"
+                            Width="68"
+                            Height="46"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource CommandButtonStyle}"
+                            Click="OpenReleaseNotes_Click"
+                            ToolTip="Sürüm notlarını aç"
+                            AutomationProperties.Name="Sürüm notlarını aç">
+                        <Viewbox Width="22"
+                                 Height="22"
+                                 Stretch="Uniform">
+                            <Canvas Width="24" Height="24">
+                                <Path Stroke="{StaticResource PrimaryTextBrush}"
+                                      StrokeThickness="1.8"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round"
+                                      Fill="Transparent"
+                                      Data="M6,3.5 L15.5,3.5 L20,8 L20,20.5 L6,20.5 Z M15.5,3.5 L15.5,8 L20,8 M9,11 L17,11 M9,14.5 L17,14.5 M9,18 L14,18" />
+                            </Canvas>
+                        </Viewbox>
+                    </Button>
+
+                    <Button Grid.Column="8"
                             Width="68"
                             Height="46"
                             VerticalAlignment="Center"

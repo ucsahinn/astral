@@ -24,6 +24,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Tarayıcı modu uygulama ve desteklenen tarayıcıları içerir", DiscordScopeIncludesBrowsersWhenEnabledAsync),
     ("Tarayıcı modu PATH üzerindeki sahte tarayıcıları kapsama almaz", DiscordScopeIgnoresPathSpoofedBrowsersAsync),
     ("Profil üretici geniş AllowedApps değerlerini değiştirir", ProfileBuilderIsStrictAsync),
+    ("Profil üretici boşluklu uygulama yollarını tırnaklar", ProfileBuilderQuotesApplicationsWithSpacesAsync),
     ("Profil üretici yapılandırma enjeksiyonunu reddeder", ProfileBuilderRejectsInjectionAsync),
     ("wgcf Discord uygulama ve web profili üretir", WgcfProvisionerBuildsDiscordAccessProfileAsync),
     ("wgcf boş hata çıktısını tanısız bırakmaz", WgcfProvisionerEmptyFailureIsDiagnosticAsync),
@@ -292,6 +293,44 @@ static Task ProfileBuilderIsStrictAsync()
     Assert(!profile.Contains("roblox.exe", StringComparison.OrdinalIgnoreCase));
     Assert(!profile.Contains("Update.exe", StringComparison.OrdinalIgnoreCase));
     Assert(profile.Split("AllowedApps =", StringSplitOptions.None).Length == 2);
+    return Task.CompletedTask;
+}
+
+static Task ProfileBuilderQuotesApplicationsWithSpacesAsync()
+{
+    const string source = """
+        [Interface]
+        PrivateKey = secret
+
+        [Peer]
+        PublicKey = public
+        Endpoint = engage.cloudflareclient.com:2408
+        AllowedIPs = 0.0.0.0/0
+        """;
+
+    const string chromePath =
+        @"C:\Program Files\Google\Chrome\Application\chrome.exe";
+    const string bravePath =
+        @"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe";
+
+    var profile = WireGuardProfileBuilder.BuildDiscordOnly(
+        source,
+        [
+            "Discord.exe",
+            chromePath,
+            bravePath
+        ]);
+
+    var allowedAppsLine = profile
+        .Split(["\r\n", "\n"], StringSplitOptions.None)
+        .Single(line => line.StartsWith("AllowedApps =", StringComparison.Ordinal));
+
+    Assert(allowedAppsLine.Contains("Discord.exe", StringComparison.Ordinal));
+    Assert(allowedAppsLine.Contains($"\"{chromePath}\"", StringComparison.Ordinal));
+    Assert(allowedAppsLine.Contains($"\"{bravePath}\"", StringComparison.Ordinal));
+    Assert(!allowedAppsLine.Contains(
+        "AllowedApps = C:\\Program Files\\",
+        StringComparison.Ordinal));
     return Task.CompletedTask;
 }
 
@@ -2921,6 +2960,7 @@ static async Task WindowsFirewallAccessLockBuildsExpectedCommandsAsync()
         await accessLock.RemoveAsync(CancellationToken.None);
 
         Assert(runner.Commands.Count == 6);
+        Assert(runner.Timeouts.All(timeout => timeout >= TimeSpan.FromSeconds(60)));
         Assert(runner.Commands[0].Contains(
             "System32\\drivers\\etc\\hosts",
             StringComparison.Ordinal));
@@ -4387,6 +4427,8 @@ file sealed class RecordingCommandRunner : ICommandRunner
 {
     public List<string> Commands { get; } = [];
 
+    public List<TimeSpan> Timeouts { get; } = [];
+
     public Task<CommandResult> RunAsync(
         string executable,
         IReadOnlyList<string> arguments,
@@ -4396,6 +4438,7 @@ file sealed class RecordingCommandRunner : ICommandRunner
     {
         cancellationToken.ThrowIfCancellationRequested();
         Commands.Add(string.Join(" ", arguments));
+        Timeouts.Add(timeout);
         return Task.FromResult(new CommandResult(0, string.Empty, string.Empty));
     }
 }

@@ -11,6 +11,7 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
     private const string DisplayName = "Discorder VPN kilidi - Discord alan adları";
     private const string BrowserScopeDisplayName =
         "Discorder tünel kapsamı - tarayıcı Discord engeli";
+    private static readonly TimeSpan ScriptTimeout = TimeSpan.FromSeconds(60);
     private const string DiscordDomains =
         "'discord.com'," +
         "'ptb.discord.com'," +
@@ -93,7 +94,7 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
                 script
             ],
             _paths.DataDirectory,
-            TimeSpan.FromSeconds(20),
+            ScriptTimeout,
             cancellationToken);
 
         if (result.Succeeded)

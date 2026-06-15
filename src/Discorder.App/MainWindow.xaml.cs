@@ -29,6 +29,8 @@ public partial class MainWindow : Window, IDisposable
 
     private static readonly Uri RepositoryUri = new(
         "https://github.com/ucsahinn/discorder");
+    private static readonly Uri ReleaseNotesUri = new(
+        "https://github.com/ucsahinn/discorder/releases/tag/v2.1.3");
     private static readonly Uri BackgroundVideoUri = new(
         "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260606_154941_df1a96e1-a06f-450c-bd02-d863414cc1a0.mp4");
     private static readonly string LocalBackgroundVideoPath = Path.Combine(
@@ -198,6 +200,9 @@ public partial class MainWindow : Window, IDisposable
 
         ToggleButton.IsEnabled = !_isToggleOperationRunning && !snapshot.IsBusy;
         RepairButton.IsEnabled = !snapshot.IsBusy;
+        RepairButton.ToolTip = snapshot.IsBusy
+            ? "Devam eden işlem bitince onarım kullanılabilir."
+            : "Bağlantı dosyalarını güvenle yenile";
         ApplyUpdateControls(snapshot.IsBusy);
         StatusMessage.Text = snapshot.Message;
         StatusDetail.Text = GetDetail(snapshot.State);
@@ -416,7 +421,7 @@ public partial class MainWindow : Window, IDisposable
         return state switch
         {
             TunnelState.DiscordRestartRequired => new StateVisual(
-                "DİSCORD",
+                "ONARIM GEREKİYOR",
                 "BAĞLANTIYI KES",
                 MediaColor.FromRgb(249, 214, 107),
                 MediaColor.FromRgb(255, 232, 145),
@@ -444,7 +449,7 @@ public partial class MainWindow : Window, IDisposable
                 MediaColor.FromRgb(86, 43, 22),
                 MediaColor.FromRgb(255, 163, 92)),
             TunnelState.Error => new StateVisual(
-                "HATA",
+                "SORUN VAR",
                 "TEKRAR DENE",
                 MediaColor.FromRgb(255, 107, 122),
                 MediaColor.FromRgb(255, 176, 187),
@@ -557,7 +562,7 @@ public partial class MainWindow : Window, IDisposable
             TunnelState.Verifying => (92, "Bağlantı doğrulanıyor", 4),
             TunnelState.Connecting => (82, "Bağlantı açılıyor", 4),
             TunnelState.Disconnecting => (62, "Bağlantı kapatılıyor", 4),
-            TunnelState.Error => (100, "Müdahale gerekiyor", 4),
+            TunnelState.Error => (100, "Sorun var", 4),
             TunnelState.Preparing when message.Contains(
                     "Cloudflare",
                     StringComparison.OrdinalIgnoreCase)
@@ -607,7 +612,7 @@ public partial class MainWindow : Window, IDisposable
             TunnelState.Preparing => "Kurulum, dijital imza ve bağlantı profili doğrulanıyor.",
             TunnelState.Connecting => "WireSock VPN Client süreci başlatılıyor.",
             TunnelState.Disconnecting => "Bağlantı güvenli biçimde sonlandırılıyor.",
-            TunnelState.Error => "Tanılama klasörünü açarak ayrıntıları inceleyin.",
+            TunnelState.Error => "Tanılama raporu oluştur veya onarım akışını başlat.",
             _ => "Discorder bağlı değilken Discord düz bağlantıya çıkmaz."
         };
     }
@@ -662,6 +667,11 @@ public partial class MainWindow : Window, IDisposable
                     : "Tarayıcı modu açık. Discord web erişimi de bağlantıya dahil."
                 : locked
                     ? "Bu oturumda değişmez. Değiştirmek için önce bağlantıyı kes."
+                    : "Kapalıyken yalnızca Discord uygulaması bağlantıya dahil.";
+            BrowserAccessToggle.ToolTip = locked
+                ? "Bu oturumda değişmez. Değiştirmek için önce bağlantıyı kes."
+                : enabled
+                    ? "Discord web bağlantısını tarayıcıda da kullan."
                     : "Kapalıyken yalnızca Discord uygulaması bağlantıya dahil.";
         }
         finally
@@ -1323,6 +1333,90 @@ public partial class MainWindow : Window, IDisposable
     private void OpenGitHub_Click(object sender, RoutedEventArgs e)
     {
         OpenUri(RepositoryUri);
+    }
+
+    private void OpenReleaseNotes_Click(object sender, RoutedEventArgs e)
+    {
+        var window = new ReleaseNotesWindow(ReleaseNotesUri)
+        {
+            Owner = this
+        };
+
+        window.ShowDialog();
+    }
+
+    private void RestartDiscorder_Click(object sender, RoutedEventArgs e)
+    {
+        var executablePath = Environment.ProcessPath;
+        if (string.IsNullOrWhiteSpace(executablePath)
+            || !File.Exists(executablePath))
+        {
+            MessageBox.Show(
+                "Discorder yeniden başlatılamadı. Uygulama yolu bulunamadı.",
+                "Discorder",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            return;
+        }
+
+        try
+        {
+            StartRestartHelper(executablePath);
+            _diagnostics.Info("ui.restart", "Kullanıcı Discorder yeniden başlatma istedi.");
+            _allowClose = true;
+            System.Windows.Application.Current.Shutdown();
+        }
+        catch (Exception exception)
+        {
+            _diagnostics.Failure(
+                "ui.restart",
+                "Discorder yeniden başlatılamadı.",
+                exception);
+            MessageBox.Show(
+                "Discorder yeniden başlatılamadı.\n\n" + exception.Message,
+                "Discorder",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+    }
+
+    private static void StartRestartHelper(string executablePath)
+    {
+        var workingDirectory = Path.GetDirectoryName(executablePath)
+            ?? AppContext.BaseDirectory;
+        var script =
+            "Wait-Process -Id " +
+            Environment.ProcessId.ToString(CultureInfo.InvariantCulture) +
+            " -ErrorAction SilentlyContinue; Start-Process -FilePath " +
+            ToPowerShellLiteral(executablePath) +
+            " -WorkingDirectory " +
+            ToPowerShellLiteral(workingDirectory);
+
+        var powerShellPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.System),
+            "WindowsPowerShell",
+            "v1.0",
+            "powershell.exe");
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = powerShellPath,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            WindowStyle = ProcessWindowStyle.Hidden
+        };
+        startInfo.ArgumentList.Add("-NoProfile");
+        startInfo.ArgumentList.Add("-NonInteractive");
+        startInfo.ArgumentList.Add("-WindowStyle");
+        startInfo.ArgumentList.Add("Hidden");
+        startInfo.ArgumentList.Add("-Command");
+        startInfo.ArgumentList.Add(script);
+
+        Process.Start(startInfo);
+    }
+
+    private static string ToPowerShellLiteral(string value)
+    {
+        return "'" + value.Replace("'", "''", StringComparison.Ordinal) + "'";
     }
 
     private async Task CheckForUpdatesOnStartupAsync()
