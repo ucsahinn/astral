@@ -17,9 +17,9 @@ Discorder güncelleme denetiminde yeni sürüm bulamazsa mevcut sürüm güncel 
 - Sistem saati.
 - Güvenlik yazılımının GitHub indirmelerini engelleyip engellemediği.
 
-## Yükle Düğmesi Görünmüyor
+## Güncelle Düğmesi Görünmüyor
 
-**Yükle** düğmesi yalnızca yeni sürüm bulunduktan sonra görünür. Önce **Güncelle** düğmesiyle denetim yapılmalıdır.
+**Güncelle** düğmesi yalnızca arka planda gerçek bir yeni sürüm bulunduğunda görünür. Düğme yoksa kurulu sürüm güncel olabilir veya GitHub denetimi geçici olarak tamamlanamamış olabilir. Discorder mevcut sürümle çalışmaya devam eder.
 
 ## İlk Kurulum Takılıyor
 

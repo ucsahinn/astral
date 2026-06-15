@@ -6,8 +6,8 @@ Discorder, Discord trafiğini tünellemek için bazı üçüncü taraf ürün ve
 
 - Üretici: NT KERNEL
 - Kullanılan sürüm: `1.4.7.1`
-- Dağıtım biçimi: Repoya veya yayın arşivine eklenmez.
-- Kullanım biçimi: İlk bağlantıda resmi MSI kurucu indirilir, doğrulanır ve kullanıcı onayıyla çalıştırılır.
+- Dağıtım biçimi: Repoya eklenmez. Yayın arşivinde doğrulanmış fallback kurucu olarak yer alabilir.
+- Kullanım biçimi: İlk bağlantıda mevcut güvenilir kurulum yeniden kullanılır. Kurulum yoksa release arşivindeki yerel MSI fallback'i veya resmi indirme SHA-256, Authenticode, yayıncı ve sürüm bilgisiyle doğrulanır; ardından kullanıcı onayıyla çalıştırılır.
 
 WireSock ayrı bir üründür. Ticari veya kurumsal kullanım lisans gerektirebilir. Lisans uygunluğunu kontrol etmek kullanıcının sorumluluğundadır.
 

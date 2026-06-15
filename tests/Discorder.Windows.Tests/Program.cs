@@ -166,10 +166,10 @@ static void RenderMainWindow()
         Assert(buttons.Contains("⛔ Uygulamayı kaldır"));
         Assert(buttons.Contains("🧾 Tanılama"));
         Assert(buttons.Contains("↻ Güncelle"));
-        Assert(buttons.Contains("Yükle"));
-        var installUpdateButton = FindVisualChildren<Button>(window)
-            .Single(button => button.Name == "InstallUpdateButton");
-        Assert(installUpdateButton.Visibility == Visibility.Collapsed);
+        Assert(!buttons.Contains("Yükle"));
+        var updateButton = FindVisualChildren<Button>(window)
+            .Single(button => button.Name == "AutoUpdateButton");
+        Assert(updateButton.Visibility == Visibility.Collapsed);
         var switches = FindVisualChildren<CheckBox>(window).ToArray();
         var browserSwitch = switches.Single(toggle =>
             toggle.Name == "BrowserAccessToggle");
@@ -188,7 +188,12 @@ static void RenderMainWindow()
                 debugDiagnosticsSwitch.ToolTip?.ToString(),
                 "Ayrıntılı ağ ve performans verisi ekle",
                 StringComparison.Ordinal));
-        Assert(FindVisualChildren<ProgressBar>(window).Any());
+        var stageProgressPercent = FindVisualChildren<TextBlock>(window)
+            .Single(block => block.Name == "StageProgressPercent");
+        Assert(stageProgressPercent.Text == "0%");
+        var stageProgressBar = FindVisualChildren<ProgressBar>(window)
+            .Single();
+        Assert(stageProgressBar.Value == 0);
         Assert(text.Contains("DNS SUNUCUSU", StringComparison.Ordinal));
         Assert(text.Contains("BAĞLANTI DURUMU", StringComparison.Ordinal));
         Assert(text.Contains("UYGULAMA KAPSAMI", StringComparison.Ordinal));

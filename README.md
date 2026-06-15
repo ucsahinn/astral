@@ -54,12 +54,12 @@ Bu repo, uygulamanın kaynak kodunu, doğrulama betiklerini, güvenlik sınırla
 | 📊 Canlı durum kartları | DNS, bağlantı durumu ve uygulama kapsamı gibi bilgileri sade biçimde gösterir. |
 | 🧾 Tanılama paketi | Bağlantı sorunlarını incelemek için paylaşılabilir rapor hazırlar. |
 | 📦 Portable kullanım | Kurulum sihirbazı olmadan ZIP içinden çalışır. |
-| 🔄 Güncelleme akışı | Önce yeni sürümü denetler, sonra kullanıcı isterse yükler. |
+| 🔄 Güncelleme akışı | Yeni sürümü arka planda denetler; yalnızca gerçek güncelleme varsa tek **Güncelle** düğmesini gösterir. |
 
 ## 🛡️ Neden Güvenli?
 
 - 🧩 Sistem DNS ayarını kalıcı değiştirmez.
-- 📦 WireSock ve wgcf ikili dosyalarını repoya gömmez.
+- 📦 WireSock ve wgcf ikili dosyalarını repoya gömmez; release paketindeki WireSock fallback kurucusu varsa hash, imza, yayıncı ve sürümle doğrulanır.
 - ✅ WireSock kurucusunu SHA-256, Authenticode imzası, yayıncı ve sürüm bilgisiyle doğrular.
 - 🔐 Otomatik güncelleme paketini GitHub release asset bilgisi, `.sha256.txt`, GitHub digest ve manifest kontrolleriyle eşleştirir.
 - 🎯 Discord dışı uygulamaları bilinçli olarak kapsam dışı bırakır.
@@ -81,12 +81,9 @@ Kullanım adımları, portable klasör önerileri ve ilk kurulum notları için 
 
 ## 🔄 Güncelleme Nasıl Çalışır?
 
-Discorder'da güncelleme iki aşamalıdır:
+Discorder açılışta güncellemeyi arka planda sessizce denetler.
 
-1. **Güncelle** düğmesi yalnızca yeni sürüm olup olmadığını denetler.
-2. Yeni sürüm bulunursa ayrı ve belirgin **Yükle** düğmesi görünür.
-
-Yükleme, denetlenen sürümle eşleşen paketi kullanır. Paket önce staging alanına indirilir, doğrulanır, mevcut portable klasör yedeklenir ve ardından `Discorder.exe` yeniden başlatılır. GitHub digest, SHA-256 dosyası veya manifest doğrulaması geçmeyen paket uygulanmaz. Ayrıntılı akış için [güncelleme dokümanına](docs/guncelleme.md) bakın.
+Yeni sürüm yoksa kullanıcı gereksiz bir düğme görmez. Yeni sürüm varsa tek ve belirgin **Güncelle** düğmesi görünür. Bu düğme, arka planda denetlenip bulunan aynı sürümü indirir ve kurar; tıklama sırasında farklı bir sürüm yeniden seçilmez. Paket önce staging alanına indirilir, doğrulanır, mevcut portable klasör yedeklenir ve ardından `Discorder.exe` yeniden başlatılır. GitHub digest, SHA-256 dosyası veya manifest doğrulaması geçmeyen paket uygulanmaz. Ayrıntılı akış için [güncelleme dokümanına](docs/guncelleme.md) bakın.
 
 ## 🗺️ Doküman Haritası
 
@@ -98,7 +95,7 @@ Yükleme, denetlenen sürümle eşleşen paketi kullanır. Paket önce staging a
 | Sorun giderme | [docs/sorun-giderme.md](docs/sorun-giderme.md) |
 | Mimari | [docs/mimari.md](docs/mimari.md) |
 | Kaynak sorun denetimi | [docs/kaynak-sorun-denetimi.md](docs/kaynak-sorun-denetimi.md) |
-| v2.1.1 release notu | [docs/releases/v2.1.1.md](docs/releases/v2.1.1.md) |
+| v2.1.2 release notu | [docs/releases/v2.1.2.md](docs/releases/v2.1.2.md) |
 
 ## 🧪 Geliştirme
 

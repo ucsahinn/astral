@@ -30,7 +30,8 @@ Discorder bilinçli olarak şunları yapmaz:
 
 - TLS doğrulamasını kapatma.
 - İmza veya hash hatasını yoksayma.
-- WireSock ya da wgcf ikili dosyalarını repoya gömme.
+- WireSock ya da wgcf ikili dosyalarını kaynak repoya gömme.
+- Release paketinde WireSock fallback kurucusu varsa hash, Authenticode, yayıncı ve sürüm doğrulaması geçmeden çalıştırma.
 - Discord dışı uygulamaları sessizce kapsama alma.
 - Sistem DNS'ini kalıcı değiştirme.
 - Kullanıcının gizli profil veya hesap dosyalarını release paketine ekleme.

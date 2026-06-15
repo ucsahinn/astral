@@ -52,6 +52,7 @@ public sealed class WireSockPackageVerifier : IWireSockPackageVerifier
 
         VerifyAuthenticode(executablePath);
         VerifyPublisher(executablePath);
+        VerifyClientVersionInfo(executablePath);
     }
 
     private static bool IsKnownCliName(string fileName)
@@ -162,6 +163,31 @@ public sealed class WireSockPackageVerifier : IWireSockPackageVerifier
             throw new InvalidDataException(
                 "WireSock kurucu ürün veya sürüm bilgisi beklenen değerle eşleşmiyor.");
         }
+    }
+
+    private static void VerifyClientVersionInfo(string executablePath)
+    {
+        var versionInfo = FileVersionInfo.GetVersionInfo(executablePath);
+        if (IsExpectedVersion(versionInfo.ProductVersion)
+            || IsExpectedVersion(versionInfo.FileVersion))
+        {
+            return;
+        }
+
+        throw new InvalidDataException(
+            "WireSock istemci sürümü beklenen değerle eşleşmiyor.");
+    }
+
+    private static bool IsExpectedVersion(string? value)
+    {
+        return string.Equals(
+                value,
+                WireSockPackage.Version,
+                StringComparison.Ordinal)
+            || string.Equals(
+                value?.Trim(),
+                WireSockPackage.Version,
+                StringComparison.Ordinal);
     }
 
     private static void VerifyMsiVersionInfo(string installerPath)

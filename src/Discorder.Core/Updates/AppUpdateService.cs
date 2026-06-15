@@ -172,9 +172,9 @@ public sealed class AppUpdateService
             {
                 var statusPercent = download.Percent is null
                     ? 20
-                    : 20 + (download.Percent.Value * 0.45);
+                    : 20 + (download.Percent.Value * 0.60);
                 progress?.Report(new AppUpdateProgress(
-                    Math.Clamp(statusPercent, 20, 65),
+                    Math.Clamp(statusPercent, 20, 80),
                     download.IsRetry
                         ? "Bağlantı tekrar deneniyor"
                         : $"v{versionText} indiriliyor",
@@ -184,8 +184,8 @@ public sealed class AppUpdateService
 
             var percent = download.Percent is null
                 ? 30
-                : 20 + (download.Percent.Value * 0.45);
-            percent = Math.Clamp(percent, 20, 65);
+                : 20 + (download.Percent.Value * 0.60);
+            percent = Math.Clamp(percent, 20, 80);
             var bucket = (int)Math.Floor(percent);
             if (bucket <= lastReportedDownloadBucket
                 && download.Percent is not >= 100)
@@ -224,7 +224,7 @@ public sealed class AppUpdateService
         }
 
         progress?.Report(new AppUpdateProgress(
-            70,
+            86,
             "Paket doğrulanıyor",
             "SHA-256 ve GitHub digest eşleşti."));
         UpdatePackageValidator.ValidateArchive(
@@ -233,7 +233,7 @@ public sealed class AppUpdateService
             versionText);
 
         progress?.Report(new AppUpdateProgress(
-            82,
+            92,
             "Dosyalar hazırlanıyor",
             "Paket güvenli staging alanına açılıyor."));
         var extractionDirectory = Path.Combine(
@@ -253,7 +253,7 @@ public sealed class AppUpdateService
             applicationDirectory,
             updateDirectory);
         progress?.Report(new AppUpdateProgress(
-            94,
+            98,
             "Yükleme yardımcısı hazırlanıyor",
             "Discorder birazdan kapanıp yeni sürümle açılacak."));
 

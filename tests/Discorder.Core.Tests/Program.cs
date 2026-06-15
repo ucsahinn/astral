@@ -22,6 +22,7 @@ var tests = new (string Name, Func<Task> Run)[]
 {
     ("Discord kapsamı parametresiz çağrıda sadece uygulamayı içerir", DiscordScopeDefaultsToAppOnlyAsync),
     ("Tarayıcı modu uygulama ve desteklenen tarayıcıları içerir", DiscordScopeIncludesBrowsersWhenEnabledAsync),
+    ("Tarayıcı modu PATH üzerindeki sahte tarayıcıları kapsama almaz", DiscordScopeIgnoresPathSpoofedBrowsersAsync),
     ("Profil üretici geniş AllowedApps değerlerini değiştirir", ProfileBuilderIsStrictAsync),
     ("Profil üretici yapılandırma enjeksiyonunu reddeder", ProfileBuilderRejectsInjectionAsync),
     ("wgcf Discord uygulama ve web profili üretir", WgcfProvisionerBuildsDiscordAccessProfileAsync),
@@ -221,6 +222,40 @@ static Task DiscordScopeIncludesBrowsersWhenEnabledAsync()
     }
     finally
     {
+        Directory.Delete(root, recursive: true);
+    }
+
+    return Task.CompletedTask;
+}
+
+static Task DiscordScopeIgnoresPathSpoofedBrowsersAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var spoofDirectory = Path.Combine(root, "SpoofedPath");
+    Directory.CreateDirectory(Path.Combine(root, "Discord"));
+    Directory.CreateDirectory(spoofDirectory);
+    File.WriteAllText(Path.Combine(root, "Discord", "Discord.exe"), "discord");
+    var spoofedChrome = Path.Combine(spoofDirectory, "chrome.exe");
+    File.WriteAllText(spoofedChrome, "not chrome");
+    var originalPath = Environment.GetEnvironmentVariable("PATH");
+
+    try
+    {
+        Environment.SetEnvironmentVariable(
+            "PATH",
+            string.IsNullOrWhiteSpace(originalPath)
+                ? spoofDirectory
+                : spoofDirectory + Path.PathSeparator + originalPath);
+
+        var apps = new DiscordAppScope(root, root, root)
+            .GetAllowedApplications(includeBrowserAccess: true);
+
+        Assert(!apps.Contains(spoofedChrome, StringComparer.OrdinalIgnoreCase));
+        Assert(apps.Any(app => app.Equals("Discord.exe", StringComparison.OrdinalIgnoreCase)));
+    }
+    finally
+    {
+        Environment.SetEnvironmentVariable("PATH", originalPath);
         Directory.Delete(root, recursive: true);
     }
 
@@ -1767,8 +1802,8 @@ static async Task ControllerLifecycleAsync()
             app.Equals(chromePath, StringComparison.OrdinalIgnoreCase)));
         Assert(profileProvisioner.LastAllowedApplications.Any(app =>
             app.Equals(edgePath, StringComparison.OrdinalIgnoreCase)));
-        Assert(profileProvisioner.LastAllowedApplications.Any(app =>
-            app.Equals(pathChromePath, StringComparison.OrdinalIgnoreCase)));
+        Assert(profileProvisioner.LastAllowedApplications.All(app =>
+            !app.Equals(pathChromePath, StringComparison.OrdinalIgnoreCase)));
         Assert(profileProvisioner.LastAllowedApplications.All(app =>
             !app.Equals("chrome.exe", StringComparison.OrdinalIgnoreCase)));
         Assert(profileProvisioner.LastAllowedApplications.All(app =>
@@ -2943,14 +2978,17 @@ static async Task WindowsFirewallAccessLockBuildsExpectedCommandsAsync()
         Assert(runner.Commands[2].Contains(
             "Get-DiscorderBrowserPrograms",
             StringComparison.Ordinal));
-        Assert(runner.Commands[2].Contains(
+        Assert(!runner.Commands[2].Contains(
             "Get-Process -Name $processName",
+            StringComparison.Ordinal));
+        Assert(!runner.Commands[2].Contains(
+            "Get-Command",
+            StringComparison.Ordinal));
+        Assert(!runner.Commands[2].Contains(
+            "HKCU:\\",
             StringComparison.Ordinal));
         Assert(runner.Commands[2].Contains(
             "CurrentVersion\\App Paths",
-            StringComparison.Ordinal));
-        Assert(runner.Commands[2].Contains(
-            "Get-Command $name",
             StringComparison.Ordinal));
         Assert(runner.Commands[2].Contains(
             "chromium.exe",

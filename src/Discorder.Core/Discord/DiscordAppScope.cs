@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Runtime.Versioning;
 using Microsoft.Win32;
 
@@ -145,25 +144,9 @@ public sealed class DiscordAppScope
             }
         }
 
-        foreach (var candidate in EnumeratePathCandidates(browser.ProcessName))
-        {
-            if (AddFileIfExists(allowed, candidate))
-            {
-                count++;
-            }
-        }
-
-        foreach (var candidate in EnumerateRunningProcessPaths(browser.ProcessName))
-        {
-            if (AddFileIfExists(allowed, candidate))
-            {
-                count++;
-            }
-        }
-
         foreach (var candidate in EnumerateWindowsAppPathCandidates(browser.ProcessName))
         {
-            if (AddFileIfExists(allowed, candidate))
+            if (AddBrowserFileIfExpected(allowed, browser, candidate))
             {
                 count++;
             }
@@ -172,65 +155,57 @@ public sealed class DiscordAppScope
         return count;
     }
 
-    private static IEnumerable<string> EnumeratePathCandidates(string processName)
+    private bool AddBrowserFileIfExpected(
+        SortedSet<string> allowed,
+        BrowserDefinition browser,
+        string path)
     {
-        var pathValue = Environment.GetEnvironmentVariable("PATH");
-        if (string.IsNullOrWhiteSpace(pathValue))
+        try
         {
-            yield break;
-        }
+            var fullPath = Path.GetFullPath(path);
+            if (!IsExpectedBrowserPath(browser, fullPath))
+            {
+                return false;
+            }
 
-        foreach (var entry in pathValue.Split(
-                     Path.PathSeparator,
-                     StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            return AddFileIfExists(allowed, fullPath);
+        }
+        catch (Exception exception)
+            when (exception is IOException
+                or UnauthorizedAccessException
+                or ArgumentException
+                or NotSupportedException)
         {
-            yield return Path.Combine(entry, processName);
+            return false;
         }
     }
 
-    private static IEnumerable<string> EnumerateRunningProcessPaths(string processName)
+    private bool IsExpectedBrowserPath(BrowserDefinition browser, string fullPath)
     {
-        var processNameWithoutExtension = Path.GetFileNameWithoutExtension(processName);
-        if (string.IsNullOrWhiteSpace(processNameWithoutExtension))
+        if (!Path.GetFileName(fullPath).Equals(
+                browser.ProcessName,
+                StringComparison.OrdinalIgnoreCase))
         {
-            yield break;
+            return false;
         }
 
-        Process[] processes;
-        try
+        foreach (var root in EnumerateProgramRoots())
         {
-            processes = Process.GetProcessesByName(processNameWithoutExtension);
-        }
-        catch (Exception exception)
-            when (exception is InvalidOperationException
-                or System.ComponentModel.Win32Exception)
-        {
-            yield break;
-        }
-
-        foreach (var process in processes)
-        {
-            using (process)
+            foreach (var relativePath in browser.RelativeExecutablePaths)
             {
-                string? fileName;
-                try
+                var expectedPath = Path.GetFullPath(
+                    Path.Combine(root, relativePath));
+                if (string.Equals(
+                        fullPath,
+                        expectedPath,
+                        StringComparison.OrdinalIgnoreCase))
                 {
-                    fileName = process.MainModule?.FileName;
-                }
-                catch (Exception exception)
-                    when (exception is InvalidOperationException
-                        or System.ComponentModel.Win32Exception
-                        or NotSupportedException)
-                {
-                    continue;
-                }
-
-                if (!string.IsNullOrWhiteSpace(fileName))
-                {
-                    yield return fileName;
+                    return true;
                 }
             }
         }
+
+        return false;
     }
 
     private static List<string> EnumerateWindowsAppPathCandidates(string processName)
@@ -249,9 +224,6 @@ public sealed class DiscordAppScope
         var candidates = new List<string>();
         foreach (var (hive, subKey) in new (RegistryKey Hive, string SubKey)[]
                  {
-                     (
-                         Registry.CurrentUser,
-                         @"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\" + processName),
                      (
                          Registry.LocalMachine,
                          @"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\" + processName),

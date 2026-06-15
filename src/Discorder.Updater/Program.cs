@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
 using System.Windows.Forms;
+using Discorder.Core.Diagnostics;
 using Discorder.Core.Updates;
 
 using var progress = UpdateProgressPresenter.Start();
@@ -503,9 +504,10 @@ internal sealed class UpdateLog
 
     public void Write(string message)
     {
+        var redacted = DiscorderDiagnostics.RedactForLog(message) ?? string.Empty;
         var line = string.Create(
             System.Globalization.CultureInfo.InvariantCulture,
-            $"{DateTimeOffset.Now:O} {message}");
+            $"{DateTimeOffset.Now:O} {redacted}");
         File.AppendAllText(_path, line + Environment.NewLine);
     }
 }
@@ -748,7 +750,8 @@ internal sealed class UpdateProgressForm : Form
 
     private static string SanitizeDisplayText(string text)
     {
-        var clean = new string(text
+        var redacted = DiscorderDiagnostics.RedactForLog(text) ?? string.Empty;
+        var clean = new string(redacted
             .Where(character => !char.IsControl(character) || char.IsWhiteSpace(character))
             .ToArray())
             .ReplaceLineEndings(" ")

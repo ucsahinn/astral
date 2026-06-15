@@ -8,14 +8,13 @@ Manuel indirme için sabit dosya adı `Discorder-win-x64.zip` kullanılır. Otom
 
 ## Kullanıcının Gördüğü Akış
 
-1. Kullanıcı **Güncelle** düğmesine basar.
-2. Discorder GitHub Releases üzerinden yeni sürüm olup olmadığını denetler.
-3. Yeni sürüm yoksa sakin bir "güncel" durumu gösterilir.
-4. Yeni sürüm varsa ayrı **Yükle** düğmesi görünür.
-5. **Yükle** düğmesi, az önce denetlenip bulunan sürümü indirir.
-6. Paket doğrulanır.
-7. Discorder güncelleme için hazırlanır.
-8. Uygulama kapanır, dosyalar güvenli şekilde değiştirilir ve `Discorder.exe` yeniden başlatılır.
+1. Discorder açılışta GitHub Releases üzerinden yeni sürüm olup olmadığını arka planda denetler.
+2. Yeni sürüm yoksa ana ekranda gürültülü bir güncelleme düğmesi gösterilmez.
+3. Yeni sürüm varsa tek **Güncelle** düğmesi görünür.
+4. **Güncelle** düğmesi, arka planda denetlenip bulunan aynı sürümü indirir; tıklama sırasında farklı bir sürüm yeniden seçilmez.
+5. Paket doğrulanır.
+6. Discorder güncelleme için hazırlanır.
+7. Uygulama kapanır, dosyalar güvenli şekilde değiştirilir ve `Discorder.exe` yeniden başlatılır.
 
 ## İndirme ve Staging
 

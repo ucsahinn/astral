@@ -447,19 +447,19 @@
                                     <TextBlock x:Name="StageProgressLabel"
                                                FontSize="12"
                                                FontWeight="SemiBold"
-                                               Text="Discorder Bağlı Değil" />
+                                               Text="Hazır" />
                                     <TextBlock Grid.Column="1"
                                                x:Name="StageProgressPercent"
                                                FontSize="12"
                                                FontWeight="SemiBold"
                                                Foreground="{StaticResource SecondaryTextBrush}"
-                                               Text="8%" />
+                                               Text="0%" />
                                 </Grid>
 
                                 <ProgressBar x:Name="StageProgressBar"
                                              Margin="0,10,0,0"
                                              Style="{StaticResource StageProgressStyle}"
-                                             Value="8" />
+                                             Value="0" />
 
                                 <UniformGrid Margin="0,10,0,0"
                                              Columns="4">
@@ -900,7 +900,6 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
                     <Button Grid.Column="0"
@@ -945,7 +944,7 @@
                                VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource SecondaryTextBrush}"
-                               Text="v2.1.1" />
+                               Text="v2.1.2" />
 
                     <Button Grid.Column="5"
                             x:Name="AutoUpdateButton"
@@ -953,26 +952,14 @@
                             Width="126"
                             Height="46"
                             VerticalAlignment="Center"
-                            Style="{StaticResource UpdateCheckButtonStyle}"
+                            Style="{StaticResource InstallUpdateButtonStyle}"
                             Click="AutoUpdate_Click"
                             Content="↻ Güncelle"
-                            ToolTip="Yeni sürüm var mı denetle"
-                            AutomationProperties.Name="Güncellemeyi denetle" />
+                            Visibility="Collapsed"
+                            ToolTip="Hazır güncellemeyi yükle"
+                            AutomationProperties.Name="Güncellemeyi yükle" />
 
                     <Button Grid.Column="6"
-                            x:Name="InstallUpdateButton"
-                            Margin="0,0,8,0"
-                            Width="92"
-                            Height="46"
-                            VerticalAlignment="Center"
-                            Style="{StaticResource InstallUpdateButtonStyle}"
-                            Content="Yükle"
-                            Click="InstallUpdate_Click"
-                            Visibility="Collapsed"
-                            ToolTip="Bulunan sürümü bu klasöre yükle"
-                            AutomationProperties.Name="Bulunan güncellemeyi yükle" />
-
-                    <Button Grid.Column="7"
                             Width="68"
                             Height="46"
                             VerticalAlignment="Center"

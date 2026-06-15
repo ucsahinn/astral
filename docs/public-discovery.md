@@ -30,7 +30,7 @@ Discorder, Windows kullanıcılarının Discord bağlantısını sade, portable 
 
 - GitHub Releases üzerinden en güncel ZIP arşivini indirin ve yayınlanan SHA-256 dosyasıyla kontrol edin.
 - ZIP'i kalıcı bir klasöre çıkarıp `Discorder.exe` dosyasını çalıştırın.
-- Güncelleme önce denetlenir; yeni sürüm varsa kullanıcı onayıyla yüklenir.
+- Discorder açılışta güncellemeyi sessizce denetler; yeni sürüm varsa tek `Güncelle` düğmesiyle yüklenir.
 
 ## Kapsanan Kullanıcı Soruları
 
@@ -39,6 +39,6 @@ README ve dokümanlar şu kullanıcı sorularını doğal biçimde yanıtlayacak
 - Discorder nedir ve Windows'ta ne işe yarar?
 - Discord bağlantısı neden ayrı bir araçla yönetilmek istenebilir?
 - Portable ZIP nasıl indirilir, çalıştırılır ve güncellenir?
-- Uygulama içi güncelleme neden önce denetleme sonra yükleme şeklinde çalışır?
+- Uygulama içi güncelleme neden yalnızca gerçek yeni sürüm bulunduğunda düğme gösterir?
 - Discorder sistem DNS'ini, tüm cihaz trafiğini veya Discord hesabını değiştirir mi?
 - Tanılama paketi hangi durumlarda hazırlanır?
