@@ -235,7 +235,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 new Dictionary<string, string?>
                 {
                     ["browserAccess"] = IncludeBrowserAccess.ToString()
-            });
+                });
             await _accessLock.DisableAsync(cancellationToken);
             _accessLockConfirmed = false;
             await _accessLock.ApplyTunnelScopeAsync(
@@ -488,7 +488,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         string profilePath,
         CancellationToken cancellationToken)
     {
-        _diagnostics.Warning(
+        _diagnostics.Info(
             "controller.discordUpdaterRecovery",
             "Discord güncelleme ekranında kaldı; bağlantı geçici olarak yenileniyor.");
         SetStatus(
@@ -718,7 +718,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 {
                     ["processId"] = marker.ProcessId.ToString(CultureInfo.InvariantCulture),
                     ["profilePath"] = marker.ProfilePath
-            });
+                });
             process.Kill(entireProcessTree: true);
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(
@@ -1194,11 +1194,11 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         string message,
         string? diagnostic = null)
     {
-            _snapshot = new TunnelSnapshot(
-                state,
-                message,
-                DateTimeOffset.Now,
-                diagnostic);
+        _snapshot = new TunnelSnapshot(
+            state,
+            message,
+            DateTimeOffset.Now,
+            diagnostic);
         _diagnostics.Info(
             "controller.status",
             message,

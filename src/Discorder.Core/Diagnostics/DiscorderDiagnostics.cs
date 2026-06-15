@@ -562,13 +562,20 @@ public sealed class DiscorderDiagnostics : IDiscorderDiagnostics
             {
                 var equalsIndex = match.Value.IndexOf('=');
                 var colonIndex = match.Value.IndexOf(':');
-                var separatorIndex = (equalsIndex, colonIndex) switch
+                var separatorIndex = -1;
+                if (equalsIndex >= 0 && colonIndex >= 0)
                 {
-                    (>= 0, >= 0) => Math.Min(equalsIndex, colonIndex),
-                    (>= 0, _) => equalsIndex,
-                    (_, >= 0) => colonIndex,
-                    _ => -1
-                };
+                    separatorIndex = Math.Min(equalsIndex, colonIndex);
+                }
+                else if (equalsIndex >= 0)
+                {
+                    separatorIndex = equalsIndex;
+                }
+                else if (colonIndex >= 0)
+                {
+                    separatorIndex = colonIndex;
+                }
+
                 if (separatorIndex < 0)
                 {
                     return "[REDACTED]";

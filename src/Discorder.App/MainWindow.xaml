@@ -704,15 +704,18 @@
                                                LineHeight="17"
                                                Foreground="{StaticResource SecondaryTextBrush}"
                                                Text="Bağlantı sorunlarını incelemek için rapor hazırla" />
-                                    <Button Grid.Row="2"
+                                    <Border Grid.Row="2"
                                             HorizontalAlignment="Left"
-                                            MinWidth="116"
-                                            Height="32"
                                             Padding="12,6"
-                                            Style="{StaticResource CommandButtonStyle}"
-                                            Click="OpenDiagnostics_Click"
-                                            Content="Rapor hazırla"
-                                            ToolTip="Tanı raporu oluştur" />
+                                            CornerRadius="6"
+                                            Background="#70305A65"
+                                            BorderBrush="{StaticResource PremiumLineBrush}"
+                                            BorderThickness="1">
+                                        <TextBlock FontSize="11"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{StaticResource PrimaryTextBrush}"
+                                                   Text="Hazır" />
+                                    </Border>
                                     <Grid Grid.Row="3"
                                           Margin="0,10,0,0">
                                         <Grid.ColumnDefinitions>
@@ -944,7 +947,7 @@
                                VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource SecondaryTextBrush}"
-                               Text="v2.1.3" />
+                               Text="v2.1.4" />
 
                     <Button Grid.Column="5"
                             x:Name="AutoUpdateButton"

@@ -80,11 +80,11 @@
                                 VerticalAlignment="Center">
                         <TextBlock FontSize="22"
                                    FontWeight="SemiBold"
-                                   Text="Discorder v2.1.3" />
+                                   Text="Discorder v2.1.4" />
                         <TextBlock Margin="0,5,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
-                                   Text="Tarayıcı modu, restart aksiyonu ve bağlantı kapsamı iyileştirmeleri" />
+                                   Text="Tooltip polish, restart aksiyonu ve bağlantı kapsamı iyileştirmeleri" />
                     </StackPanel>
                 </Grid>
 
@@ -107,7 +107,7 @@
                                            FontSize="14"
                                            LineHeight="21"
                                            TextWrapping="Wrap"
-                                           Text="v2.1.3, Discord uygulaması + tarayıcı kapsamını daha kararlı hale getirir ve uygulama içinden sürüm notu / yeniden başlatma aksiyonlarını ekler." />
+                                           Text="v2.1.4, tooltip görünümünü düzeltir; Discord uygulaması + tarayıcı kapsamını ve uygulama içi restart / sürüm notu akışını korur." />
                             </StackPanel>
                         </Border>
 
@@ -126,11 +126,11 @@
                                            FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="• Tarayıcı modu açıkken boşluk içeren Chrome, Brave ve Edge yolları güvenli biçimde profile yazılır." />
+                                           Text="• Tooltip kutuları koyu glass tema ile görünür ve okunur hale getirildi." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="• Discorder alt aksiyon çubuğuna uygulama içi sürüm notları ve yeniden başlatma butonları eklendi." />
+                                           Text="• Sağ tanılama kartındaki gereksiz ikinci rapor butonu kaldırıldı; tanılama alt bardan yönetilir." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"

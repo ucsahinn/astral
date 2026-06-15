@@ -95,7 +95,7 @@ Yeni sürüm yoksa kullanıcı gereksiz bir düğme görmez. Yeni sürüm varsa 
 | Sorun giderme | [docs/sorun-giderme.md](docs/sorun-giderme.md) |
 | Mimari | [docs/mimari.md](docs/mimari.md) |
 | Kaynak sorun denetimi | [docs/kaynak-sorun-denetimi.md](docs/kaynak-sorun-denetimi.md) |
-| v2.1.3 release notu | [docs/releases/v2.1.3.md](docs/releases/v2.1.3.md) |
+| v2.1.4 release notu | [docs/releases/v2.1.4.md](docs/releases/v2.1.4.md) |
 
 ## 🧪 Geliştirme
 
