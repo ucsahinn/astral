@@ -229,6 +229,11 @@ public sealed class WindowsDiscordProcessInspector : IDiscordProcessManager
             return new DiscordRestartResult(true, "Discord güncellendi.");
         }
 
+        if (windowResult is VisibleDiscordWindowResult.TrustedBackgroundProcess)
+        {
+            return new DiscordRestartResult(true, "Discord arka planda hazır.");
+        }
+
         if (windowResult is VisibleDiscordWindowResult.UpdaterWindow)
         {
             return new DiscordRestartResult(
@@ -380,6 +385,11 @@ public sealed class WindowsDiscordProcessInspector : IDiscordProcessManager
             return new DiscordRestartResult(true, successMessage);
         }
 
+        if (windowResult is VisibleDiscordWindowResult.TrustedBackgroundProcess)
+        {
+            return new DiscordRestartResult(true, successMessage);
+        }
+
         if (windowResult is VisibleDiscordWindowResult.UpdaterWindow)
         {
             return new DiscordRestartResult(
@@ -521,10 +531,13 @@ public sealed class WindowsDiscordProcessInspector : IDiscordProcessManager
     {
         var deadline = DateTimeOffset.UtcNow + LaunchVerificationTimeout;
         var updaterWindowSeen = false;
+        var trustedProcessSeen = false;
+        var maxTrustedProcessCount = 0;
 
         while (DateTimeOffset.UtcNow < deadline)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            var trustedProcessCount = 0;
             foreach (var processName in launchSpecs
                          .Select(launchSpec => launchSpec.ProcessName)
                          .Distinct(StringComparer.OrdinalIgnoreCase))
@@ -541,6 +554,12 @@ public sealed class WindowsDiscordProcessInspector : IDiscordProcessManager
                             return VisibleDiscordWindowResult.MainWindow;
                         }
 
+                        if (windowResult is not VisibleDiscordWindowResult.None)
+                        {
+                            trustedProcessSeen = true;
+                            trustedProcessCount++;
+                        }
+
                         if (windowResult is VisibleDiscordWindowResult.UpdaterWindow)
                         {
                             updaterWindowSeen = true;
@@ -549,7 +568,34 @@ public sealed class WindowsDiscordProcessInspector : IDiscordProcessManager
                 }
             }
 
+            maxTrustedProcessCount = Math.Max(maxTrustedProcessCount, trustedProcessCount);
             await Task.Delay(LaunchVerificationInterval, cancellationToken);
+        }
+
+        return ResolveVisibleDiscordWindowResult(
+            updaterWindowSeen,
+            trustedProcessSeen,
+            maxTrustedProcessCount);
+    }
+
+    internal static string ResolveVisibleDiscordWindowResultForTesting(
+        bool updaterWindowSeen,
+        bool trustedProcessSeen,
+        int maxTrustedProcessCount) =>
+        ResolveVisibleDiscordWindowResult(
+            updaterWindowSeen,
+            trustedProcessSeen,
+            maxTrustedProcessCount).ToString();
+
+    private static VisibleDiscordWindowResult ResolveVisibleDiscordWindowResult(
+        bool updaterWindowSeen,
+        bool trustedProcessSeen,
+        int maxTrustedProcessCount)
+    {
+        if (trustedProcessSeen
+            && (!updaterWindowSeen || maxTrustedProcessCount > 1))
+        {
+            return VisibleDiscordWindowResult.TrustedBackgroundProcess;
         }
 
         return updaterWindowSeen
@@ -580,13 +626,13 @@ public sealed class WindowsDiscordProcessInspector : IDiscordProcessManager
             var handle = process.MainWindowHandle;
             if (handle == IntPtr.Zero || !IsWindowVisible(handle))
             {
-                return VisibleDiscordWindowResult.None;
+                return VisibleDiscordWindowResult.TrustedBackgroundProcess;
             }
 
             if (IsIconic(handle))
             {
                 ShowWindow(handle, RestoreWindow);
-                return VisibleDiscordWindowResult.None;
+                return VisibleDiscordWindowResult.TrustedBackgroundProcess;
             }
 
             var title = process.MainWindowTitle;
@@ -1070,6 +1116,7 @@ public sealed class WindowsDiscordProcessInspector : IDiscordProcessManager
     {
         None,
         MainWindow,
-        UpdaterWindow
+        UpdaterWindow,
+        TrustedBackgroundProcess
     }
 }

@@ -8,8 +8,8 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <AssemblyName>Discorder.Updater</AssemblyName>
     <RootNamespace>Discorder.Updater</RootNamespace>
-    <Version>2.1.5</Version>
-    <FileVersion>2.1.5.0</FileVersion>
+    <Version>2.1.6</Version>
+    <FileVersion>2.1.6.0</FileVersion>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Discorder.Core\Discorder.Core.csproj" />

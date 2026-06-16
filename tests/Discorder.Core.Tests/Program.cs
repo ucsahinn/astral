@@ -72,6 +72,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Denetleyici bağlantıyı Discord oturumu sanmadan doğrular", ControllerVerifiesTunnelWithoutClaimingDiscordSessionAsync),
     ("Windows Discord başlatma planı updater yerine uygulamayı hedefler", WindowsDiscordLaunchPlanUsesAppExecutableAsync),
     ("Windows Discord başlatma planı updater fallback kullanabilir", WindowsDiscordLaunchPlanCanUseUpdaterFallbackAsync),
+    ("Windows Discord arka plan süreçlerini hazır kabul eder", WindowsDiscordBackgroundProcessesCountAsReadyAsync),
     ("Denetleyici Discord kapalıyken uygulamayı açmayı dener", ControllerOpensDiscordWhenItIsClosedAsync),
     ("Denetleyici Discord otomatik yenileme başarısızlığını ayrı durum yapar", ControllerKeepsTunnelActiveWhenDiscordRestartFailsAsync),
     ("Denetleyici Discord penceresi gecikirse tekrar doğrular", ControllerVerifiesDiscordWhenWindowAppearsLateAsync),
@@ -2289,6 +2290,28 @@ static Task WindowsDiscordLaunchPlanCanUseUpdaterFallbackAsync()
             Directory.Delete(testRoot, recursive: true);
         }
     }
+}
+
+static Task WindowsDiscordBackgroundProcessesCountAsReadyAsync()
+{
+    Assert(WindowsDiscordProcessInspector.ResolveVisibleDiscordWindowResultForTesting(
+        updaterWindowSeen: false,
+        trustedProcessSeen: true,
+        maxTrustedProcessCount: 1) == "TrustedBackgroundProcess");
+    Assert(WindowsDiscordProcessInspector.ResolveVisibleDiscordWindowResultForTesting(
+        updaterWindowSeen: true,
+        trustedProcessSeen: true,
+        maxTrustedProcessCount: 5) == "TrustedBackgroundProcess");
+    Assert(WindowsDiscordProcessInspector.ResolveVisibleDiscordWindowResultForTesting(
+        updaterWindowSeen: true,
+        trustedProcessSeen: true,
+        maxTrustedProcessCount: 1) == "UpdaterWindow");
+    Assert(WindowsDiscordProcessInspector.ResolveVisibleDiscordWindowResultForTesting(
+        updaterWindowSeen: false,
+        trustedProcessSeen: false,
+        maxTrustedProcessCount: 0) == "None");
+
+    return Task.CompletedTask;
 }
 
 static async Task ControllerOpensDiscordWhenItIsClosedAsync()

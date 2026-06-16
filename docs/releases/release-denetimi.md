@@ -1,6 +1,6 @@
 # Discorder Release ve Tag Denetimi
 
-Son denetim: 2026-06-15
+Son denetim: 2026-06-17
 Son cleanup: 2026-06-14
 
 Bu doküman, GitHub Releases yüzeyindeki sürüm karmaşasını güvenli şekilde sınıflandırır. `APPROVED - CLEAN RELEASES` onayı sonrası ara deneme/hotfix yayınları temizlendi ve public release yüzeyi anlamlı milestone sürümlere indirildi.
@@ -19,7 +19,15 @@ Release/tag/asset silme veya `--cleanup-tag` kullanımı yıkıcı işlem sayıl
 
 ## Sürüm Kararı
 
-Yeni patch hedef `v2.1.5` olarak belirlendi.
+Yeni patch hedef `v2.1.6` olarak belirlendi.
+
+Neden `v2.1.6`?
+
+- `v2.1.5` Discord updater recovery ve güvenli tray çıkış hotfix'i olarak korunur.
+- Yeni değişiklik geriye uyumlu hotfix niteliğindedir: güvenilir Discord süreçleri arka planda hazırken Windows görünür pencere handle'ı dönmese bile bağlantı false negative ile `DiscordRestartRequired` durumuna düşmez.
+- Updater-only hata dalı korunur; güvenilir süreç kanıtı olmadan bağlantı hazır sayılmaz.
+
+Önceki patch hedef `v2.1.5` olarak belirlenmişti.
 
 Neden `v2.1.5`?
 
@@ -70,7 +78,8 @@ Neden `v2.1.0`?
 
 | Release | Canlı durum | Asset durumu | Karar | Gerekçe | Not |
 | --- | --- | --- | --- | --- | --- |
-| `v2.1.5` | Hazırlanıyor | 4 asset | Yayınla | Discord updater toparlama ve güvenli tray çıkış hotfix'i. | Yeni patch hedefi. |
+| `v2.1.6` | Hazırlanıyor | 4 asset | Yayınla | Discord arka plan readiness false-negative hotfix'i. | Yeni patch hedefi. |
+| `v2.1.5` | Yayında | 4 asset | Koru | Discord updater toparlama ve güvenli tray çıkış hotfix'i. | Önceki patch baseline. |
 | `v2.1.4` | Yayında | 4 asset | Koru | Tooltip polish ve sağ tanılama paneli sadeleşmesi. | Önceki patch baseline. |
 | `v2.1.3` | Yayında | 4 asset | Koru | Tarayıcı modu path quoting hotfix'i, restart aksiyonu ve sürüm notları popup'ı. | Önceki patch baseline. |
 | `v2.1.2` | Yayında | 4 asset | Koru | Tek düğmeli güncelleme UX'i, tarayıcı kapsamı sertleştirme ve updater log güvenliği. | Önceki patch baseline. |
@@ -99,7 +108,7 @@ Aşağıdaki canlı release'i olmayan tag-only kalıntılar remote ve local tag 
 Uygulanan güvenli politika:
 
 - Public release yüzeyi anlamlı milestone sürümlerde tutuldu.
-- Cleanup sonrası Latest işareti milestone patch hattında tutulur; güncel Latest hedefi v2.1.5'tir.
+- Cleanup sonrası Latest işareti milestone patch hattında tutulur; güncel Latest hedefi v2.1.6'tır.
 - Ara hotfix ve deneme yayınları silindi.
 - Tag-only başarısız yayın kalıntıları silindi.
 - `docs/releases/` altında yalnızca canlı milestone release notları ve bu denetim dosyası tutulur.
@@ -108,6 +117,19 @@ Uygulanan güvenli politika:
 - Yerel `artifacts/` altındaki eski ZIP/log/smoke dosyaları silinmedi ve source commit'e alınmadı.
 
 ## Yayın Kapısı
+
+`v2.1.5` yayını tamamlandıktan sonra doğrulanan koşullar:
+
+- Proje ve updater sürümü `2.1.5` ile aynı.
+- `v2.1.5` tag'i remote'a pushlandı.
+- GitHub Actions doğrulama ve yayın workflow'ları başarılı.
+- Release assetleri `Discorder-2.1.5-win-x64.zip`, `Discorder-2.1.5-win-x64.sha256.txt`, `Discorder-win-x64.zip`, `Discorder-win-x64.sha256.txt`.
+- Sürümlü ve sabit ZIP hash'leri eşleşiyor.
+- ZIP içindeki manifest sürümü `2.1.5`.
+- ZIP içinde doğrulanmış yerel fallback için `installers/wiresock-vpn-client-x64-1.4.7.1.msi` bulunur.
+- Canonical workflow SHA-256: `669660C2BBF350C9FA01D8B897B12795D84C40BEB556999BB412D31C0D70492D`.
+- Kod imzalama sertifikası yapılandırılmadığı için paket imzasızdır.
+- Core tests, Windows smoke tests, `dotnet build`, `scripts\build-release.ps1`, `git diff --check` ve Gitleaks geçti.
 
 `v2.1.4` yayını tamamlandıktan sonra doğrulanan koşullar:
 

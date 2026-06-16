@@ -80,11 +80,11 @@
                                 VerticalAlignment="Center">
                         <TextBlock FontSize="22"
                                    FontWeight="SemiBold"
-                                   Text="Discorder v2.1.5" />
+                                   Text="Discorder v2.1.6" />
                         <TextBlock Margin="0,5,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
-                                   Text="Discord updater toparlama ve güvenli çıkış hotfix'i" />
+                                   Text="Discord arka plan readiness hotfix'i" />
                     </StackPanel>
                 </Grid>
 
@@ -107,7 +107,7 @@
                                            FontSize="14"
                                            LineHeight="21"
                                            TextWrapping="Wrap"
-                                           Text="v2.1.5, Discord updater ekranında takılma durumunu daha iyi toparlar ve bildirim alanındaki Çıkış komutunun aktif bağlantıyı kapatmadan arkada süreç bırakmasını engeller." />
+                                           Text="v2.1.6, Discord güvenilir süreçlerle arka planda hazır olduğunda görünür pencere handle'ı gelmese bile bağlantıyı false negative ile düşürmez." />
                             </StackPanel>
                         </Border>
 
@@ -126,19 +126,19 @@
                                            FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="• Discord penceresi geç görünürse bağlantı hemen manuel aksiyona düşmeden sınırlı şekilde tekrar doğrulanır." />
+                                           Text="• Güvenilir Discord.exe süreçleri ayakta kaldığında pencere görünmese bile bağlantı hazır kabul edilir." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="• Updater penceresi tünel yenilemesinden sonra hâlâ görünürse bağlantı üstünden yeniden hazır olma kontrolü yapılır." />
+                                           Text="• Sadece updater penceresi görülen tek süreç durumu hâlâ manuel aksiyon olarak korunur." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="• Bildirim alanındaki Çıkış artık arka plan ayarı açık olsa bile güvenli shutdown yolundan geçer." />
+                                           Text="• v2.1.5 güvenli tray çıkış ve updater recovery davranışı korunur." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="• windir/SystemRoot eksik başlatma ortamlarında WPF açılış uyumluluğu sertleştirildi." />
+                                           Text="• Tanılama bundle'ında görülen 5 Discord süreci + 0 pencere handle varyantı için regresyon testi eklendi." />
                             </StackPanel>
                         </Border>
 
