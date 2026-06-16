@@ -1,10 +1,12 @@
 using System.IO;
 using System.Net.Http;
+using System.Reflection;
 using System.Runtime.ExceptionServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using Discorder.App;
 using Discorder.App.Installation;
 using Discorder.App.Security;
@@ -63,6 +65,8 @@ finally
 
 static void RenderWindows()
 {
+    WindowsPresentationEnvironment.EnsureProcessEnvironment();
+
     Exception? failure = null;
     var thread = new Thread(() =>
     {
@@ -84,6 +88,7 @@ static void RenderWindows()
                 try
                 {
                     RenderMainWindow();
+                    VerifyWindowLifetimeBehavior();
                     RenderConsentWindow();
                 }
                 catch (Exception exception)
@@ -238,17 +243,136 @@ static void RenderMainWindow()
     Console.WriteLine("GEÇTİ Ana pencere çizildi");
 }
 
-static MainWindow CreateMainWindow(string root)
+static void VerifyWindowLifetimeBehavior()
 {
-    var bootstrapper = new FakeWireSockBootstrapper();
+    VerifyCloseHidesToTrayWhenRunInBackgroundIsEnabled();
+    VerifyTrayExitDisposesActiveConnectionWhenRunInBackgroundIsEnabled();
+
+    Console.WriteLine("GEÇTİ Pencere kapanış ve arka plan davranışı doğrulandı");
+}
+
+static void VerifyCloseHidesToTrayWhenRunInBackgroundIsEnabled()
+{
+    MainWindow? window = null;
+    var root = CreateTemporaryDirectory();
+
+    try
+    {
+        new AppSettingsStore(new AppPaths(root))
+            .SetRunInBackgroundOnCloseEnabled(true);
+        window = CreateMainWindow(root);
+        var closed = false;
+        window.Closed += (_, _) => closed = true;
+        window.Show();
+        window.UpdateLayout();
+
+        window.Close();
+        PumpDispatcherUntil(() => !window.IsVisible, TimeSpan.FromSeconds(2));
+
+        Assert(!window.IsVisible);
+        Assert(!closed);
+    }
+    finally
+    {
+        ForceCloseWindow(window);
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static void VerifyTrayExitDisposesActiveConnectionWhenRunInBackgroundIsEnabled()
+{
+    MainWindow? window = null;
+    var root = CreateTemporaryDirectory();
+    var launcher = new FakeProcessLauncher();
+
+    try
+    {
+        new AppSettingsStore(new AppPaths(root))
+            .SetRunInBackgroundOnCloseEnabled(true);
+        window = CreateMainWindow(root, launcher);
+        var controller = GetController(window);
+        window.Show();
+        window.UpdateLayout();
+        RunDispatcherTask(
+            controller.ConnectAsync(CancellationToken.None),
+            TimeSpan.FromSeconds(3));
+        Assert(launcher.LastProcess is { HasExited: false });
+        var closed = false;
+        window.Closed += (_, _) => closed = true;
+
+        InvokeTrayExit(window);
+        PumpDispatcherUntil(() => closed, TimeSpan.FromSeconds(3));
+
+        Assert(closed);
+        Assert(launcher.LastProcess is { HasExited: true });
+        window = null;
+    }
+    finally
+    {
+        ForceCloseWindow(window);
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static void PumpDispatcherUntil(Func<bool> condition, TimeSpan timeout)
+{
+    var deadline = DateTimeOffset.UtcNow + timeout;
+    while (!condition() && DateTimeOffset.UtcNow < deadline)
+    {
+        var frame = new DispatcherFrame();
+        Dispatcher.CurrentDispatcher.BeginInvoke(
+            DispatcherPriority.Background,
+            new Action(() => frame.Continue = false));
+        Dispatcher.PushFrame(frame);
+    }
+}
+
+static void RunDispatcherTask(Task task, TimeSpan timeout)
+{
+    PumpDispatcherUntil(() => task.IsCompleted, timeout);
+    task.GetAwaiter().GetResult();
+}
+
+static DiscordTunnelController GetController(MainWindow window) =>
+    (DiscordTunnelController)typeof(MainWindow)
+        .GetField("_controller", BindingFlags.Instance | BindingFlags.NonPublic)!
+        .GetValue(window)!;
+
+static void InvokeTrayExit(MainWindow window)
+{
+    typeof(MainWindow)
+        .GetMethod("ExitFromTray", BindingFlags.Instance | BindingFlags.NonPublic)!
+        .Invoke(window, null);
+}
+
+static void ForceCloseWindow(MainWindow? window)
+{
+    if (window is null)
+    {
+        return;
+    }
+
+    typeof(MainWindow)
+        .GetField("_allowClose", BindingFlags.Instance | BindingFlags.NonPublic)!
+        .SetValue(window, true);
+    window.Close();
+}
+
+static MainWindow CreateMainWindow(
+    string root,
+    FakeProcessLauncher? processLauncher = null)
+{
     var paths = new AppPaths(root);
+    var bootstrapper = new FakeWireSockBootstrapper(
+        Path.Combine(root, "wiresock-client.exe"));
     var controller = new DiscordTunnelController(
         paths,
         new DiscordAppScope(root, root, root),
         bootstrapper,
         new FakeProfileProvisioner(Path.Combine(root, "discord.conf")),
-        new FakeProcessLauncher(),
-        TimeSpan.Zero);
+        processLauncher ?? new FakeProcessLauncher(),
+        TimeSpan.Zero,
+        discordProcessManager: new NullDiscordProcessManager());
 
     return new MainWindow(
         controller,
@@ -383,15 +507,15 @@ static void Assert(bool condition)
     }
 }
 
-file sealed class FakeWireSockBootstrapper : IWireSockBootstrapper
+file sealed class FakeWireSockBootstrapper(string? executablePath = null) : IWireSockBootstrapper
 {
     public string RequiredVersion => WireSockPackage.Version;
 
     public Uri ProductPage => WireSockPackage.ProductPage;
 
-    public bool IsInstalled => false;
+    public bool IsInstalled => executablePath is not null;
 
-    public bool IsSetupConsentAccepted => false;
+    public bool IsSetupConsentAccepted => executablePath is not null;
 
     public void AcceptSetupConsent()
     {
@@ -401,7 +525,14 @@ file sealed class FakeWireSockBootstrapper : IWireSockBootstrapper
         IProgress<string>? progress,
         CancellationToken cancellationToken)
     {
-        throw new NotSupportedException();
+        if (executablePath is null)
+        {
+            throw new NotSupportedException();
+        }
+
+        Directory.CreateDirectory(Path.GetDirectoryName(executablePath)!);
+        File.WriteAllText(executablePath, string.Empty);
+        return Task.FromResult(executablePath);
     }
 }
 
@@ -449,6 +580,17 @@ file sealed class FakeProfileProvisioner(string profilePath) : IProfileProvision
         IProgress<string>? progress,
         CancellationToken cancellationToken)
     {
+        Directory.CreateDirectory(Path.GetDirectoryName(profilePath)!);
+        File.WriteAllText(
+            profilePath,
+            """
+            [Interface]
+            DNS = 1.1.1.1
+
+            [Peer]
+            AllowedIPs = 0.0.0.0/0
+            Endpoint = 127.0.0.1:2408
+            """);
         return Task.FromResult(profilePath);
     }
 }
@@ -468,13 +610,16 @@ file sealed class FakeCommandRunner : ICommandRunner
 
 file sealed class FakeProcessLauncher : IProcessLauncher
 {
+    public FakeManagedProcess? LastProcess { get; private set; }
+
     public IManagedProcess Start(
         string executable,
         IReadOnlyList<string> arguments,
         string workingDirectory,
         string logPath)
     {
-        return new FakeManagedProcess();
+        LastProcess = new FakeManagedProcess();
+        return LastProcess;
     }
 }
 

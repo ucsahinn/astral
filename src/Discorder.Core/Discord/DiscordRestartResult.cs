@@ -4,6 +4,7 @@ public enum DiscordRestartFailureKind
 {
     None,
     UpdaterWindow,
+    WindowNotVisible,
     Unknown
 }
 

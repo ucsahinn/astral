@@ -19,7 +19,15 @@ Release/tag/asset silme veya `--cleanup-tag` kullanımı yıkıcı işlem sayıl
 
 ## Sürüm Kararı
 
-Yeni patch hedef `v2.1.4` olarak belirlendi.
+Yeni patch hedef `v2.1.5` olarak belirlendi.
+
+Neden `v2.1.5`?
+
+- `v2.1.4` tooltip polish ve tanılama paneli sadeleşmesi sürümü olarak korunur.
+- Yeni değişiklikler geriye uyumlu hotfix niteliğindedir: Discord updater/window readiness toparlama, tray `Çıkış` cleanup düzeltmesi ve WPF başlatma ortamı dayanıklılığı.
+- Ana ürün amacı değişmedi; `BAĞLAN` yine Discord bağlantısını yönetir, tarayıcı kapsamı kullanıcı tercihine bağlıdır.
+
+Önceki patch hedef `v2.1.4` olarak belirlenmişti.
 
 Neden `v2.1.4`?
 
@@ -62,7 +70,8 @@ Neden `v2.1.0`?
 
 | Release | Canlı durum | Asset durumu | Karar | Gerekçe | Not |
 | --- | --- | --- | --- | --- | --- |
-| `v2.1.4` | Yayında | 4 asset | Koru | Tooltip polish ve sağ tanılama paneli sadeleşmesi. | Latest patch baseline. |
+| `v2.1.5` | Hazırlanıyor | 4 asset | Yayınla | Discord updater toparlama ve güvenli tray çıkış hotfix'i. | Yeni patch hedefi. |
+| `v2.1.4` | Yayında | 4 asset | Koru | Tooltip polish ve sağ tanılama paneli sadeleşmesi. | Önceki patch baseline. |
 | `v2.1.3` | Yayında | 4 asset | Koru | Tarayıcı modu path quoting hotfix'i, restart aksiyonu ve sürüm notları popup'ı. | Önceki patch baseline. |
 | `v2.1.2` | Yayında | 4 asset | Koru | Tek düğmeli güncelleme UX'i, tarayıcı kapsamı sertleştirme ve updater log güvenliği. | Önceki patch baseline. |
 | `v2.1.1` | Yayında | 4 asset | Koru | Bağlantı hazırlığı, tarayıcı modu ve Discord launch hotfix'i. | Önceki patch baseline. |
@@ -90,7 +99,7 @@ Aşağıdaki canlı release'i olmayan tag-only kalıntılar remote ve local tag 
 Uygulanan güvenli politika:
 
 - Public release yüzeyi anlamlı milestone sürümlerde tutuldu.
-- Cleanup sonrası Latest işareti milestone patch hattında tutulur; güncel Latest hedefi v2.1.4'tür.
+- Cleanup sonrası Latest işareti milestone patch hattında tutulur; güncel Latest hedefi v2.1.5'tir.
 - Ara hotfix ve deneme yayınları silindi.
 - Tag-only başarısız yayın kalıntıları silindi.
 - `docs/releases/` altında yalnızca canlı milestone release notları ve bu denetim dosyası tutulur.

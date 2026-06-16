@@ -17,6 +17,8 @@ namespace Discorder.Core.Connection;
 
 public sealed class DiscordTunnelController : IAsyncDisposable
 {
+    private const int MaxDiscordReadinessChecks = 2;
+
     private readonly AppPaths _paths;
     private readonly DiscordAppScope _discordScope;
     private readonly IWireSockBootstrapper _wireSockBootstrapper;
@@ -324,6 +326,17 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 discordProcesses = _discordProcessManager.Capture();
                 _lastDiscordProcessSnapshot = discordProcesses;
             }
+            else if (ShouldRetryDiscordReadiness(restart))
+            {
+                restart = await VerifyDiscordReadinessAsync(
+                    "controller.discordReadiness",
+                    "Discord penceresi bekleniyor",
+                    cancellationToken);
+                restartStatus = restart.Message;
+                _lastDiscordRestartStatus = restartStatus;
+                discordProcesses = _discordProcessManager.Capture();
+                _lastDiscordProcessSnapshot = discordProcesses;
+            }
 
             if (restart.Restarted)
             {
@@ -525,6 +538,34 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
         if (!directRestart.Restarted)
         {
+            if (ShouldRetryDiscordReadiness(directRestart))
+            {
+                var verifyAfterResume = await VerifyDiscordReadinessAsync(
+                    "controller.discordUpdaterRecovery",
+                    "Discord bağlantısı doğrulanıyor",
+                    cancellationToken);
+                _diagnostics.Info(
+                    "controller.discordUpdaterRecovery",
+                    "Discord updater sonrasında tünel üstünden tekrar doğrulandı.",
+                    new Dictionary<string, string?>
+                    {
+                        ["message"] = verifyAfterResume.Message,
+                        ["diagnostic"] = verifyAfterResume.Diagnostic,
+                        ["ready"] = verifyAfterResume.Restarted.ToString()
+                    });
+
+                if (verifyAfterResume.Restarted)
+                {
+                    return verifyAfterResume;
+                }
+
+                return new DiscordRestartResult(
+                    false,
+                    "Discord güncelleme bağlantısı tamamlanamadı. Discord'u kapatıp tekrar deneyin.",
+                    verifyAfterResume.Diagnostic ?? directRestart.Diagnostic,
+                    verifyAfterResume.FailureKind);
+            }
+
             return new DiscordRestartResult(
                 false,
                 "Discord güncelleme bağlantısı tamamlanamadı. Discord'u kapatıp tekrar deneyin.",
@@ -543,10 +584,9 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             });
 
         SetStatus(TunnelState.Verifying, "Discord bağlantısı doğrulanıyor");
-        var resumedSnapshot = _discordProcessManager.Capture();
-        _lastDiscordProcessSnapshot = resumedSnapshot;
-        var verifyReady = await _discordProcessManager.VerifyReadyAsync(
-            resumedSnapshot,
+        var verifyReady = await VerifyDiscordReadinessAsync(
+            "controller.discordUpdaterRecovery",
+            "Discord bağlantısı doğrulanıyor",
             cancellationToken);
         _diagnostics.Info(
             "controller.discordUpdaterRecovery",
@@ -569,6 +609,54 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             verifyReady.Diagnostic,
             verifyReady.FailureKind);
     }
+
+    private async Task<DiscordRestartResult> VerifyDiscordReadinessAsync(
+        string diagnosticSource,
+        string statusMessage,
+        CancellationToken cancellationToken)
+    {
+        DiscordRestartResult? lastResult = null;
+        for (var attempt = 1; attempt <= MaxDiscordReadinessChecks; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            SetStatus(TunnelState.Verifying, statusMessage);
+
+            var snapshot = _discordProcessManager.Capture();
+            _lastDiscordProcessSnapshot = snapshot;
+            lastResult = await _discordProcessManager.VerifyReadyAsync(
+                snapshot,
+                cancellationToken);
+            _diagnostics.Info(
+                diagnosticSource,
+                "Discord hazır olma durumu kontrol edildi.",
+                new Dictionary<string, string?>
+                {
+                    ["attempt"] = attempt.ToString(CultureInfo.InvariantCulture),
+                    ["maxAttempts"] = MaxDiscordReadinessChecks.ToString(CultureInfo.InvariantCulture),
+                    ["message"] = lastResult.Message,
+                    ["diagnostic"] = lastResult.Diagnostic,
+                    ["ready"] = lastResult.Restarted.ToString(),
+                    ["failureKind"] = lastResult.FailureKind.ToString()
+                });
+
+            if (lastResult.Restarted || !ShouldRetryDiscordReadiness(lastResult))
+            {
+                return lastResult;
+            }
+        }
+
+        return lastResult
+            ?? new DiscordRestartResult(
+                false,
+                "Discord açıldı ama pencere görünmedi. Görev çubuğundan Discord'u açın.",
+                "Discord readiness verification did not run.",
+                DiscordRestartFailureKind.WindowNotVisible);
+    }
+
+    private static bool ShouldRetryDiscordReadiness(DiscordRestartResult result) =>
+        !result.Restarted
+        && result.FailureKind is DiscordRestartFailureKind.UpdaterWindow
+            or DiscordRestartFailureKind.WindowNotVisible;
 
     private static Task<IReadOnlyList<string>> PrepareWireSockArgumentsAsync(
         string wireSockExecutable,

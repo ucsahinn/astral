@@ -34,6 +34,7 @@ public partial class App : System.Windows.Application, IDisposable
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        WindowsPresentationEnvironment.EnsureProcessEnvironment();
         base.OnStartup(e);
 
         _singleInstanceMutex = new Mutex(
@@ -101,7 +102,7 @@ public partial class App : System.Windows.Application, IDisposable
             Timeout = TimeSpan.FromMinutes(10)
         };
         _httpClient.DefaultRequestHeaders.UserAgent.Add(
-            new ProductInfoHeaderValue("Discorder", "2.1.4"));
+            new ProductInfoHeaderValue("Discorder", "2.1.5"));
 
         var downloader = new VerifiedDownloader(_httpClient, maxAttempts: 5);
         var wireSockLocator = new WireSockLocator();

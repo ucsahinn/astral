@@ -80,11 +80,11 @@
                                 VerticalAlignment="Center">
                         <TextBlock FontSize="22"
                                    FontWeight="SemiBold"
-                                   Text="Discorder v2.1.4" />
+                                   Text="Discorder v2.1.5" />
                         <TextBlock Margin="0,5,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
-                                   Text="Tooltip polish, restart aksiyonu ve bağlantı kapsamı iyileştirmeleri" />
+                                   Text="Discord updater toparlama ve güvenli çıkış hotfix'i" />
                     </StackPanel>
                 </Grid>
 
@@ -107,7 +107,7 @@
                                            FontSize="14"
                                            LineHeight="21"
                                            TextWrapping="Wrap"
-                                           Text="v2.1.4, tooltip görünümünü düzeltir; Discord uygulaması + tarayıcı kapsamını ve uygulama içi restart / sürüm notu akışını korur." />
+                                           Text="v2.1.5, Discord updater ekranında takılma durumunu daha iyi toparlar ve bildirim alanındaki Çıkış komutunun aktif bağlantıyı kapatmadan arkada süreç bırakmasını engeller." />
                             </StackPanel>
                         </Border>
 
@@ -126,19 +126,19 @@
                                            FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="• Tooltip kutuları koyu glass tema ile görünür ve okunur hale getirildi." />
+                                           Text="• Discord penceresi geç görünürse bağlantı hemen manuel aksiyona düşmeden sınırlı şekilde tekrar doğrulanır." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="• Sağ tanılama kartındaki gereksiz ikinci rapor butonu kaldırıldı; tanılama alt bardan yönetilir." />
+                                           Text="• Updater penceresi tünel yenilemesinden sonra hâlâ görünürse bağlantı üstünden yeniden hazır olma kontrolü yapılır." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="• Firewall / hosts temizleme scriptleri yoğun makinelerde timeout'a daha dayanıklı hale getirildi." />
+                                           Text="• Bildirim alanındaki Çıkış artık arka plan ayarı açık olsa bile güvenli shutdown yolundan geçer." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="• Progress, hata, onarım ve tarayıcı modu metinleri daha net hale getirildi." />
+                                           Text="• windir/SystemRoot eksik başlatma ortamlarında WPF açılış uyumluluğu sertleştirildi." />
                             </StackPanel>
                         </Border>
 

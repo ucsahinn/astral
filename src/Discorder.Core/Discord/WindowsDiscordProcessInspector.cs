@@ -242,7 +242,7 @@ public sealed class WindowsDiscordProcessInspector : IDiscordProcessManager
             false,
             "Discord açıldı ama pencere görünmedi. Görev çubuğundan Discord'u açın.",
             "No trusted visible Discord main window was detected after tunnel resume.",
-            DiscordRestartFailureKind.Unknown);
+            DiscordRestartFailureKind.WindowNotVisible);
     }
 
     public async Task<DiscordRestartResult> CloseAsync(
@@ -393,7 +393,7 @@ public sealed class WindowsDiscordProcessInspector : IDiscordProcessManager
             false,
             "Discord açıldı ama pencere görünmedi. Görev çubuğundan Discord'u açın.",
             "Discord process was launched, but no visible trusted Discord main window was detected.",
-            DiscordRestartFailureKind.Unknown);
+            DiscordRestartFailureKind.WindowNotVisible);
     }
 
     private static void ShellExecuteUnelevated(LaunchSpec launchSpec)

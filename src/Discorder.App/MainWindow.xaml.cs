@@ -30,7 +30,7 @@ public partial class MainWindow : Window, IDisposable
     private static readonly Uri RepositoryUri = new(
         "https://github.com/ucsahinn/discorder");
     private static readonly Uri ReleaseNotesUri = new(
-        "https://github.com/ucsahinn/discorder/releases/tag/v2.1.4");
+        "https://github.com/ucsahinn/discorder/releases/tag/v2.1.5");
     private static readonly Uri BackgroundVideoUri = new(
         "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260606_154941_df1a96e1-a06f-450c-bd02-d863414cc1a0.mp4");
     private static readonly string LocalBackgroundVideoPath = Path.Combine(
@@ -65,6 +65,7 @@ public partial class MainWindow : Window, IDisposable
     private readonly CancellationTokenSource _windowLifetimeCancellation = new();
     private CancellationTokenSource? _operationCancellation;
     private bool _allowClose;
+    private bool _exitRequested;
     private bool _isClosing;
     private bool _disposed;
 
@@ -1240,7 +1241,7 @@ public partial class MainWindow : Window, IDisposable
 
     private void ExitFromTray()
     {
-        _allowClose = true;
+        _exitRequested = true;
         RestoreFromTray();
         Close();
     }
@@ -1821,7 +1822,7 @@ public partial class MainWindow : Window, IDisposable
             return;
         }
 
-        if (_isRunInBackgroundEnabled)
+        if (_isRunInBackgroundEnabled && !_exitRequested)
         {
             e.Cancel = true;
             HideToTray(showNotification: true);
@@ -1851,6 +1852,7 @@ public partial class MainWindow : Window, IDisposable
                 "ui.shutdown",
                 "Kapanış temizliği tamamlanamadı.",
                 exception);
+            _exitRequested = false;
             _isClosing = false;
             IsEnabled = true;
             Show();
