@@ -78,7 +78,7 @@ Neden `v2.1.0`?
 
 | Release | Canlı durum | Asset durumu | Karar | Gerekçe | Not |
 | --- | --- | --- | --- | --- | --- |
-| `v2.1.6` | Hazırlanıyor | 4 asset | Yayınla | Discord arka plan readiness false-negative hotfix'i. | Yeni patch hedefi. |
+| `v2.1.6` | Yayında | 4 asset | Koru | Discord arka plan readiness false-negative hotfix'i. | Latest patch baseline. |
 | `v2.1.5` | Yayında | 4 asset | Koru | Discord updater toparlama ve güvenli tray çıkış hotfix'i. | Önceki patch baseline. |
 | `v2.1.4` | Yayında | 4 asset | Koru | Tooltip polish ve sağ tanılama paneli sadeleşmesi. | Önceki patch baseline. |
 | `v2.1.3` | Yayında | 4 asset | Koru | Tarayıcı modu path quoting hotfix'i, restart aksiyonu ve sürüm notları popup'ı. | Önceki patch baseline. |
@@ -117,6 +117,19 @@ Uygulanan güvenli politika:
 - Yerel `artifacts/` altındaki eski ZIP/log/smoke dosyaları silinmedi ve source commit'e alınmadı.
 
 ## Yayın Kapısı
+
+`v2.1.6` yayını tamamlandıktan sonra doğrulanan koşullar:
+
+- Proje ve updater sürümü `2.1.6` ile aynı.
+- `v2.1.6` tag'i remote'a pushlandı.
+- GitHub Actions doğrulama ve yayın workflow'ları başarılı.
+- Release assetleri `Discorder-2.1.6-win-x64.zip`, `Discorder-2.1.6-win-x64.sha256.txt`, `Discorder-win-x64.zip`, `Discorder-win-x64.sha256.txt`.
+- Sürümlü ve sabit ZIP hash'leri eşleşiyor.
+- ZIP içindeki update manifest sürümü `2.1.6`.
+- ZIP içinde doğrulanmış yerel fallback için `installers/wiresock-vpn-client-x64-1.4.7.1.msi` bulunur.
+- Canonical workflow SHA-256: `517FD05733CCA8B5374320DFD4375B1D28EF7E4D07ED79914605EE1E3C430CB5`.
+- Kod imzalama sertifikası yapılandırılmadığı için paket imzasızdır.
+- Core tests, Windows smoke tests, `dotnet build`, `scripts\verify.ps1`, `scripts\build-release.ps1`, `git diff --check` ve Gitleaks geçti.
 
 `v2.1.5` yayını tamamlandıktan sonra doğrulanan koşullar:
 
