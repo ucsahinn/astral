@@ -43,16 +43,6 @@ public sealed class TargetScopeResolver
             AddProxyRules(target.Domains, proxyRules);
         }
 
-        foreach (var customExecutable in selection.CustomExecutables)
-        {
-            allowedApplications.Add(customExecutable.Path);
-        }
-
-        foreach (var customDomain in selection.CustomDomains)
-        {
-            proxyRules.Add(customDomain.DomainPattern.Pattern);
-        }
-
         if (proxyRules.Count > 0)
         {
             allowedApplications.Add(_webProxyExecutablePath);

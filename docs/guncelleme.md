@@ -4,13 +4,15 @@ Astral portable ZIP olarak çalışır. Bu yüzden güncelleme akışı, klasik 
 
 GitHub Releases üzerinden indirilen ZIP paketi manuel kullanım içindir. Uygulama içi otomatik güncelleme, aynı paketi GitHub release yolu, asset digest, SHA-256 dosyası ve manifest eşleşmesiyle doğrular.
 
-Manuel indirme için sabit dosya adı `Astral-win-x64.zip` kullanılır. Otomatik güncelleme ise denetlenen sürümü kilitlemek için `Astral-<version>-win-x64.zip` asset'ini ve aynı sürüme ait SHA-256 dosyasını doğrular. Eski Discorder istemcilerinden geçiş için release içinde ayrıca `Discorder-<version>-win-x64.zip` köprü asset'i üretilir; bu paket eski manifest/exe doğrulamasını karşılar ve yeni Astral payload'ına geçiş yapar.
+Manuel indirme için sabit dosya adı `Astral-win-x64.zip` kullanılır. Otomatik güncelleme ise denetlenen sürümü kilitlemek için `Astral-<version>-win-x64.zip` asset'ini ve aynı sürüme ait SHA-256 dosyasını doğrular.
+
+Eski istemcilerden Astral'a geçiş ana Astral release assetleriyle yapılmaz. Geçiş dönemi için ayrı köprü reposu kullanılabilir; o yüzey yalnız eski updater'ın beklediği eski paket adını karşılar. Astral reposunun güncel release hattı sadece `Astral-*` assetlerini üretir ve doğrular.
 
 ## Kullanıcının Gördüğü Akış
 
 1. Astral açılışta GitHub Releases üzerinden yeni sürüm olup olmadığını arka planda denetler.
-2. Ana ekrandaki tek güncelleme düğmesi ilk durumda **Denetle**, denetim sürerken **Denetleniyor**, güncelse **Güncel**, hata varsa **Tekrar dene** metnini gösterir.
-3. Yeni sürüm varsa aynı düğme **Güncelle** durumuna geçer.
+2. Yeni sürüm yoksa ana ekranda güncelleme düğmesi görünmez; normal bağlantı arayüzü yer kaplamadan kalır.
+3. Yeni sürüm varsa tek **Güncelle** düğmesi görünür.
 4. **Güncelle**, arka planda denetlenip bulunan aynı sürümü indirir; tıklama sırasında farklı bir sürüm yeniden seçilmez.
 5. Paket doğrulanır.
 6. Astral güncelleme için hazırlanır.
@@ -52,7 +54,7 @@ C:\Tools\Astral\Astral.exe
 
 Bu durumda güncelleme `C:\Tools\Astral` klasörünü hedef alır.
 
-Yeni elle kurulumlarda klasör adını sabit `Astral` tutmak önerilir. `Astral-2.1.0-win-x64` veya `2.1.0` gibi sürüm adlı klasörlerden çalıştırma desteklenir, ancak Astral bu durumu tanılama paketine yazar ve kullanıcı onayı olmadan klasör taşımaz.
+Yeni elle kurulumlarda klasör adını sabit `Astral` tutmak önerilir. `Astral-2.2.4-win-x64` veya `2.2.4` gibi sürüm adlı klasörlerden çalıştırma desteklenir, ancak Astral bu durumu tanılama paketine yazar ve kullanıcı onayı olmadan klasör taşımaz.
 
 ## Güvenli Değiştirme ve Geri Dönüş
 
@@ -65,7 +67,7 @@ Güncelleme sırasında:
 - Hata oluşursa önceki dosyalar geri taşınmaya çalışılır.
 - Başarılı olursa yeni `Astral.exe` başlatılır.
 
-Amaç, indirme veya doğrulama hatasının çalışan uygulama klasörünü kullanılmaz hale getirmemesidir. Dosya kilidi, antivirüs/EDR veya yetki problemi geri yüklemeyi de engellerse kullanıcı doğrulanmış ZIP paketini yeniden çıkararak kurtarabilir.
+Amaç, indirme veya doğrulama hatasının çalışan uygulama klasörünü kullanılamaz hale getirmemesidir. Dosya kilidi, antivirüs/EDR veya yetki problemi geri yüklemeyi de engellerse kullanıcı doğrulanmış ZIP paketini yeniden çıkararak kurtarabilir.
 
 ## Kısayol ve Başlangıç Kaydı
 
@@ -77,5 +79,5 @@ Kullanıcı klasörü elle taşırsa kısayol veya başlangıç kaydını yenide
 
 - Kod imzalama yoksa paket imzasız yayınlanabilir; bu durumda güven sınırı GitHub yayın yetkisi, release yolu, asset digest, SHA-256 dosyası ve manifest doğrulamasıdır.
 - GitHub digest, SHA-256 dosyası veya manifest doğrulaması geçmeyen paketler uygulanmaz.
-- GitHub erişimi olmayan ağlarda güncelleme denetimi başarısız olabilir; uygulama mevcut sürümle çalışmaya devam eder.
+- GitHub erişimi olmayan ağlarda güncelleme denetimi başarısız olabilir; uygulama mevcut sürümle çalışmaya devam eder ve güncelleme düğmesi göstermez.
 - Çok yavaş bağlantılarda indirme zaman aşımı yaşanırsa kullanıcı daha sonra tekrar deneyebilir.

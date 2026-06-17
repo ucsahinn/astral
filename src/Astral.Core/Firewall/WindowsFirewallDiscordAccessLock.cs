@@ -62,12 +62,12 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
 
     public Task EnableAsync(CancellationToken cancellationToken)
     {
-        return RunScriptAsync(BuildEnableScript(), cancellationToken);
+        return RunScriptAsync("Enable", BuildEnableScript(), cancellationToken);
     }
 
     public Task DisableAsync(CancellationToken cancellationToken)
     {
-        return RunScriptAsync(BuildDisableScript(), cancellationToken);
+        return RunScriptAsync("Disable", BuildDisableScript(), cancellationToken);
     }
 
     public Task ApplyTunnelScopeAsync(
@@ -75,21 +75,26 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
         CancellationToken cancellationToken)
     {
         return RunScriptAsync(
+            "ApplyTunnelScope",
             BuildApplyTunnelScopeScript(includeBrowserAccess),
             cancellationToken);
     }
 
     public Task ClearTunnelScopeAsync(CancellationToken cancellationToken)
     {
-        return RunScriptAsync(BuildClearTunnelScopeScript(), cancellationToken);
+        return RunScriptAsync(
+            "ClearTunnelScope",
+            BuildClearTunnelScopeScript(),
+            cancellationToken);
     }
 
     public Task RemoveAsync(CancellationToken cancellationToken)
     {
-        return RunScriptAsync(BuildRemoveScript(), cancellationToken);
+        return RunScriptAsync("Remove", BuildRemoveScript(), cancellationToken);
     }
 
     private async Task RunScriptAsync(
+        string operation,
         string script,
         CancellationToken cancellationToken)
     {
@@ -121,7 +126,7 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
         }
 
         throw new InvalidOperationException(
-            "Discord VPN kilidi güncellenemedi: " +
+            $"Hedef VPN kilidi güncellenemedi ({operation}): " +
             diagnostic.Trim().ReplaceLineEndings(" "));
     }
 

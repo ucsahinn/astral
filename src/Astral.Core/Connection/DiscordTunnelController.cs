@@ -183,7 +183,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 return;
             }
 
-            _diagnostics.Info("controller.lock", "Discord bağlantı koruması etkinleştiriliyor.");
+            _diagnostics.Info("controller.lock", "Hedef bağlantı koruması etkinleştiriliyor.");
             await StopOwnedOrphanWireSockProcessAsync(cancellationToken);
             await _webProxyService.ClearAsync(cancellationToken);
             await _accessLock.EnableAsync(cancellationToken);
@@ -1233,12 +1233,6 @@ public sealed class DiscordTunnelController : IAsyncDisposable
     {
         return left.SelectedTargetIds.SequenceEqual(
                 right.SelectedTargetIds,
-                StringComparer.OrdinalIgnoreCase)
-            && left.CustomExecutables.Select(target => target.Path).SequenceEqual(
-                right.CustomExecutables.Select(target => target.Path),
-                StringComparer.OrdinalIgnoreCase)
-            && left.CustomDomains.Select(target => target.Pattern).SequenceEqual(
-                right.CustomDomains.Select(target => target.Pattern),
                 StringComparer.OrdinalIgnoreCase);
     }
 
@@ -1562,10 +1556,10 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
         if (exception is InvalidOperationException
             && exception.Message.Contains(
-                "Discord VPN kilidi",
+                "Hedef VPN kilidi",
                 StringComparison.OrdinalIgnoreCase))
         {
-            return "Discord bağlantı koruması güncellenemedi. Astral'ı yönetici olarak açıp tekrar deneyin; hosts dosyasını koruyan güvenlik yazılımı varsa izin verin.";
+            return "Hedef bağlantı koruması güncellenemedi. Astral'ı yönetici olarak açıp tekrar deneyin; hosts dosyasını koruyan güvenlik yazılımı varsa izin verin.";
         }
 
         return exception.Message;

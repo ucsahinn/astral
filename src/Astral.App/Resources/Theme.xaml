@@ -444,4 +444,85 @@
             </Setter.Value>
         </Setter>
     </Style>
+
+    <Style x:Key="TargetCardCheckBoxStyle" TargetType="CheckBox">
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Focusable" Value="True" />
+        <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}" />
+        <Setter Property="Background" Value="#6E101D31" />
+        <Setter Property="BorderBrush" Value="#759CD4FF" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="10" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CheckBox">
+                    <Border x:Name="CardBorder"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="8"
+                            Padding="{TemplateBinding Padding}"
+                            SnapsToDevicePixels="True">
+                        <Grid>
+                            <ContentPresenter HorizontalAlignment="Stretch"
+                                              VerticalAlignment="Center" />
+                            <Border x:Name="CheckMark"
+                                    Width="20"
+                                    Height="20"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Top"
+                                    CornerRadius="10"
+                                    Background="{StaticResource AccentBrush}"
+                                    BorderBrush="#F5F7FB"
+                                    BorderThickness="1"
+                                    Opacity="0">
+                                <Path Stroke="#07120C"
+                                      StrokeThickness="2"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      Data="M5,10 L9,14 L15,6" />
+                            </Border>
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="CardBorder"
+                                    Property="BorderBrush"
+                                    Value="{StaticResource AccentCyanBrush}" />
+                            <Setter TargetName="CardBorder"
+                                    Property="Background"
+                                    Value="#8A17243B" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="CardBorder"
+                                    Property="BorderBrush"
+                                    Value="#F5F7FB" />
+                            <Setter TargetName="CardBorder"
+                                    Property="BorderThickness"
+                                    Value="2" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="CardBorder"
+                                    Property="BorderBrush"
+                                    Value="{StaticResource AccentBrush}" />
+                            <Setter TargetName="CardBorder"
+                                    Property="Background"
+                                    Value="#9B183A38" />
+                            <Setter TargetName="CheckMark"
+                                    Property="Opacity"
+                                    Value="1" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="CardBorder"
+                                    Property="Opacity"
+                                    Value="0.82" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.50" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
 </ResourceDictionary>

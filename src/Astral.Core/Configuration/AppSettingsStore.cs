@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Astral.Core.Targets;
 
 namespace Astral.Core.Configuration;
@@ -6,7 +7,7 @@ namespace Astral.Core.Configuration;
 public sealed class AppSettingsStore
 {
     private const int CurrentBrowserAccessPreferenceVersion = 1;
-    private const int CurrentTargetSelectionPreferenceVersion = 1;
+    private const int CurrentTargetSelectionPreferenceVersion = 2;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -77,13 +78,15 @@ public sealed class AppSettingsStore
                 return false;
             }
 
+            var selection = settings.TargetSelection?.ToTargetSelection()
+                ?? TargetSelection.Default;
             _paths.EnsureDirectories();
             Save(settings with
             {
                 BrowserAccessEnabled = false,
                 BrowserAccessPreferenceVersion = CurrentBrowserAccessPreferenceVersion,
                 TargetSelectionPreferenceVersion = CurrentTargetSelectionPreferenceVersion,
-                TargetSelection = StoredTargetSelection.From(TargetSelection.Default)
+                TargetSelection = StoredTargetSelection.From(selection)
             });
 
             return true;
@@ -305,59 +308,39 @@ public sealed class AppSettingsStore
     }
 
     private sealed record StoredTargetSelection(
-        IReadOnlyList<string>? SelectedTargetIds,
-        IReadOnlyList<string>? CustomExecutables,
-        IReadOnlyList<string>? CustomDomains)
+        IReadOnlyList<string>? SelectedTargetIds)
     {
+        [JsonExtensionData]
+        public Dictionary<string, JsonElement>? IgnoredLegacyFields { get; init; }
+
         public static StoredTargetSelection From(TargetSelection selection)
         {
             return new StoredTargetSelection(
-                selection.SelectedTargetIds.ToArray(),
-                selection.CustomExecutables.Select(target => target.Path).ToArray(),
-                selection.CustomDomains.Select(target => target.Pattern).ToArray());
+                NormalizeSelectedTargetIds(selection.SelectedTargetIds));
         }
 
         public TargetSelection ToTargetSelection()
         {
-            var selectedTargetIds = (SelectedTargetIds is { Count: > 0 }
-                    ? SelectedTargetIds
-                    : Astral.Core.Targets.TargetSelection.Default.SelectedTargetIds)
-                .Where(id => !string.IsNullOrWhiteSpace(id))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-
-            var customExecutables = new List<CustomExecutableTarget>();
-            foreach (var path in CustomExecutables ?? [])
-            {
-                try
-                {
-                    customExecutables.Add(CustomExecutableTarget.Create(path));
-                }
-                catch (Exception exception)
-                    when (exception is ArgumentException
-                        or IOException
-                        or NotSupportedException
-                        or UnauthorizedAccessException)
-                {
-                }
-            }
-
-            var customDomains = new List<CustomDomainTarget>();
-            foreach (var pattern in CustomDomains ?? [])
-            {
-                try
-                {
-                    customDomains.Add(CustomDomainTarget.Create(pattern));
-                }
-                catch (ArgumentException)
-                {
-                }
-            }
-
             return new TargetSelection(
-                selectedTargetIds,
-                customExecutables,
-                customDomains);
+                NormalizeSelectedTargetIds(SelectedTargetIds));
         }
+    }
+
+    private static IReadOnlyList<string> NormalizeSelectedTargetIds(
+        IReadOnlyList<string>? selectedTargetIds)
+    {
+        var registry = TargetRegistry.CreateDefault();
+        var supported = (selectedTargetIds is { Count: > 0 }
+                ? selectedTargetIds
+                : TargetSelection.Default.SelectedTargetIds)
+            .Where(id =>
+                !string.IsNullOrWhiteSpace(id)
+                && registry.TryGet(id, out _))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        return supported.Length > 0
+            ? supported
+            : TargetSelection.Default.SelectedTargetIds;
     }
 }

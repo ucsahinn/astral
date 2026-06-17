@@ -3,9 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Astral"
         Width="1320"
-        Height="780"
+        Height="820"
         MinWidth="1320"
-        MinHeight="780"
+        MinHeight="820"
         ResizeMode="CanMinimize"
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource WindowBrush}"
@@ -21,7 +21,7 @@
                       UnloadedBehavior="Close"
                       Stretch="UniformToFill"
                       Volume="0"
-                      Opacity="0.80"
+                      Opacity="0.88"
                       IsHitTestVisible="False"
                       Loaded="BackgroundVideo_Loaded"
                       MediaEnded="BackgroundVideo_MediaEnded"
@@ -52,7 +52,7 @@
             </Rectangle.Fill>
         </Rectangle>
 
-        <Rectangle IsHitTestVisible="False" Opacity="0.86">
+        <Rectangle IsHitTestVisible="False" Opacity="0.72">
             <Rectangle.Fill>
                 <LinearGradientBrush StartPoint="0,1" EndPoint="0,0">
                     <GradientStop Color="#A7040710" Offset="0" />
@@ -90,7 +90,7 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="76" />
                 <RowDefinition Height="*" />
-                <RowDefinition Height="74" />
+                <RowDefinition Height="60" />
             </Grid.RowDefinitions>
 
             <Border Grid.Row="0"
@@ -232,7 +232,7 @@
                 </Grid>
             </Border>
 
-            <Grid Grid.Row="1" Margin="0,24">
+            <Grid Grid.Row="1" Margin="0,12">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="560" />
                     <ColumnDefinition Width="*" />
@@ -488,7 +488,7 @@
                 <Grid Grid.Column="1" Margin="28,0,0,0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
@@ -498,7 +498,7 @@
                             BorderBrush="#B58EC8FF"
                             BorderThickness="1"
                             CornerRadius="8"
-                            Padding="22,20">
+                            Padding="18,16">
                         <Border.Background>
                             <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
                                 <GradientStop Color="#8E0B1422" Offset="0" />
@@ -517,54 +517,51 @@
                             <TextBlock FontSize="13"
                                        Foreground="{StaticResource MutedTextBrush}"
                                        Text="TÜNEL KAPSAMI" />
-                            <Grid Margin="0,16,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-
-                                <StackPanel Grid.Column="0">
-                                    <TextBlock FontSize="18"
-                                               FontWeight="SemiBold"
-                                               Text="Seçili hedefler" />
-                                    <TextBlock x:Name="TargetSummaryChips"
-                                               Margin="0,8,18,0"
-                                               FontSize="13"
-                                               FontWeight="SemiBold"
-                                               Foreground="{StaticResource PrimaryTextBrush}"
-                                               TextWrapping="Wrap"
-                                               Text="[Discord]" />
-                                    <TextBlock x:Name="TargetScopeStatus"
-                                               Margin="0,8,18,0"
-                                               TextWrapping="Wrap"
-                                               FontSize="12"
-                                               LineHeight="18"
-                                               Foreground="{StaticResource SecondaryTextBrush}"
-                                               Text="Seçilen uygulama ve web hedefleri tünele alınır. Diğer tüm trafik normal bağlantıda kalır." />
-                                </StackPanel>
-
-                                <Button Grid.Column="1"
-                                        x:Name="SelectTargetsButton"
-                                        Padding="18,10"
-                                        VerticalAlignment="Top"
-                                        Style="{StaticResource CommandButtonStyle}"
-                                        Click="SelectTargetsButton_Click"
-                                        ToolTip="Hedef Merkezi'ni aç"
-                                        AutomationProperties.Name="Hedefleri Seç">
-                                    <TextBlock Text="Hedefleri Seç" />
-                                </Button>
-                            </Grid>
+                            <TextBlock Margin="0,6,0,0"
+                                       FontSize="17"
+                                       FontWeight="SemiBold"
+                                       Text="Seçili hedefler" />
+                            <TextBlock x:Name="TargetSummaryChips"
+                                       Margin="0,6,0,0"
+                                       FontSize="12"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource PrimaryTextBrush}"
+                                       TextWrapping="Wrap"
+                                       Text="[Discord]" />
+                            <TextBlock x:Name="TargetScopeStatus"
+                                       Margin="0,6,0,0"
+                                       TextWrapping="Wrap"
+                                       FontSize="11"
+                                       LineHeight="15"
+                                       Foreground="{StaticResource SecondaryTextBrush}"
+                                       Text="Seçilen uygulama ve web hedefleri tünele alınır. Diğer tüm trafik normal bağlantıda kalır." />
+                            <TextBlock x:Name="TargetValidationMessage"
+                                       Margin="0,4,0,0"
+                                       FontSize="11"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource WarningBrush}"
+                                       Text=""
+                                       TextWrapping="Wrap" />
+                            <ScrollViewer Margin="0,10,0,0"
+                                          MaxHeight="150"
+                                          VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          CanContentScroll="False">
+                                <WrapPanel x:Name="TargetCardsPanel"
+                                           ItemWidth="194"
+                                           ItemHeight="50" />
+                            </ScrollViewer>
                         </StackPanel>
                     </Border>
 
                     <Border Grid.Row="1"
                             HorizontalAlignment="Right"
-                            VerticalAlignment="Center"
+                            Margin="0,12,0,0"
                             Width="650"
                             BorderBrush="#B58EC8FF"
                             BorderThickness="1"
                             CornerRadius="8"
-                            Padding="20,18">
+                            Padding="16,13">
                         <Border.Background>
                             <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
                                 <GradientStop Color="#920B1422" Offset="0" />
@@ -590,7 +587,7 @@
                                        Text="İŞLETİM MERKEZİ" />
 
                             <Grid Grid.Row="1"
-                                  Margin="0,14,0,0">
+                                  Margin="0,10,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="1" />
@@ -611,16 +608,17 @@
                                                    FontFamily="Segoe UI Emoji"
                                                    FontSize="14"
                                                    Text="🌙" />
-                                        <TextBlock FontSize="15"
+                                        <TextBlock FontSize="13"
                                                    FontWeight="SemiBold"
                                                    Text="Arka planda çalıştır" />
                                     </StackPanel>
-                                    <TextBlock Grid.Row="1"
-                                               x:Name="RunInBackgroundStatus"
-                                               Margin="0,5,0,10"
-                                               TextWrapping="Wrap"
-                                               FontSize="12"
-                                               LineHeight="17"
+                            <TextBlock Grid.Row="1"
+                                       x:Name="RunInBackgroundStatus"
+                                       Margin="0,5,0,10"
+                                       Visibility="Collapsed"
+                                       TextWrapping="Wrap"
+                                               FontSize="11"
+                                               LineHeight="14"
                                                Foreground="{StaticResource SecondaryTextBrush}"
                                                Text="Pencere kapanınca bildirim alanında kalmaz." />
                                     <CheckBox Grid.Row="2"
@@ -654,18 +652,19 @@
                                                    FontSize="14"
                                                    Text="🚀" />
                                         <TextBlock Grid.Column="1"
-                                                   FontSize="15"
+                                                   FontSize="13"
                                                    FontWeight="SemiBold"
                                                    TextWrapping="Wrap"
-                                                   LineHeight="18"
+                                                   LineHeight="16"
                                                    Text="Windows açılışında çalıştır" />
                                     </Grid>
-                                    <TextBlock Grid.Row="1"
-                                               x:Name="StartupStatus"
-                                               Margin="0,5,0,10"
-                                               TextWrapping="Wrap"
-                                               FontSize="12"
-                                               LineHeight="17"
+                            <TextBlock Grid.Row="1"
+                                       x:Name="StartupStatus"
+                                       Margin="0,5,0,10"
+                                       Visibility="Collapsed"
+                                       TextWrapping="Wrap"
+                                               FontSize="11"
+                                               LineHeight="14"
                                                Foreground="{StaticResource SecondaryTextBrush}"
                                                Text="Windows açılışında çalıştır" />
                                     <CheckBox Grid.Row="2"
@@ -695,21 +694,22 @@
                                                    FontFamily="Segoe UI Emoji"
                                                    FontSize="14"
                                                    Text="🧾" />
-                                        <TextBlock FontSize="15"
+                                        <TextBlock FontSize="13"
                                                    FontWeight="SemiBold"
                                                    Text="Tanılama" />
                                     </StackPanel>
-                                    <TextBlock Grid.Row="1"
-                                               x:Name="DiagnosticsStatus"
-                                               Margin="0,5,0,10"
-                                               TextWrapping="Wrap"
-                                               FontSize="12"
-                                               LineHeight="17"
+                            <TextBlock Grid.Row="1"
+                                       x:Name="DiagnosticsStatus"
+                                       Margin="0,5,0,10"
+                                       Visibility="Collapsed"
+                                       TextWrapping="Wrap"
+                                               FontSize="11"
+                                               LineHeight="14"
                                                Foreground="{StaticResource SecondaryTextBrush}"
                                                Text="Bağlantı sorunlarını incelemek için rapor hazırla" />
                                     <Border Grid.Row="2"
                                             HorizontalAlignment="Left"
-                                            Padding="12,6"
+                                            Padding="10,4"
                                             CornerRadius="6"
                                             Background="#70305A65"
                                             BorderBrush="{StaticResource PremiumLineBrush}"
@@ -720,20 +720,21 @@
                                                    Text="Hazır" />
                                     </Border>
                                     <Grid Grid.Row="3"
-                                          Margin="0,10,0,0">
+                                          Margin="0,8,0,0">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <StackPanel>
-                                            <TextBlock FontSize="12"
+                                            <TextBlock FontSize="11"
                                                        FontWeight="SemiBold"
                                                        Text="Debug tan&#x131;lama" />
-                                            <TextBlock x:Name="DebugDiagnosticsStatus"
-                                                       Margin="0,3,10,0"
-                                                       TextWrapping="Wrap"
-                                                       FontSize="11"
-                                                       LineHeight="15"
+                            <TextBlock x:Name="DebugDiagnosticsStatus"
+                                       Margin="0,3,10,0"
+                                       Visibility="Collapsed"
+                                       TextWrapping="Wrap"
+                                                       FontSize="10"
+                                                       LineHeight="13"
                                                        Foreground="{StaticResource MutedTextBrush}"
                                                        Text="Kapal&#x131;. Normal rapor hafif kal&#x131;r." />
                                         </StackPanel>
@@ -753,11 +754,12 @@
 
                     <Border Grid.Row="2"
                             HorizontalAlignment="Right"
+                            Margin="0,12,0,0"
                             Width="650"
                             BorderBrush="#B58EC8FF"
                             BorderThickness="1"
                             CornerRadius="8"
-                            Padding="20,18">
+                            Padding="16,13">
                         <Border.Background>
                             <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
                                 <GradientStop Color="#890B1422" Offset="0" />
@@ -782,7 +784,7 @@
                             </Grid.ColumnDefinitions>
 
                             <Border Grid.Column="0"
-                                    Padding="14,10"
+                                    Padding="12,8"
                                     CornerRadius="7"
                                     Background="#33101D31"
                                     BorderBrush="#369CD4FF"
@@ -792,14 +794,14 @@
                                            Foreground="{StaticResource MutedTextBrush}"
                                            Text="DNS SUNUCUSU" />
                                 <TextBlock x:Name="DnsSummary"
-                                           Margin="0,6,0,0"
-                                           FontSize="16"
+                                           Margin="0,5,0,0"
+                                           FontSize="14"
                                            FontWeight="SemiBold"
                                            TextWrapping="NoWrap"
                                            TextTrimming="CharacterEllipsis"
                                            Text="Okunuyor" />
                                 <TextBlock x:Name="DnsDetail"
-                                           Margin="0,4,0,0"
+                                           Margin="0,3,0,0"
                                            FontSize="11"
                                            Foreground="{StaticResource SecondaryTextBrush}"
                                            TextWrapping="NoWrap"
@@ -814,7 +816,7 @@
 
                             <Border Grid.Column="2"
                                     Margin="16,0"
-                                    Padding="14,10"
+                                    Padding="12,8"
                                     CornerRadius="7"
                                     Background="#33101D31"
                                     BorderBrush="#369CD4FF"
@@ -824,14 +826,14 @@
                                            Foreground="{StaticResource MutedTextBrush}"
                                            Text="BAĞLANTI DURUMU" />
                                 <TextBlock x:Name="ConnectionSummary"
-                                           Margin="0,6,0,0"
-                                           FontSize="16"
+                                           Margin="0,5,0,0"
+                                           FontSize="14"
                                            FontWeight="SemiBold"
                                            TextWrapping="NoWrap"
                                            TextTrimming="CharacterEllipsis"
                                            Text="Hazır" />
                                 <TextBlock x:Name="ConnectionDetail"
-                                           Margin="0,4,0,0"
+                                           Margin="0,3,0,0"
                                            FontSize="11"
                                            Foreground="{StaticResource SecondaryTextBrush}"
                                            TextWrapping="NoWrap"
@@ -845,7 +847,7 @@
                                        Fill="#3DFFFFFF" />
 
                             <Border Grid.Column="4"
-                                    Padding="14,10"
+                                    Padding="12,8"
                                     CornerRadius="7"
                                     Background="#33101D31"
                                     BorderBrush="#369CD4FF"
@@ -855,14 +857,14 @@
                                            Foreground="{StaticResource MutedTextBrush}"
                                            Text="KAPSAM" />
                                 <TextBlock x:Name="ScopeSummary"
-                                           Margin="0,6,0,0"
-                                           FontSize="16"
+                                           Margin="0,5,0,0"
+                                           FontSize="14"
                                            FontWeight="SemiBold"
                                            TextWrapping="NoWrap"
                                            TextTrimming="CharacterEllipsis"
                                            Text="Discord" />
                                 <TextBlock x:Name="ScopeDetail"
-                                           Margin="0,4,0,0"
+                                           Margin="0,3,0,0"
                                            FontSize="11"
                                            Foreground="{StaticResource SecondaryTextBrush}"
                                            TextWrapping="NoWrap"
@@ -879,7 +881,7 @@
                     BorderBrush="{StaticResource PremiumLineBrush}"
                     BorderThickness="1"
                     CornerRadius="8"
-                    Padding="16,0"
+                    Padding="14,0"
                     MaxWidth="1264">
                 <Border.Background>
                     <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
@@ -910,7 +912,7 @@
 
                     <Button Grid.Column="0"
                             Margin="0,0,10,0"
-                            Height="46"
+                            Height="40"
                             VerticalAlignment="Center"
                             Style="{StaticResource CommandButtonStyle}"
                             Content="🔌 WireSock"
@@ -918,7 +920,7 @@
                             ToolTip="WireSock VPN Client resmi sayfası" />
 
                     <Button Grid.Column="1"
-                            Height="46"
+                            Height="40"
                             VerticalAlignment="Center"
                             Style="{StaticResource CommandButtonStyle}"
                             Content="🧾 Tanılama"
@@ -928,7 +930,7 @@
                     <Button Grid.Column="2"
                             x:Name="RepairButton"
                             Margin="10,0,0,0"
-                            Height="46"
+                            Height="40"
                             VerticalAlignment="Center"
                             Style="{StaticResource CommandButtonStyle}"
                             Content="🛠 Onar"
@@ -938,7 +940,7 @@
                     <Button Grid.Column="3"
                             x:Name="CleanProfileButton"
                             Margin="10,0,0,0"
-                            Height="46"
+                            Height="40"
                             VerticalAlignment="Center"
                             Style="{StaticResource DangerCommandButtonStyle}"
                             Content="⛔ Profil Temizle"
@@ -950,24 +952,25 @@
                                VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource SecondaryTextBrush}"
-                               Text="v2.2.3" />
+                               Text="v2.2.4" />
 
                     <Button Grid.Column="5"
                             x:Name="AutoUpdateButton"
                             Margin="0,0,8,0"
                             Width="142"
-                            Height="46"
+                            Height="40"
                             VerticalAlignment="Center"
                             Style="{StaticResource InstallUpdateButtonStyle}"
                             Click="AutoUpdate_Click"
-                            Content="↻ Denetle"
-                            ToolTip="Güncellemeyi denetle"
-                            AutomationProperties.Name="Güncelleme durumunu denetle" />
+                            Content="↻ Güncelle"
+                            Visibility="Collapsed"
+                            ToolTip="Yeni sürüm varsa burada görünür"
+                            AutomationProperties.Name="Yeni sürüm varsa görünen güncelleme düğmesi" />
 
                     <Button Grid.Column="6"
                             Margin="0,0,8,0"
                             Width="68"
-                            Height="46"
+                            Height="40"
                             VerticalAlignment="Center"
                             Style="{StaticResource CommandButtonStyle}"
                             Click="RestartAstral_Click"
@@ -991,7 +994,7 @@
                     <Button Grid.Column="7"
                             Margin="0,0,8,0"
                             Width="68"
-                            Height="46"
+                            Height="40"
                             VerticalAlignment="Center"
                             Style="{StaticResource CommandButtonStyle}"
                             Click="OpenReleaseNotes_Click"
@@ -1014,7 +1017,7 @@
 
                     <Button Grid.Column="8"
                             Width="68"
-                            Height="46"
+                            Height="40"
                             VerticalAlignment="Center"
                             Style="{StaticResource CommandButtonStyle}"
                             Click="OpenGitHub_Click"

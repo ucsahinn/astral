@@ -25,13 +25,7 @@ $archive = Join-Path $root "artifacts\Astral-$version-$Runtime.zip"
 $shaPath = Join-Path $root "artifacts\Astral-$version-$Runtime.sha256.txt"
 $stableArchive = Join-Path $root "artifacts\Astral-$Runtime.zip"
 $stableShaPath = Join-Path $root "artifacts\Astral-$Runtime.sha256.txt"
-$compatOutput = Join-Path $root "artifacts\publish\$Runtime-discorder-compat"
-$compatArchive = Join-Path $root "artifacts\Discorder-$version-$Runtime.zip"
-$compatShaPath = Join-Path $root "artifacts\Discorder-$version-$Runtime.sha256.txt"
-$compatStableArchive = Join-Path $root "artifacts\Discorder-$Runtime.zip"
-$compatStableShaPath = Join-Path $root "artifacts\Discorder-$Runtime.sha256.txt"
 $signingStatusPath = Join-Path $root 'artifacts\signing-status.txt'
-$updateManifestPath = Join-Path $output 'astral.update-manifest.json'
 $wireSockInstallerName = 'wiresock-vpn-client-x64-1.4.7.1.msi'
 $wireSockInstallerHash = 'FA3F483DA7EA1AE6C234F95BECB0AA6A18E7EB18B944D3FFB4518D40F4292F40'
 $wireSockInstallerSource = Join-Path $root "vendor\wiresock\$wireSockInstallerName"
@@ -110,9 +104,6 @@ try {
     if (Test-Path -LiteralPath $output) {
         Remove-Item -LiteralPath $output -Recurse -Force
     }
-    if (Test-Path -LiteralPath $compatOutput) {
-        Remove-Item -LiteralPath $compatOutput -Recurse -Force
-    }
 
     dotnet publish src\Astral.App\Astral.App.csproj `
         --configuration Release `
@@ -177,12 +168,6 @@ try {
     if (Test-Path -LiteralPath $stableArchive) {
         Remove-Item -LiteralPath $stableArchive -Force
     }
-    if (Test-Path -LiteralPath $compatArchive) {
-        Remove-Item -LiteralPath $compatArchive -Force
-    }
-    if (Test-Path -LiteralPath $compatStableArchive) {
-        Remove-Item -LiteralPath $compatStableArchive -Force
-    }
 
     $hash = New-ReleaseArchive `
         -SourceDirectory $output `
@@ -194,37 +179,7 @@ try {
         -Value "$($hash.Hash)  $(Split-Path -Leaf $stableArchive)" `
         -Encoding ASCII
 
-    New-Item -ItemType Directory -Path $compatOutput -Force | Out-Null
-    Copy-Item `
-        -Path (Join-Path $output '*') `
-        -Destination $compatOutput `
-        -Recurse `
-        -Force
-    Copy-Item `
-        -LiteralPath (Join-Path $compatOutput 'Astral.exe') `
-        -Destination (Join-Path $compatOutput 'Discorder.exe') `
-        -Force
-    Copy-Item `
-        -LiteralPath (Join-Path $compatOutput 'Astral.Updater.exe') `
-        -Destination (Join-Path $compatOutput 'Discorder.Updater.exe') `
-        -Force
-    New-UpdateManifest `
-        -RootDirectory $compatOutput `
-        -Version $version `
-        -ManifestFileName 'discorder.update-manifest.json'
-
-    $compatHash = New-ReleaseArchive `
-        -SourceDirectory $compatOutput `
-        -ArchivePath $compatArchive `
-        -ShaPath $compatShaPath
-    Copy-Item -LiteralPath $compatArchive -Destination $compatStableArchive -Force
-    Set-Content `
-        -LiteralPath $compatStableShaPath `
-        -Value "$($compatHash.Hash)  $(Split-Path -Leaf $compatStableArchive)" `
-        -Encoding ASCII
-
     $hash
-    $compatHash
 }
 finally {
     Pop-Location

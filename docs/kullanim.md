@@ -8,13 +8,14 @@ Astral ZIP içinden çalışan portable bir Windows uygulamasıdır. Seçili uyg
 2. ZIP içeriğini sabit bir klasöre çıkarın.
 3. `Astral.exe` dosyasını yönetici yetkisiyle çalıştırın.
 4. İlk kurulum ekranında WireSock ve Cloudflare WARP koşullarını okuyup onaylayın.
-5. Ana ekranda **Hedefleri Seç** düğmesini açın.
-6. Hedef Merkezi'nde presetleri veya özel hedefleri seçip **Kaydet** deyin.
-7. Ana ekranda **Bağlan** düğmesine basın.
+5. Ana ekrandaki hedef kartlarından kapsamı belirleyin.
+6. **Bağlan** düğmesine basın.
 
-## Hedef Merkezi
+## Hedef Kartları
 
-Hedef Merkezi ana ekrana gömülü değildir; ayrı modal olarak açılır. Üstteki arama alanı hedef adı, domain, exe ipucu veya kısa takma adlarla filtreler; alttaki ikonlu kartlardan şu hedefleri seçebilirsiniz:
+Hedef seçimi ana ekranın sağ panelindedir. Kartlar ayrı bir pencere açmadan seçilir ve seçim bağlantı başlamadan önce kaydedilir.
+
+Hazır hedefler:
 
 - Discord
 - Roblox
@@ -25,10 +26,10 @@ Hedef Merkezi ana ekrana gömülü değildir; ayrı modal olarak açılır. Üst
 - LiVU
 - IMVU
 - Blogspot
-- Özel EXE
-- Özel Domain
 
-Kartlardaki “Uygulama + Web”, “Web”, “Uygulama” ve “Özel” etiketleri yalnız kapsam türünü anlatır. Erişim durumunu, çalışma garantisini veya servislerin güncel durumunu iddia etmez.
+Kartlardaki `Uygulama + Web`, `Web` ve `Uygulama` etiketleri yalnız kapsam türünü anlatır. Erişim durumunu, çalışma garantisini veya servislerin güncel durumunu iddia etmez.
+
+Bağlantı açıkken hedef seçimi kilitlenir. Kapsamı değiştirmek için önce **Bağlantıyı Kes** düğmesine basın, sonra hedef kartlarını güncelleyin.
 
 ## Bağlanma Davranışı
 
@@ -42,7 +43,7 @@ Bağlantı açıkken:
 
 - Ana durum **Astral Bağlı** görünür.
 - Sadece seçili hedefler tünelden çıkar.
-- Hedef seçimi bu oturumda kilitlenir; değiştirmek için önce bağlantıyı kesin.
+- Hedef seçimi bu oturumda kilitlenir.
 
 ## Web Hedefleri
 
@@ -54,20 +55,6 @@ Web hedeflerinde genel tarayıcı süreçleri WireSock profiline eklenmez. Astra
 4. PAC içinde seçili domainlere PROXY, diğer tüm domainlere DIRECT döndürür.
 
 HTTPS içeriği çözülmez. Astral sertifika kurmaz, TLS MITM yapmaz ve sayfa içeriğini okumaz.
-
-## Özel Hedefler
-
-Özel EXE:
-
-- Mutlak `.exe` yolu olmalıdır.
-- Dosya gerçekten var olmalıdır.
-- Reparse point veya genel tarayıcı exe'si olamaz.
-
-Özel Domain:
-
-- `example.com` veya `*.example.com` biçiminde olmalıdır.
-- URL, port, IP adresi, `*`, `*.com` gibi geniş patternler reddedilir.
-- IDN domainler punycode'a normalize edilir.
 
 ## Profil Temizle
 

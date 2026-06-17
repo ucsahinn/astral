@@ -25,7 +25,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Hedef kayıt defteri yerleşik presetleri güvenli kapsamla tanımlar", TargetRegistryDefinesBuiltInPresetsAsync),
     ("Hedef seçimi varsayılan Discord kapsamını ve eski tarayıcı ayarını güvenli taşır", TargetSelectionStoreDefaultsAndMigratesLegacyBrowserAsync),
     ("Hedef çözümleyici web hedeflerinde tarayıcıları değil web proxy sürecini kapsar", TargetScopeResolverUsesWebProxyForWebTargetsAsync),
-    ("Hedef çözümleyici özel exe ve domain girdilerini doğrular", TargetScopeResolverRejectsInvalidCustomTargetsAsync),
+    ("Hedef çözümleyici eski özel hedef girdilerini kapsama almaz", TargetScopeResolverIgnoresLegacyCustomTargetsAsync),
     ("Web proxy politikası yalnızca seçili domainleri kabul eder", WebProxyPolicyAllowsOnlySelectedDomainsAsync),
     ("PAC üretici yalnızca seçili domainleri proxyye yönlendirir", ProxyPacRoutesOnlySelectedDomainsAsync),
     ("Discord kapsamı parametresiz çağrıda sadece uygulamayı içerir", DiscordScopeDefaultsToAppOnlyAsync),
@@ -103,6 +103,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Denetleyici indirme zaman aşımını Türkçe açıklar", ControllerDownloadTimeoutIsUserFriendlyAsync),
     ("Denetleyici duran indirme zaman aşımını Türkçe açıklar", ControllerDirectDownloadTimeoutIsUserFriendlyAsync),
     ("Denetleyici bağlantı koruması hatasını Türkçe açıklar", ControllerAccessLockFailureIsUserFriendlyAsync),
+    ("Windows Firewall koruması sessiz PowerShell hatasını operasyonla açıklar", WindowsFirewallAccessLockLabelsSilentPowerShellFailureAsync),
     ("Windows Firewall koruması Discord alan adı kuralını yönetir", WindowsFirewallAccessLockBuildsExpectedCommandsAsync),
     ("Windows Firewall koruması DNS temizleme hatasını kritik çıkış kodu yapmaz", WindowsFirewallAccessLockIgnoresDnsFlushExitCodeAsync),
     ("WireSock hazırlık denetimi wt WireGuard adaptörünü tanır", TunnelReadinessRecognizesWireSockWireGuardAdapterAsync),
@@ -152,7 +153,7 @@ static Task TargetRegistryDefinesBuiltInPresetsAsync()
     var registry = TargetRegistry.CreateDefault();
     var targets = registry.GetBuiltInTargets().ToArray();
 
-    Assert(targets.Length == 11);
+    Assert(targets.Length == 9);
     Assert(registry.TryGet(TargetIds.Discord, out var discord));
     Assert(discord.Label == "Discord");
     Assert(discord.ScopeKind == TargetScopeKind.ApplicationAndWeb);
@@ -172,11 +173,9 @@ static Task TargetRegistryDefinesBuiltInPresetsAsync()
     Assert(registry.TryGet(TargetIds.Blogspot, out var blogspot));
     Assert(blogspot.Domains.Any(domain => domain.Value == "blogspot.com"));
 
-    Assert(registry.TryGet(TargetIds.CustomExecutable, out var customExe));
-    Assert(customExe.ScopeKind == TargetScopeKind.CustomExecutable);
-
-    Assert(registry.TryGet(TargetIds.CustomDomain, out var customDomain));
-    Assert(customDomain.ScopeKind == TargetScopeKind.CustomDomain);
+    Assert(!targets.Any(target =>
+        target.Id.Equals("custom-executable", StringComparison.OrdinalIgnoreCase)
+        || target.Id.Equals("custom-domain", StringComparison.OrdinalIgnoreCase)));
 
     Assert(targets.All(target =>
         !target.Metadata.Values.Any(value =>
@@ -209,8 +208,6 @@ static async Task TargetSelectionStoreDefaultsAndMigratesLegacyBrowserAsync()
         var selection = store.GetTargetSelection();
 
         Assert(selection.SelectedTargetIds.SequenceEqual([TargetIds.Discord]));
-        Assert(selection.CustomExecutables.Count == 0);
-        Assert(selection.CustomDomains.Count == 0);
         Assert(!store.IsBrowserAccessEnabled());
 
         var reloaded = new AppSettingsStore(paths);
@@ -218,15 +215,38 @@ static async Task TargetSelectionStoreDefaultsAndMigratesLegacyBrowserAsync()
         Assert(reloaded.GetTargetSelection().SelectedTargetIds.SequenceEqual([TargetIds.Discord]));
 
         var updated = new TargetSelection(
-            [TargetIds.Discord, TargetIds.Wattpad, TargetIds.Blogspot],
-            [],
-            [CustomDomainTarget.Create("*.example.com")]);
+            [TargetIds.Discord, TargetIds.Wattpad, TargetIds.Blogspot]);
         reloaded.SetTargetSelection(updated);
 
         var saved = new AppSettingsStore(paths).GetTargetSelection();
         Assert(saved.SelectedTargetIds.SequenceEqual(
             [TargetIds.Discord, TargetIds.Wattpad, TargetIds.Blogspot]));
-        Assert(saved.CustomDomains.Single().Pattern == "*.example.com");
+
+        await File.WriteAllTextAsync(paths.SettingsFile, """
+            {
+              "BrowserAccessEnabled": true,
+              "BrowserAccessPreferenceVersion": 1,
+              "TargetSelectionPreferenceVersion": 1,
+              "TargetSelection": {
+                "SelectedTargetIds": [
+                  "discord",
+                  "custom-domain",
+                  "wattpad",
+                  "custom-executable",
+                  "not-supported"
+                ],
+                "CustomExecutables": [
+                  "C:\\Tools\\legacy.exe"
+                ],
+                "CustomDomains": [
+                  "*.example.com"
+                ]
+              }
+            }
+            """);
+        var migratedLegacyCustom = new AppSettingsStore(paths).GetTargetSelection();
+        Assert(migratedLegacyCustom.SelectedTargetIds.SequenceEqual(
+            [TargetIds.Discord, TargetIds.Wattpad]));
     }
     finally
     {
@@ -254,9 +274,7 @@ static Task TargetScopeResolverUsesWebProxyForWebTargetsAsync()
             webProxyPath);
 
         var plan = resolver.Resolve(new TargetSelection(
-            [TargetIds.Discord, TargetIds.Wattpad, TargetIds.Blogspot],
-            [],
-            []));
+            [TargetIds.Discord, TargetIds.Wattpad, TargetIds.Blogspot]));
 
         Assert(plan.AllowedApplications.Any(app =>
             app.Equals("Discord.exe", StringComparison.OrdinalIgnoreCase)));
@@ -268,9 +286,7 @@ static Task TargetScopeResolverUsesWebProxyForWebTargetsAsync()
         Assert(plan.AllowedApplications.All(app => !RoutingPlan.IsBrowserExecutable(app)));
 
         var wattpadOnly = resolver.Resolve(new TargetSelection(
-            [TargetIds.Wattpad],
-            [],
-            []));
+            [TargetIds.Wattpad]));
         Assert(wattpadOnly.AllowedApplications.SequenceEqual([webProxyPath]));
         Assert(wattpadOnly.AllowedApplications.All(app => !RoutingPlan.IsBrowserExecutable(app)));
     }
@@ -282,30 +298,35 @@ static Task TargetScopeResolverUsesWebProxyForWebTargetsAsync()
     return Task.CompletedTask;
 }
 
-static Task TargetScopeResolverRejectsInvalidCustomTargetsAsync()
+static Task TargetScopeResolverIgnoresLegacyCustomTargetsAsync()
 {
     var root = CreateTemporaryDirectory();
     var validExe = Path.Combine(root, "tools", "custom.exe");
     Directory.CreateDirectory(Path.GetDirectoryName(validExe)!);
     File.WriteAllText(validExe, "exe");
+    var webProxyPath = Path.Combine(root, "Astral.WebProxy.exe");
+    File.WriteAllText(webProxyPath, "proxy");
 
-    var executable = CustomExecutableTarget.Create(validExe);
-    Assert(Path.IsPathFullyQualified(executable.Path));
-    Assert(executable.Path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase));
+    try
+    {
+        var resolver = new TargetScopeResolver(
+            TargetRegistry.CreateDefault(),
+            new DiscordAppScope(root, root, root),
+            webProxyPath);
+        var plan = resolver.Resolve(new TargetSelection(
+            [TargetIds.Wattpad, "custom-domain", "custom-executable"]));
 
-    AssertThrows<ArgumentException>(() => CustomExecutableTarget.Create(@"..\relative.exe"));
-    AssertThrows<ArgumentException>(() => CustomExecutableTarget.Create(Path.Combine(root, "not-exe.txt")));
-    AssertThrows<FileNotFoundException>(() => CustomExecutableTarget.Create(Path.Combine(root, "missing.exe")));
+        Assert(plan.SelectedTargets.Single().Id == TargetIds.Wattpad);
+        Assert(plan.AllowedApplications.SequenceEqual([webProxyPath]));
+        Assert(!plan.AllowedApplications.Contains(validExe, StringComparer.OrdinalIgnoreCase));
+        Assert(plan.ProxyRules.Any(rule => rule.Pattern == "wattpad.com"));
+        Assert(!plan.ProxyRules.Any(rule => rule.Pattern == "*.example.com"));
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
 
-    Assert(CustomDomainTarget.Create("wattpad.com").Pattern == "wattpad.com");
-    Assert(CustomDomainTarget.Create("*.example.com").Pattern == "*.example.com");
-    Assert(CustomDomainTarget.Create("bücher.example").Pattern == "xn--bcher-kva.example");
-    AssertThrows<ArgumentException>(() => CustomDomainTarget.Create("*"));
-    AssertThrows<ArgumentException>(() => CustomDomainTarget.Create("*.com"));
-    AssertThrows<ArgumentException>(() => CustomDomainTarget.Create("https://example.com/path"));
-    AssertThrows<ArgumentException>(() => CustomDomainTarget.Create("example.com:443"));
-
-    Directory.Delete(root, recursive: true);
     return Task.CompletedTask;
 }
 
@@ -2180,9 +2201,7 @@ static async Task ControllerConnectsWebOnlyTargetWithoutDiscordProcessAsync()
     try
     {
         Assert(controller.TrySetTargetSelection(new TargetSelection(
-            [TargetIds.Wattpad],
-            [],
-            [])));
+            [TargetIds.Wattpad])));
 
         await controller.ConnectAsync();
 
@@ -2475,17 +2494,13 @@ static async Task ControllerLocksTargetScopeWhileConnectedAsync()
         Assert(profileProvisioner.LastAllowedApplications.All(app =>
             !app.Equals("chrome.exe", StringComparison.OrdinalIgnoreCase)));
         Assert(!controller.TrySetTargetSelection(new TargetSelection(
-            [TargetIds.Wattpad],
-            [],
-            [])));
+            [TargetIds.Wattpad])));
         Assert(controller.TargetSelection.SelectedTargetIds.SequenceEqual([TargetIds.Discord]));
 
         await controller.DisconnectAsync();
         Assert(controller.Snapshot.State == TunnelState.Disconnected);
         Assert(controller.TrySetTargetSelection(new TargetSelection(
-            [TargetIds.Wattpad],
-            [],
-            [])));
+            [TargetIds.Wattpad])));
         Assert(controller.IncludeBrowserAccess);
     }
     finally
@@ -3683,7 +3698,7 @@ static async Task ControllerAccessLockFailureIsUserFriendlyAsync()
     var root = CreateTemporaryDirectory();
     var accessLock = new FakeDiscordAccessLock(
         disableException: new InvalidOperationException(
-            "Discord VPN kilidi güncellenemedi: Set-Content : Akış okunabilir değildi."));
+            "Hedef VPN kilidi güncellenemedi (ApplyTunnelScope): Set-Content : Akış okunabilir değildi."));
     var controller = new DiscordTunnelController(
         new AppPaths(root),
         new DiscordAppScope(root, root, root),
@@ -3703,7 +3718,7 @@ static async Task ControllerAccessLockFailureIsUserFriendlyAsync()
         await controller.ConnectAsync();
         Assert(controller.Snapshot.State == TunnelState.Error);
         Assert(controller.Snapshot.Message.Contains(
-            "Discord bağlantı koruması güncellenemedi",
+            "Hedef bağlantı koruması güncellenemedi",
             StringComparison.OrdinalIgnoreCase));
         Assert(controller.Snapshot.Message.Contains(
             "yönetici",
@@ -3715,6 +3730,36 @@ static async Task ControllerAccessLockFailureIsUserFriendlyAsync()
     finally
     {
         await controller.DisposeAsync();
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task WindowsFirewallAccessLockLabelsSilentPowerShellFailureAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var runner = new RecordingCommandRunner(
+        new CommandResult(1, string.Empty, string.Empty));
+    var accessLock = new WindowsFirewallDiscordAccessLock(
+        new AppPaths(root),
+        runner,
+        "powershell.exe");
+
+    try
+    {
+        var exception = await AssertThrowsAsync<InvalidOperationException>(
+            () => accessLock.ApplyTunnelScopeAsync(
+                includeBrowserAccess: false,
+                CancellationToken.None));
+
+        Assert(exception.Message.Contains(
+            "ApplyTunnelScope",
+            StringComparison.Ordinal));
+        Assert(exception.Message.Contains(
+            "PowerShell exit code 1",
+            StringComparison.Ordinal));
+    }
+    finally
+    {
         Directory.Delete(root, recursive: true);
     }
 }
@@ -5366,7 +5411,7 @@ file sealed class FakeProfileProvisioner(
     }
 }
 
-file sealed class RecordingCommandRunner : ICommandRunner
+file sealed class RecordingCommandRunner(CommandResult? result = null) : ICommandRunner
 {
     public List<string> Commands { get; } = [];
 
@@ -5382,7 +5427,7 @@ file sealed class RecordingCommandRunner : ICommandRunner
         cancellationToken.ThrowIfCancellationRequested();
         Commands.Add(string.Join(" ", arguments));
         Timeouts.Add(timeout);
-        return Task.FromResult(new CommandResult(0, string.Empty, string.Empty));
+        return Task.FromResult(result ?? new CommandResult(0, string.Empty, string.Empty));
     }
 }
 

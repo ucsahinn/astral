@@ -120,8 +120,6 @@ function Set-AstralTargetSelection {
 
     $targetSelection = [pscustomobject]@{
         SelectedTargetIds = @('discord')
-        CustomExecutables = @()
-        CustomDomains = @()
     }
 
     $settings | Add-Member `

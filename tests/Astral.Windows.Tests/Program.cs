@@ -17,7 +17,6 @@ using Astral.Core.Firewall;
 using Astral.Core.Infrastructure;
 using Astral.Core.Maintenance;
 using Astral.Core.Provisioning;
-using Astral.Core.Targets;
 using Astral.Core.Updates;
 using Astral.Core.WireSock;
 
@@ -89,8 +88,6 @@ static void RenderWindows()
                 try
                 {
                     RenderMainWindow();
-                    VerifyLegacyDiscorderBridgeBehavior();
-                    RenderTargetSelectionWindow();
                     VerifyWindowLifetimeBehavior();
                     RenderConsentWindow();
                 }
@@ -155,7 +152,14 @@ static void RenderMainWindow()
         Assert(text.Contains("Seçili hedef kapsamı hazır", StringComparison.Ordinal));
         Assert(text.Contains("TÜNEL KAPSAMI", StringComparison.Ordinal));
         Assert(text.Contains("Seçili hedefler", StringComparison.Ordinal));
-        Assert(text.Contains("Hedefleri Seç", StringComparison.Ordinal));
+        Assert(!text.Contains("Hedefleri Seç", StringComparison.Ordinal));
+        Assert(!text.Contains("Hedef Merkezi", StringComparison.Ordinal));
+        Assert(text.Contains("Discord", StringComparison.Ordinal));
+        Assert(text.Contains("Roblox", StringComparison.Ordinal));
+        Assert(text.Contains("Wattpad", StringComparison.Ordinal));
+        Assert(text.Contains("Blogspot", StringComparison.Ordinal));
+        Assert(!text.Contains("Özel EXE", StringComparison.Ordinal));
+        Assert(!text.Contains("Özel Domain", StringComparison.Ordinal));
         Assert(!text.Contains("Tarayıcı modu", StringComparison.Ordinal));
         Assert(text.Contains("İŞLETİM MERKEZİ", StringComparison.Ordinal));
         Assert(text.Contains("Arka planda çalıştır", StringComparison.Ordinal));
@@ -169,6 +173,7 @@ static void RenderMainWindow()
             "Bağlantı sorunlarını incelemek için rapor hazırla",
             StringComparison.Ordinal));
         var buttons = FindVisualChildren<Button>(window)
+            .Where(button => button.Visibility == Visibility.Visible)
             .Select(button => button.Content?.ToString())
             .OfType<string>()
             .Where(content => !string.IsNullOrWhiteSpace(content))
@@ -176,7 +181,7 @@ static void RenderMainWindow()
         Assert(buttons.Contains("🛠 Onar"));
         Assert(buttons.Contains("⛔ Profil Temizle"));
         Assert(buttons.Contains("🧾 Tanılama"));
-        Assert(buttons.Any(button =>
+        Assert(!buttons.Any(button =>
             button.Contains("Denetle", StringComparison.Ordinal)
             || button.Contains("Güncelle", StringComparison.Ordinal)
             || button.Contains("Tekrar dene", StringComparison.Ordinal)
@@ -184,15 +189,29 @@ static void RenderMainWindow()
         Assert(!buttons.Contains("Yükle"));
         var updateButton = FindVisualChildren<Button>(window)
             .Single(button => button.Name == "AutoUpdateButton");
-        Assert(updateButton.Visibility == Visibility.Visible);
-        var updateButtonText = updateButton.Content?.ToString() ?? string.Empty;
-        Assert(
-            updateButtonText.Contains("Denetle", StringComparison.Ordinal)
-            || updateButtonText.Contains("Denetleniyor", StringComparison.Ordinal)
-            || updateButtonText.Contains("Güncel", StringComparison.Ordinal)
-            || updateButtonText.Contains("Güncelle", StringComparison.Ordinal)
-            || updateButtonText.Contains("Tekrar dene", StringComparison.Ordinal));
+        Assert(updateButton.Visibility == Visibility.Collapsed);
         var switches = FindVisualChildren<CheckBox>(window).ToArray();
+        var targetToggles = switches
+            .Where(toggle => toggle.Name.StartsWith(
+                "TargetToggle_",
+                StringComparison.Ordinal))
+            .ToArray();
+        Assert(targetToggles.Length == 9);
+        Assert(targetToggles.Any(toggle =>
+            toggle.Name == "TargetToggle_discord"
+            && toggle.IsChecked == true));
+        Assert(targetToggles.Any(toggle => toggle.Name == "TargetToggle_roblox"));
+        Assert(targetToggles.Any(toggle => toggle.Name == "TargetToggle_wattpad"));
+        Assert(targetToggles.All(toggle =>
+            !toggle.Name.Contains("custom", StringComparison.OrdinalIgnoreCase)));
+
+        var robloxTarget = targetToggles.Single(toggle =>
+            toggle.Name == "TargetToggle_roblox");
+        robloxTarget.IsChecked = true;
+        window.UpdateLayout();
+        Assert(GetController(window).TargetSelection.SelectedTargetIds
+            .Contains("roblox", StringComparer.OrdinalIgnoreCase));
+
         var runInBackgroundSwitch = switches.Single(toggle =>
             toggle.Name == "RunInBackgroundToggle");
         var startupSwitch = switches.Single(toggle =>
@@ -255,122 +274,6 @@ static void RenderMainWindow()
     }
 
     Console.WriteLine("GEÇTİ Ana pencere çizildi");
-}
-
-static void VerifyLegacyDiscorderBridgeBehavior()
-{
-    var root = Path.Combine(
-        Path.GetTempPath(),
-        "AstralBridgeTests",
-        Guid.NewGuid().ToString("N"));
-    Directory.CreateDirectory(root);
-    try
-    {
-        var astralPath = Path.Combine(root, "Astral.exe");
-        File.WriteAllText(astralPath, "astral");
-
-        var resolved = MainWindow.ResolveUpdateExecutableName(
-            Path.Combine(root, "Discorder.exe"),
-            root);
-        Assert(resolved == "Astral.exe");
-
-        resolved = MainWindow.ResolveUpdateExecutableName(
-            Path.Combine(root, "Astral.exe"),
-            root);
-        Assert(resolved == "Astral.exe");
-
-        var startInfo = App.CreateLegacyDiscorderRedirectStartInfo(
-            Path.Combine(root, "Discorder.exe"),
-            root,
-            ["--background-start"]);
-        Assert(startInfo is not null);
-        var redirectStartInfo = startInfo
-            ?? throw new InvalidOperationException("Legacy redirect start info was null.");
-        Assert(redirectStartInfo.FileName == astralPath);
-        Assert(redirectStartInfo.WorkingDirectory == root);
-        Assert(redirectStartInfo.ArgumentList.Count == 1);
-        Assert(redirectStartInfo.ArgumentList[0] == "--background-start");
-
-        var noRedirect = App.CreateLegacyDiscorderRedirectStartInfo(
-            Path.Combine(root, "Astral.exe"),
-            root,
-            []);
-        Assert(noRedirect is null);
-    }
-    finally
-    {
-        Directory.Delete(root, recursive: true);
-    }
-}
-
-static void RenderTargetSelectionWindow()
-{
-    TargetSelectionWindow? window = null;
-
-    try
-    {
-        window = new TargetSelectionWindow(
-            TargetRegistry.CreateDefault(),
-            TargetSelection.Default);
-        window.Show();
-        window.UpdateLayout();
-
-        var text = string.Join(
-            "\n",
-            FindVisualChildren<TextBlock>(window).Select(block => block.Text));
-        Assert(text.Contains("Hedef Merkezi", StringComparison.Ordinal));
-        Assert(text.Contains("Discord", StringComparison.Ordinal));
-        Assert(text.Contains("Roblox", StringComparison.Ordinal));
-        Assert(text.Contains("Wattpad", StringComparison.Ordinal));
-        Assert(text.Contains("Blogspot", StringComparison.Ordinal));
-        Assert(text.Contains("Özel EXE", StringComparison.Ordinal));
-        Assert(text.Contains("Özel Domain", StringComparison.Ordinal));
-        Assert(text.Contains("Seçilenler: Discord", StringComparison.Ordinal));
-        Assert(text.Contains("Kapsam hazır", StringComparison.Ordinal));
-        Assert(text.Contains("Bilgi gerekli", StringComparison.Ordinal));
-        Assert(!text.Contains("Popüler", StringComparison.Ordinal));
-        Assert(!text.Contains("İletişim", StringComparison.Ordinal));
-        Assert(!text.Contains("Canlı/Sosyal", StringComparison.Ordinal));
-
-        var textBoxes = FindVisualChildren<TextBox>(window).ToArray();
-        var searchBox = textBoxes.Single(box => box.Name == "SearchBox");
-        Assert(textBoxes.Any(box => box.Name == "CustomExecutableTextBox"));
-        Assert(textBoxes.Any(box => box.Name == "CustomDomainTextBox"));
-
-        var targetCards = FindVisualChildren<CheckBox>(window).ToArray();
-        Assert(targetCards.Length == TargetRegistry.CreateDefault().GetBuiltInTargets().Count);
-
-        var buttons = FindVisualChildren<Button>(window)
-            .Select(button => button.Content?.ToString())
-            .Where(content => !string.IsNullOrWhiteSpace(content))
-            .ToArray();
-        Assert(buttons.Contains("Kaydet"));
-        Assert(buttons.Contains("Vazgeç"));
-
-        window.Width = window.MinWidth;
-        searchBox.Text = "hedef-yok-astral-test";
-        window.UpdateLayout();
-        var emptyStateText = string.Join(
-            "\n",
-            FindVisualChildren<TextBlock>(window).Select(block => block.Text));
-        Assert(emptyStateText.Contains("Sonuç bulunamadı", StringComparison.Ordinal));
-        Assert(!FindVisualChildren<CheckBox>(window).Any());
-        searchBox.Text = string.Empty;
-        window.Width = 940;
-        window.Height = 700;
-        window.UpdateLayout();
-
-        SaveWindowPng(window, Path.Combine(
-            FindRepositoryRoot(),
-            "artifacts",
-            "ui-target-selection-window.png"));
-    }
-    finally
-    {
-        window?.Close();
-    }
-
-    Console.WriteLine("GEÇTİ Hedef Merkezi penceresi çizildi");
 }
 
 static void VerifyWindowLifetimeBehavior()

@@ -94,23 +94,7 @@ public sealed class TargetRegistry
                 TargetScopeKind.Web,
                 ["blogspot.com", "*.blogspot.com"],
                 [],
-                "blogspot"),
-            Create(
-                TargetIds.CustomExecutable,
-                "Özel EXE",
-                TargetCategory.Custom,
-                TargetScopeKind.CustomExecutable,
-                [],
-                [],
-                "custom-exe"),
-            Create(
-                TargetIds.CustomDomain,
-                "Özel Domain",
-                TargetCategory.Custom,
-                TargetScopeKind.CustomDomain,
-                [],
-                [],
-                "custom-domain")
+                "blogspot")
         ]);
     }
 

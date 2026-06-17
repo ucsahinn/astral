@@ -7,11 +7,11 @@ Astral, eski geniş kapsamlı bağlantı yaklaşımlarını büyütmek yerine he
 | Risk | Yeni davranış |
 | --- | --- |
 | Tüm tarayıcı sürecinin tünele girmesi | Web hedeflerinde tarayıcı exe `AllowedApps` içine yazılmaz; yalnız `Astral.WebProxy.exe` kullanılır. |
-| Seçilmemiş uygulamaların etkilenmesi | `TargetScopeResolver` yalnız seçili preset/özel hedeflerden plan üretir. |
-| Geniş domain wildcard'ları | `*`, `*.com`, URL, port ve IP literal reddedilir. |
-| Özel EXE ile path enjeksiyonu | Mutlak `.exe`, mevcut dosya ve reparse point kontrolleri uygulanır. |
+| Seçilmemiş uygulamaların etkilenmesi | `TargetScopeResolver` yalnız seçili presetlerden plan üretir. |
+| Eski özel hedef alanlarının yanlışlıkla taşınması | Migration eski `CustomExecutables` ve `CustomDomains` alanlarını route planına almaz. |
 | Profil bozulması veya geniş `AllowedApps` | Profil yeniden yazılır; eski `AllowedApps` satırları kaldırılır. |
 | Proxy/PAC state kalması | Apply öncesi state alınır; disconnect/error/dispose yollarında restore denenir. |
+| Release asset adı uyuşmazlığı | Astral release hattı yalnız `Astral-*` ZIP ve SHA assetlerini doğrular. |
 
 ## Başlangıç Presetleri
 
@@ -24,22 +24,23 @@ Astral, eski geniş kapsamlı bağlantı yaklaşımlarını büyütmek yerine he
 - LiVU
 - IMVU
 - Blogspot
-- Özel EXE
-- Özel Domain
 
 Bu presetler erişim durumunu kalıcı gerçek gibi ifade etmez. Yalnız hedef kapsamını tanımlar.
 
 ## Test Kapsamı
 
-- TargetRegistry presetleri.
-- TargetSelection migration ve persist/restore.
-- TargetScopeResolver app/web/proxy ayrımı.
+- `TargetRegistry` presetleri.
+- `TargetSelectionStore` migration ve persist/restore.
+- `TargetScopeResolver` app/web/proxy ayrımı.
 - Browser executable denylist.
-- Custom EXE/domain validation.
-- WebProxy allowlist.
+- Eski custom alanların yok sayılması.
+- `WebProxy` allowlist.
 - PAC PROXY/DIRECT üretimi.
 - Controller connect/disconnect proxy apply/clear yaşam döngüsü.
-- WPF ana ekran ve Hedef Merkezi render testi.
+- Access-lock PowerShell hata aşaması görünürlüğü.
+- WPF ana ekran inline hedef kartları.
+- Güncelleme düğmesinin yalnız update varsa görünmesi.
+- Tray, kapanma ve restart yardımcı davranışları.
 
 ## Kalan Operasyonel Riskler
 

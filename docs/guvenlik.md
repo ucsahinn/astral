@@ -8,6 +8,7 @@ Astral'ın güvenlik hedefi, seçili hedefler dışında kalan trafiği kapsam d
 - Web hedefleri için `chrome.exe`, `msedge.exe`, `firefox.exe`, `brave.exe`, `opera.exe`, `vivaldi.exe` gibi genel tarayıcı süreçleri `AllowedApps` içine eklenmez.
 - Web hedeflerinde yalnız `Astral.WebProxy.exe` WireSock kapsamına girer.
 - PAC kuralı seçili domainlerde PROXY, diğer tüm domainlerde DIRECT döndürür.
+- Eski ayarlarda kalan özel hedef alanları yeni sürümde route planına taşınmaz.
 
 ## TLS ve İçerik
 
@@ -16,22 +17,12 @@ Astral'ın güvenlik hedefi, seçili hedefler dışında kalan trafiği kapsam d
 - HTTPS içeriği okunmaz veya çözülmez.
 - Proxy sadece CONNECT host, HTTP Host ve domain allowlist kararını verir.
 
-## Custom Target Güvenliği
+## Hedef Seçimi
 
-Özel EXE doğrulaması:
-
-- Mutlak canonical path.
-- `.exe` uzantısı.
-- Mevcut dosya.
-- Reparse point reddi.
-- Genel tarayıcı exe reddi.
-
-Özel domain doğrulaması:
-
-- IDN/punycode normalize edilir.
-- URL, path, port ve IP literal reddedilir.
-- Tek label veya public-suffix seviyesinde wildcard reddedilir.
-- `*` ve `*.com` gibi geniş patternler reddedilir.
+- Kullanıcı yalnız hazır hedef kartlarını seçer.
+- Seçim bağlantı başlamadan önce yapılır ve bağlantı açıkken kilitlenir.
+- `TargetRegistry` desteklenmeyen veya eski ID'leri route planına almaz.
+- Web hedefleri sadece kendi domain allowlist'iyle proxy edilir.
 
 ## İkili Dosyalar
 
