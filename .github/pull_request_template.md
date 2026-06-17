@@ -4,8 +4,8 @@
 
 ## Ürün sözleşmesi
 
-- [ ] Discord uygulaması varsayılan kapsamı ve isteğe bağlı tarayıcı modu korunuyor.
-- [ ] Servis ve görev zamanlayıcı davranışı eklenmedi; hosts/firewall değişikliği yalnızca Astral Discord kilidiyle sınırlı.
+- [ ] Seçili hedef kapsamı korunuyor; genel tarayıcı, tüm PC veya sistem geneli VPN davranışı eklenmedi.
+- [ ] Servis ve görev zamanlayıcı davranışı eklenmedi; hosts/firewall/proxy değişikliği yalnızca Astral hedef kilidiyle sınırlı.
 - [ ] Üçüncü taraf ikili dosya, kurucu, sürücü veya arşiv eklenmedi.
 - [ ] TLS doğrulaması ve hata kontrolleri zayıflatılmadı.
 - [ ] Kullanıcıya görünen metinler Türkçe.

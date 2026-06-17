@@ -71,6 +71,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("WireSock hazırlığı doğrulanmış yerel kurucuyu indirmeden kullanır", BootstrapUsesVerifiedLocalInstallerAsync),
     ("WireSock hazırlığı yeniden başlatma gerektiren başarı kodunu kabul eder", BootstrapAcceptsRestartRequiredExitCodeAsync),
     ("Denetleyici idempotent bağlanır ve keser", ControllerLifecycleAsync),
+    ("Denetleyici web-only hedefte Discord sürecine dokunmaz", ControllerConnectsWebOnlyTargetWithoutDiscordProcessAsync),
     ("Denetleyici temiz kapanışta firewall scriptini tekrar çalıştırmaz", ControllerDisposeSkipsDisconnectedCleanupAsync),
     ("Denetleyici kilit doğrulanmadan kapanışta kilidi yeniler", ControllerDisposeRefreshesUnconfirmedDisconnectedLockAsync),
     ("Denetleyici aktif bağlantıyı kapanışta güvenle temizler", ControllerDisposeCleansActiveConnectionAsync),
@@ -2146,6 +2147,70 @@ static async Task ControllerLifecycleAsync()
     }
 }
 
+static async Task ControllerConnectsWebOnlyTargetWithoutDiscordProcessAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var process = new FakeManagedProcess();
+    var accessLock = new FakeDiscordAccessLock();
+    var webProxyService = new FakeScopedWebProxyService();
+    var profileProvisioner = new FakeProfileProvisioner(
+        Path.Combine(root, "wattpad.conf"));
+    var discordManager = new FakeDiscordProcessManager(
+        new DiscordProcessSnapshot(
+            1,
+            [Path.Combine(root, "Discord", "app-1.0.9999", "Discord.exe")],
+            [100]));
+    var controller = new DiscordTunnelController(
+        new AppPaths(root),
+        new DiscordAppScope(root, root, root),
+        new FakeWireSockBootstrapper(Path.Combine(
+            root,
+            "WireSock VPN Client",
+            "bin",
+            WireSockPackage.CliExecutableFileName)),
+        profileProvisioner,
+        new FakeProcessLauncher(process),
+        TimeSpan.Zero,
+        accessLock,
+        discordProcessManager: discordManager,
+        webProxyService: webProxyService);
+
+    try
+    {
+        Assert(controller.TrySetTargetSelection(new TargetSelection(
+            [TargetIds.Wattpad],
+            [],
+            [])));
+
+        await controller.ConnectAsync();
+
+        Assert(controller.Snapshot.State == TunnelState.Connected);
+        Assert(controller.Snapshot.Message.Contains(
+            "seçili hedefler",
+            StringComparison.OrdinalIgnoreCase));
+        Assert(discordManager.RestartCount == 0);
+        Assert(discordManager.VerifyReadyCount == 0);
+        Assert(webProxyService.ApplyCount == 1);
+        Assert(webProxyService.LastPlan?.Summary == "Wattpad");
+        Assert(profileProvisioner.LastAllowedApplications.Any(app =>
+            app.EndsWith("Astral.WebProxy.exe", StringComparison.OrdinalIgnoreCase)));
+        Assert(profileProvisioner.LastAllowedApplications.All(app =>
+            !app.Equals("Discord.exe", StringComparison.OrdinalIgnoreCase)));
+        Assert(profileProvisioner.LastAllowedApplications.All(app =>
+            !RoutingPlan.IsBrowserExecutable(app)));
+
+        await controller.DisconnectAsync();
+
+        Assert(discordManager.CloseCount == 0);
+        Assert(webProxyService.ClearCount == 1);
+    }
+    finally
+    {
+        await controller.DisposeAsync();
+        Directory.Delete(root, recursive: true);
+    }
+}
+
 static async Task ControllerDisposeSkipsDisconnectedCleanupAsync()
 {
     var root = CreateTemporaryDirectory();
@@ -2943,7 +3008,7 @@ static async Task ControllerKeepsTunnelActiveWhenDiscordRestartFailsAsync()
 
         var health = await File.ReadAllTextAsync(
             Path.Combine(root, "Astral", "logs", "health.json"));
-        Assert(health.Contains("\"status\":\"discord yeniden başlatılmalı\"", StringComparison.Ordinal));
+        Assert(health.Contains("\"status\":\"hedef için ek aksiyon gerekli\"", StringComparison.Ordinal));
         Assert(health.Contains("\"discordRestartStatus\":\"Discord otomatik yenilenemedi.\"", StringComparison.Ordinal));
 
         await controller.DisconnectAsync();
@@ -3010,7 +3075,7 @@ static async Task ControllerRequiresManualActionWhenDiscordWindowIsHiddenAsync()
         var health = await File.ReadAllTextAsync(
             Path.Combine(root, "Astral", "logs", "health.json"));
         Assert(health.Contains("Discord açıldı ama pencere görünmedi", StringComparison.Ordinal));
-        Assert(health.Contains("\"status\":\"discord yeniden başlatılmalı\"", StringComparison.Ordinal));
+        Assert(health.Contains("\"status\":\"hedef için ek aksiyon gerekli\"", StringComparison.Ordinal));
     }
     finally
     {

@@ -31,7 +31,7 @@ public partial class MainWindow : Window, IDisposable
     private static readonly Uri RepositoryUri = new(
         "https://github.com/ucsahinn/astral");
     private static readonly Uri ReleaseNotesUri = new(
-        "https://github.com/ucsahinn/astral/releases/tag/v2.2.0");
+        "https://github.com/ucsahinn/astral/releases/tag/v2.2.1");
     private static readonly Uri BackgroundVideoUri = new(
         "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260606_154941_df1a96e1-a06f-450c-bd02-d863414cc1a0.mp4");
     private static readonly string LocalBackgroundVideoPath = Path.Combine(
@@ -392,7 +392,7 @@ public partial class MainWindow : Window, IDisposable
         {
             TunnelState.DiscordRestartRequired => $"Discord yeniden başlatılmalı, {time}",
             TunnelState.Connected => $"Tünel aktif, son durum {time}",
-            TunnelState.Verifying => $"Discord için son adım kontrol ediliyor, {time}",
+            TunnelState.Verifying => $"Seçili hedef kapsamı kontrol ediliyor, {time}",
             TunnelState.Preparing or TunnelState.Connecting
                 => $"Kurulum ve profil kontrolü, {time}",
             TunnelState.Disconnecting => $"Bağlantı kapatılıyor, {time}",
@@ -571,9 +571,9 @@ public partial class MainWindow : Window, IDisposable
                 || message.Contains("profil", StringComparison.OrdinalIgnoreCase)
                 => (68, "Profil hazırlanıyor", 3),
             TunnelState.Preparing when message.Contains(
-                    "Discord bağlantısı",
+                    "Hedef bağlantısı",
                     StringComparison.OrdinalIgnoreCase)
-                => (22, "Discord bağlantısı hazırlanıyor", 1),
+                => (22, "Hedef bağlantısı hazırlanıyor", 1),
             TunnelState.Preparing when message.Contains(
                     "WireSock",
                     StringComparison.OrdinalIgnoreCase)
@@ -870,7 +870,7 @@ public partial class MainWindow : Window, IDisposable
     {
         var confirmation = MessageBox.Show(
             "Astral bağlantıyı kapatacak; kendi bağlantı kilidini, yerel ayarlarını, loglarını, profilini ve yönetilen verilerini temizleyecek. " +
-            "Portable ZIP klasörü ve Discord uygulaması silinmez. WireSock Astral tarafından kurulduysa Windows'tan kaldırılacak.\n\nDevam edilsin mi?",
+            "Portable ZIP klasörü ve seçili hedef uygulamaları silinmez. WireSock Astral tarafından kurulduysa Windows'tan kaldırılacak.\n\nDevam edilsin mi?",
             "Astral profil temizliği",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning,

@@ -8,9 +8,9 @@ body:
     attributes:
       label: Ürün sözleşmesi
       options:
-        - label: Öneri yalnızca Windows, Discord uygulaması ve Discord web kapsamındadır.
+        - label: Öneri yalnızca Astral'ın seçilebilir hedef/preset kapsamındadır.
           required: true
-        - label: Desteklenen tarayıcılar dışında oyun, özel uygulama listesi, DNS veya başka bypass motoru istemiyorum.
+        - label: Tüm PC, tüm tarayıcı, sistem geneli VPN, DNS veya başka geniş kapsamlı bypass motoru istemiyorum.
           required: true
   - type: textarea
     id: problem

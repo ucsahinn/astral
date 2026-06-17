@@ -18,9 +18,9 @@ yıkıcı işlem sayılır; yalnız açık cleanup onayıyla yapılır.
 
 ## Güncel Sürüm Kararı
 
-Yeni minor hedef `v2.2.0` olarak belirlendi.
+Güncel patch hedef `v2.2.1` olarak belirlendi.
 
-Neden `v2.2.0`?
+Neden `v2.2.1`?
 
 - Ürün davranışı Discord merkezli tek hedef yapısından seçilebilir hedef/preset
   tabanlı bağlantı yöneticisine taşındı.
@@ -29,14 +29,15 @@ Neden `v2.2.0`?
   taşınıyor.
 - Custom EXE ve Custom Domain doğrulaması eklendi.
 - UI'da hedef seçimi ayrı Hedef Merkezi penceresine taşındı.
-- Bu değişiklik patch değil, geriye uyumlu ancak görünür ürün kapsamını genişleten
-  minor sürümdür.
+- `v2.2.0` canlı yayına çıktıktan sonra web-only hedeflerde Discord sürecine dokunmama
+  ve release workflow idempotency doğrulaması için patch gerekiyordu.
 
 ## Public Release Yüzeyi
 
 | Release | Canlı durum | Asset durumu | Karar | Gerekçe |
 | --- | --- | --- | --- | --- |
-| `v2.2.0` | Yayın adayı | Bekliyor | Yayınla | Seçilebilir hedef kapsamı ve Astral.WebProxy mimarisi. |
+| `v2.2.1` | Yayın adayı | Bekliyor | Yayınla | Web-only hedef süreci, ürün dili ve release workflow idempotency düzeltmesi. |
+| `v2.2.0` | Yayında | 4 asset | Koru | Seçilebilir hedef kapsamı ve Astral.WebProxy mimarisi. |
 | `v2.1.6` | Yayında | 4 asset | Koru | Önceki patch baseline. |
 | `v2.1.5` | Yayında | 4 asset | Koru | Önceki patch baseline. |
 | `v2.1.4` | Yayında | 4 asset | Koru | Önceki patch baseline. |
@@ -52,13 +53,13 @@ Neden `v2.2.0`?
 
 ## Yayın Kapısı
 
-`v2.2.0` yayınından önce tamamlanması gereken koşullar:
+`v2.2.1` yayınından önce tamamlanması gereken koşullar:
 
-- Proje, updater ve web proxy sürümü `2.2.0` ile aynı.
-- `Astral-2.2.0-win-x64.zip` ve sabit `Astral-win-x64.zip` aynı içeriği gösterir.
+- Proje, updater ve web proxy sürümü `2.2.1` ile aynı.
+- `Astral-2.2.1-win-x64.zip` ve sabit `Astral-win-x64.zip` aynı içeriği gösterir.
 - ZIP içinde `Astral.exe`, `Astral.Updater.exe`, `Astral.WebProxy.exe`, update
   manifest'i ve gerekli runtime dosyaları bulunur.
-- ZIP içindeki update manifest sürümü `2.2.0`.
+- ZIP içindeki update manifest sürümü `2.2.1`.
 - Kod imzalama sertifikası yapılandırılmadıysa paket imzasız olduğu açıkça not edilir.
 - `dotnet build`, Core tests, Windows tests, `scripts/verify.ps1`,
   `scripts/build-release.ps1`, `git diff --check` ve Gitleaks geçer.
@@ -69,5 +70,5 @@ Neden `v2.2.0`?
 
 2026-06-14 tarihinde verilen `APPROVED - CLEAN RELEASES` onayı sonrasında ara
 deneme/hotfix yayınları temizlendi ve public release yüzeyi anlamlı milestone
-sürümlere indirildi. Yeni 2.2.0 çalışması kapsamında eski release veya tag
+sürümlere indirildi. Yeni 2.2.x çalışması kapsamında eski release veya tag
 silinmeyecek.

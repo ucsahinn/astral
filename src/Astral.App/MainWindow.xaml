@@ -279,8 +279,8 @@
                                 Cursor="Hand"
                                 Click="ToggleButton_Click"
                                 AutomationProperties.AutomationId="TunnelToggleButton"
-                                AutomationProperties.Name="Discord bağlantısını aç veya kapat"
-                                ToolTip="Discord bağlantısını aç veya kapat">
+                                AutomationProperties.Name="Seçili hedef bağlantısını aç veya kapat"
+                                ToolTip="Seçili hedef bağlantısını aç veya kapat">
                             <Button.Template>
                                 <ControlTemplate TargetType="Button">
                                     <Grid Width="{TemplateBinding Width}"
@@ -950,7 +950,7 @@
                                VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource SecondaryTextBrush}"
-                               Text="v2.2.0" />
+                               Text="v2.2.1" />
 
                     <Button Grid.Column="5"
                             x:Name="AutoUpdateButton"

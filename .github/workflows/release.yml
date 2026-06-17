@@ -144,11 +144,11 @@ jobs:
           else {
             $releaseDate = Get-Date -Format 'yyyy-MM-dd'
             $notes = @"
-          # Astral $tag - Portable Windows Discord bağlantı yöneticisi
+          # Astral $tag - seçili hedef bağlantı yöneticisi
 
           Tarih: $releaseDate
 
-          Astral $version, Windows'ta Discord bağlantısını sade bir arayüzle yöneten portable masaüstü uygulamasıdır.
+          Astral $version, Windows'ta yalnızca seçili uygulama ve web hedeflerini dar kapsamla tünele alan portable masaüstü uygulamasıdır.
           "@
           }
 
@@ -188,7 +188,7 @@ jobs:
         run: |
           $tag = $env:RELEASE_TAG
           $repo = $env:RELEASE_REPOSITORY
-          $releaseTitle = "Astral $tag - Portable Windows Discord bağlantı yöneticisi"
+          $releaseTitle = "Astral $tag - seçili hedef bağlantı yöneticisi"
           if (Test-Path -LiteralPath $env:RELEASE_NOTES) {
             $firstHeading = Get-Content -LiteralPath $env:RELEASE_NOTES |
               Where-Object { $_ -match '^#\s+' } |
@@ -293,7 +293,8 @@ jobs:
             [string] $stableArchiveName,
             [string] $stableShaName,
             [string] $localArchivePath,
-            [string] $localStableArchivePath)
+            [string] $localStableArchivePath,
+            [bool] $compareLocalPackage)
           {
             $release = Get-ReleaseMetadata
             Assert-ReleaseTargetIfPinned $release
@@ -310,15 +311,17 @@ jobs:
 
             $versionedHash = Assert-ReleaseAssetPair $release $archiveName $shaName $assetCheckDir
             $stableHash = Assert-ReleaseAssetPair $release $stableArchiveName $stableShaName $assetCheckDir
-            $localHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $localArchivePath).Hash.ToLowerInvariant()
-            $localStableHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $localStableArchivePath).Hash.ToLowerInvariant()
-
             if ($versionedHash -ne $stableHash) {
               throw "Versioned ve sabit isimli release ZIP hash'leri eslesmiyor."
             }
 
-            if ($versionedHash -ne $localHash -or $stableHash -ne $localStableHash) {
-              throw "Release ZIP hash'i bu workflow'da uretilen paketle eslesmiyor."
+            if ($compareLocalPackage) {
+              $localHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $localArchivePath).Hash.ToLowerInvariant()
+              $localStableHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $localStableArchivePath).Hash.ToLowerInvariant()
+
+              if ($versionedHash -ne $localHash -or $stableHash -ne $localStableHash) {
+                throw "Release ZIP hash'i bu workflow'da uretilen paketle eslesmiyor."
+              }
             }
           }
 
@@ -425,7 +428,8 @@ jobs:
                 $stableArchiveName `
                 $stableShaName `
                 $env:RELEASE_ARCHIVE `
-                $env:RELEASE_STABLE_ARCHIVE
+                $env:RELEASE_STABLE_ARCHIVE `
+                $false
 
               Invoke-Gh release edit $tag `
                 --repo $repo `
@@ -451,7 +455,8 @@ jobs:
               $stableArchiveName `
               $stableShaName `
               $env:RELEASE_ARCHIVE `
-              $env:RELEASE_STABLE_ARCHIVE
+              $env:RELEASE_STABLE_ARCHIVE `
+              $true
             Invoke-Gh release edit $tag `
               --repo $repo `
               --title $releaseTitle `
@@ -476,7 +481,8 @@ jobs:
               $stableArchiveName `
               $stableShaName `
               $env:RELEASE_ARCHIVE `
-              $env:RELEASE_STABLE_ARCHIVE
+              $env:RELEASE_STABLE_ARCHIVE `
+              $true
             Invoke-Gh release edit $tag `
               --repo $repo `
               --title $releaseTitle `
