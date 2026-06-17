@@ -5,6 +5,7 @@ using System.Runtime.ExceptionServices;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -156,9 +157,9 @@ static void RenderMainWindow()
         Assert(!text.Contains("Seçili hedefler", StringComparison.Ordinal));
         Assert(!text.Contains("Hedefleri Seç", StringComparison.Ordinal));
         Assert(!text.Contains("Hedef Merkezi", StringComparison.Ordinal));
-        Assert(!text.Contains("Bigo Live", StringComparison.Ordinal));
-        Assert(!text.Contains("Blogspot", StringComparison.Ordinal));
-        Assert(!text.Contains("Wattpad", StringComparison.Ordinal));
+        Assert(text.Contains("Bigo Live", StringComparison.Ordinal));
+        Assert(text.Contains("Blogspot", StringComparison.Ordinal));
+        Assert(text.Contains("Wattpad", StringComparison.Ordinal));
         Assert(!text.Contains("Özel EXE", StringComparison.Ordinal));
         Assert(!text.Contains("Özel Domain", StringComparison.Ordinal));
         Assert(!text.Contains("Tarayıcı modu", StringComparison.Ordinal));
@@ -199,6 +200,11 @@ static void RenderMainWindow()
                 StringComparison.Ordinal))
             .ToArray();
         Assert(targetToggles.Length == 9);
+        var targetRows = FindVisualChildren<UniformGrid>(window)
+            .Where(grid => grid.Name is "TargetCardsTopPanel" or "TargetCardsBottomPanel")
+            .ToDictionary(grid => grid.Name, grid => grid);
+        Assert(targetRows["TargetCardsTopPanel"].Children.Count == 5);
+        Assert(targetRows["TargetCardsBottomPanel"].Children.Count == 4);
         var targetNames = targetToggles
             .Select(AutomationProperties.GetName)
             .ToArray();
@@ -217,7 +223,7 @@ static void RenderMainWindow()
         {
             Assert(targetNames.Contains(expectedTarget));
         }
-        var visibleTargetLabels = new[]
+        var expectedVisibleTargetLabels = new[]
         {
             "Discord",
             "Roblox",
@@ -227,17 +233,25 @@ static void RenderMainWindow()
             "Tango",
             "LiVU",
             "IMVU",
-            "Blogspot",
-            "Uygulama + Web",
-            "Web"
+            "Blogspot"
         };
+        var visibleTargetCardTexts = targetToggles
+            .SelectMany(toggle => FindVisualChildren<TextBlock>(toggle))
+            .Select(block => block.Text)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .ToArray();
+        foreach (var expectedLabel in expectedVisibleTargetLabels)
+        {
+            Assert(visibleTargetCardTexts.Contains(expectedLabel));
+        }
+
         foreach (var targetToggle in targetToggles)
         {
             var cardTexts = FindVisualChildren<TextBlock>(targetToggle)
                 .Select(block => block.Text)
                 .Where(value => !string.IsNullOrWhiteSpace(value))
                 .ToArray();
-            Assert(!cardTexts.Any(cardText => visibleTargetLabels.Contains(cardText)));
+            Assert(!cardTexts.Any(cardText => cardText is "Uygulama + Web" or "Web"));
             Assert(targetToggle.ToolTip?.ToString()?.Length > 0);
         }
 

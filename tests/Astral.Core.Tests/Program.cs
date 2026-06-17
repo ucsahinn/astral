@@ -121,6 +121,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Tanılama logları devops paketi üretir", DiagnosticsWritesDevOpsBundleAsync),
     ("Debug tanılama yalnızca açıkken ayrıntılı paket üretir", DiagnosticsWritesDebugBundleOnlyWhenEnabledAsync),
     ("Tanılama kalıcı hata loglarını redakte eder", DiagnosticsRedactsPersistentErrorLogAsync),
+    ("Tanılama eski portable marka yolunu redakte eder", DiagnosticsRedactsLegacyPortableBrandInPathsAsync),
     ("WireSock süreç logları yazılırken redakte edilir", ProcessLauncherRedactsTunnelLogAndConfirmsExitAsync),
     ("Süreç başlatıcı WireSock ve web proxy için ortak tunnel logunu paylaşır", ProcessLauncherSharesTunnelLogAcrossScopedProcessesAsync),
     ("Tanılama özeti son bilgi durumunu gecikmeli yazar", DiagnosticsFlushesDebouncedSummaryAsync)
@@ -2979,6 +2980,8 @@ static async Task ControllerRejectsBlockedTunnelReadinessAsync(
 
         var details = controller.CreateDiagnosticDetails();
         Assert(details["tunnelReadiness"] == expectedStatus);
+        Assert(!string.IsNullOrWhiteSpace(details["wireSockProcessId"]));
+        Assert(details["wireSockProcessExited"] == "False");
         if (expectedAdapterStatus is not null)
         {
             Assert(details["wireSockAdapterStatus"] == expectedAdapterStatus);
@@ -2990,6 +2993,9 @@ static async Task ControllerRejectsBlockedTunnelReadinessAsync(
             StringComparison.Ordinal));
         Assert(health.Contains(
             $"\"tunnelReadiness\":\"{expectedStatus}\"",
+            StringComparison.Ordinal));
+        Assert(health.Contains(
+            "\"wireSockProcessExited\":\"False\"",
             StringComparison.Ordinal));
     }
     finally
@@ -4673,6 +4679,24 @@ static async Task DiagnosticsRedactsPersistentErrorLogAsync()
             Directory.Delete(root, recursive: true);
         }
     }
+}
+
+static Task DiagnosticsRedactsLegacyPortableBrandInPathsAsync()
+{
+    var legacyProductName = string.Concat("Dis", "corder");
+    var redacted = AstralDiagnostics.RedactForLog(
+        $@"C:\Users\operator\Desktop\{legacyProductName}-2.0.20-win-x64\Astral.exe");
+
+    if (redacted is null)
+    {
+        throw new InvalidOperationException("Redaksiyon sonucu bos dondu.");
+    }
+
+    Assert(!redacted.Contains(legacyProductName, StringComparison.OrdinalIgnoreCase));
+    Assert(redacted.Contains("Astral-legacy-portable", StringComparison.OrdinalIgnoreCase));
+    Assert(redacted.Contains("Astral.exe", StringComparison.OrdinalIgnoreCase));
+
+    return Task.CompletedTask;
 }
 
 static async Task ProcessLauncherRedactsTunnelLogAndConfirmsExitAsync()

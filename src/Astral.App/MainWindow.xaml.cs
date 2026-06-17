@@ -38,7 +38,7 @@ public partial class MainWindow : Window, IDisposable
     private static readonly Uri RepositoryUri = new(
         "https://github.com/ucsahinn/astral");
     private static readonly Uri ReleaseNotesUri = new(
-        "https://github.com/ucsahinn/astral/releases/tag/v2.2.8");
+        "https://github.com/ucsahinn/astral/releases/tag/v2.2.9");
     private static readonly Uri BackgroundVideoUri = new(
         "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260606_154941_df1a96e1-a06f-450c-bd02-d863414cc1a0.mp4");
     private static readonly string LocalBackgroundVideoPath = Path.Combine(
@@ -670,18 +670,20 @@ public partial class MainWindow : Window, IDisposable
 
     private void RenderTargetCards()
     {
-        TargetCardsPanel.Children.Clear();
+        TargetCardsTopPanel.Children.Clear();
+        TargetCardsBottomPanel.Children.Clear();
         _targetToggles.Clear();
 
+        var index = 0;
         foreach (var target in _targetRegistry.GetBuiltInTargets())
         {
             var toggle = new WpfCheckBox
             {
                 Name = "TargetToggle_" + CreateSafeTargetName(target.Id),
                 Tag = target,
-                Width = 60,
-                Height = 50,
-                Margin = new Thickness(4),
+                Width = 116,
+                Height = 60,
+                Margin = new Thickness(3),
                 Padding = new Thickness(5),
                 Style = (Style)FindResource("TargetCardCheckBoxStyle"),
                 ToolTip = $"{target.Label} - {target.ScopeLabel}",
@@ -691,7 +693,16 @@ public partial class MainWindow : Window, IDisposable
             toggle.Checked += TargetToggle_Changed;
             toggle.Unchecked += TargetToggle_Changed;
             _targetToggles[target.Id] = toggle;
-            TargetCardsPanel.Children.Add(toggle);
+            if (index < 5)
+            {
+                TargetCardsTopPanel.Children.Add(toggle);
+            }
+            else
+            {
+                TargetCardsBottomPanel.Children.Add(toggle);
+            }
+
+            index++;
         }
     }
 
@@ -810,17 +821,20 @@ public partial class MainWindow : Window, IDisposable
         var visual = GetTargetVisual(target.IconKey);
         var grid = new Grid
         {
-            HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Center,
+            SnapsToDevicePixels = true
         };
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
         var iconBadge = new Border
         {
-            Width = 42,
-            Height = 42,
+            Width = 34,
+            Height = 34,
             HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
-            CornerRadius = new CornerRadius(11),
+            CornerRadius = new CornerRadius(10),
             BorderBrush = new SolidColorBrush(MediaColor.FromArgb(146, 245, 247, 251)),
             BorderThickness = new Thickness(1),
             Background = new LinearGradientBrush(visual.StartColor, visual.EndColor, 42),
@@ -835,6 +849,23 @@ public partial class MainWindow : Window, IDisposable
             Color = visual.EndColor
         };
         grid.Children.Add(iconBadge);
+
+        var label = new TextBlock
+        {
+            Text = target.Label,
+            FontSize = 11.5,
+            LineHeight = 14,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(MediaColor.FromRgb(245, 247, 251)),
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Center,
+            TextAlignment = TextAlignment.Center,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            TextWrapping = TextWrapping.NoWrap,
+            Margin = new Thickness(0, 3, 0, 0)
+        };
+        Grid.SetRow(label, 1);
+        grid.Children.Add(label);
 
         return grid;
     }
@@ -941,6 +972,7 @@ public partial class MainWindow : Window, IDisposable
         {
             Width = 32,
             Height = 32,
+            ClipToBounds = false,
             HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center
         };

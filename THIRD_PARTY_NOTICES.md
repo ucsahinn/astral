@@ -23,3 +23,5 @@ wgcf, Cloudflare tarafından üretilen veya desteklenen resmi bir araç değildi
 ## Marka ve Servis Adları
 
 Discord, Roblox, Wattpad, Bigo Live, Azar, Tango, LiVU, IMVU, Blogspot, Cloudflare ve WireSock adları ilgili sahiplerine aittir. Astral bağımsız bir bağlantı kapsamı yöneticisidir; bu servisler veya marka sahipleri tarafından onaylanmış resmi bir ürün değildir.
+
+Astral paketinde bu servislerin resmi logo dosyaları bundle edilmez. Ana ekrandaki hedef kartları, lisanslı marka asset'i gibi dağıtılmayan brand-color fallback marklar ve servis adlarıyla render edilir.

@@ -516,16 +516,22 @@
                                               ShadowDepth="0"
                                               Color="#4C72FF" />
                         </Border.Effect>
-                        <ScrollViewer MaxHeight="188"
-                                      VerticalScrollBarVisibility="Disabled"
-                                      HorizontalScrollBarVisibility="Disabled"
-                                      CanContentScroll="False"
-                                      Focusable="False">
-                            <WrapPanel x:Name="TargetCardsPanel"
-                                       HorizontalAlignment="Center"
-                                       ItemWidth="68"
-                                       ItemHeight="58" />
-                        </ScrollViewer>
+                        <StackPanel HorizontalAlignment="Center"
+                                    VerticalAlignment="Center">
+                            <UniformGrid x:Name="TargetCardsTopPanel"
+                                         Width="610"
+                                         Rows="1"
+                                         Columns="5"
+                                         HorizontalAlignment="Center"
+                                         SnapsToDevicePixels="True" />
+                            <UniformGrid x:Name="TargetCardsBottomPanel"
+                                         Width="488"
+                                         Margin="0,8,0,0"
+                                         Rows="1"
+                                         Columns="4"
+                                         HorizontalAlignment="Center"
+                                         SnapsToDevicePixels="True" />
+                        </StackPanel>
                     </Border>
 
                     <Border Grid.Row="1"
@@ -916,7 +922,7 @@
                                VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource SecondaryTextBrush}"
-                               Text="v2.2.8" />
+                               Text="v2.2.9" />
 
                     <Button Grid.Column="4"
                             x:Name="AutoUpdateButton"
@@ -966,10 +972,12 @@
                             Click="OpenReleaseNotes_Click"
                             ToolTip="Sürüm notlarını aç"
                             AutomationProperties.Name="Sürüm notlarını aç">
-                        <Viewbox Width="22"
-                                 Height="22"
+                        <Viewbox Width="20"
+                                 Height="20"
                                  Stretch="Uniform">
-                            <Canvas Width="24" Height="24">
+                            <Canvas Width="24"
+                                    Height="24"
+                                    ClipToBounds="False">
                                 <Path Stroke="{StaticResource PrimaryTextBrush}"
                                       StrokeThickness="1.8"
                                       StrokeStartLineCap="Round"
@@ -989,12 +997,14 @@
                             Click="OpenGitHub_Click"
                             ToolTip="GitHub deposunu aç"
                             AutomationProperties.Name="GitHub deposunu aç">
-                        <Viewbox Width="22"
-                                 Height="22"
+                        <Viewbox Width="20"
+                                 Height="20"
                                  Stretch="Uniform">
-                            <Canvas Width="24" Height="24">
+                            <Canvas Width="26"
+                                    Height="26"
+                                    ClipToBounds="False">
                                 <Path Fill="{StaticResource PrimaryTextBrush}"
-                                      Data="M12,0.5C5.65,0.5 0.5,5.65 0.5,12C0.5,17.1 3.79,21.42 8.36,22.95C8.94,23.06 9.15,22.7 9.15,22.4C9.15,22.13 9.14,21.42 9.14,20.47C5.95,21.16 5.28,19.12 5.28,19.12C4.76,17.8 4.01,17.45 4.01,17.45C2.97,16.74 4.09,16.75 4.09,16.75C5.24,16.83 5.84,17.93 5.84,17.93C6.86,19.68 8.52,19.18 9.17,18.88C9.27,18.14 9.57,17.64 9.9,17.36C7.35,17.07 4.67,16.08 4.67,11.68C4.67,10.42 5.12,9.39 5.85,8.59C5.73,8.3 5.34,7.13 5.96,5.55C5.96,5.55 6.92,5.24 9.11,6.73C10.02,6.48 11,6.35 11.97,6.35C12.94,6.35 13.92,6.48 14.83,6.73C17.02,5.24 17.98,5.55 17.98,5.55C18.6,7.13 18.21,8.3 18.09,8.59C18.83,9.39 19.27,10.42 19.27,11.68C19.27,16.09 16.58,17.07 14.03,17.35C14.44,17.7 14.81,18.4 14.81,19.47C14.81,21 14.79,22.23 14.79,22.4C14.79,22.71 15,23.07 15.59,22.95C20.18,21.42 23.5,17.1 23.5,12C23.5,5.65 18.35,0.5 12,0.5Z" />
+                                      Data="M13,2.3C7.1,2.3 2.3,7.1 2.3,13C2.3,17.76 5.36,21.79 9.62,23.22C10.15,23.32 10.34,23 10.34,22.72C10.34,22.47 10.33,21.81 10.33,20.93C7.36,21.58 6.74,19.68 6.74,19.68C6.26,18.45 5.56,18.12 5.56,18.12C4.59,17.46 5.63,17.47 5.63,17.47C6.7,17.55 7.26,18.57 7.26,18.57C8.21,20.2 9.76,19.74 10.36,19.46C10.45,18.77 10.73,18.31 11.04,18.05C8.66,17.78 6.17,16.86 6.17,12.76C6.17,11.59 6.59,10.63 7.27,9.88C7.16,9.61 6.8,8.52 7.38,7.05C7.38,7.05 8.27,6.76 10.31,8.15C11.16,7.92 12.07,7.8 12.97,7.8C13.87,7.8 14.78,7.92 15.63,8.15C17.67,6.76 18.56,7.05 18.56,7.05C19.14,8.52 18.78,9.61 18.67,9.88C19.36,10.63 19.77,11.59 19.77,12.76C19.77,16.87 17.27,17.78 14.9,18.04C15.28,18.37 15.62,19.02 15.62,20.02C15.62,21.44 15.6,22.59 15.6,22.72C15.6,23.01 15.79,23.33 16.34,23.22C20.61,21.79 23.7,17.76 23.7,13C23.7,7.1 18.9,2.3 13,2.3Z" />
                             </Canvas>
                         </Viewbox>
                     </Button>

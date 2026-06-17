@@ -62,6 +62,9 @@ public sealed class DiscordTunnelController : IAsyncDisposable
     private bool _lastWireSockConnectionEstablished;
     private string? _lastWireSockHandshakeDiagnostic =
         "WireSock handshake has not been checked.";
+    private string? _lastWireSockProcessId;
+    private bool? _lastWireSockProcessExited;
+    private string? _lastWireSockProcessExitCode;
     private long _lastTunnelLogStartPosition;
     private IReadOnlyDictionary<string, string?> _lastRoutingSummary =
         new Dictionary<string, string?>();
@@ -586,12 +589,14 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             arguments,
             Path.GetDirectoryName(wireSockExecutable)!,
             _paths.TunnelLog);
+        CaptureWireSockProcessState();
         WriteWireSockProcessMarker(profilePath);
         _wireSockProcess.Exited += OnWireSockExited;
 
         SetStatus(TunnelState.Verifying, "Bağlantı doğrulanıyor");
         await Task.Delay(_startupGracePeriod, cancellationToken);
 
+        CaptureWireSockProcessState();
         if (_wireSockProcess.HasExited)
         {
             var exitCode = _wireSockProcess.ExitCode;
@@ -613,6 +618,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         {
             cancellationToken.ThrowIfCancellationRequested();
             _lastTunnelReadiness = _tunnelReadinessProbe.Capture();
+            CaptureWireSockProcessState();
             _lastWireSockConnectionEstablished =
                 HasWireSockConnectionEstablished(tunnelLogStartPosition);
             var details = CreateTunnelReadinessDetails();
@@ -658,7 +664,46 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             _lastWireSockConnectionEstablished.ToString();
         details["wireSockHandshakeDiagnostic"] =
             _lastWireSockHandshakeDiagnostic;
+        if (!string.IsNullOrWhiteSpace(_lastWireSockProcessId))
+        {
+            details["wireSockProcessId"] = _lastWireSockProcessId;
+        }
+
+        if (_lastWireSockProcessExited is not null)
+        {
+            details["wireSockProcessExited"] =
+                _lastWireSockProcessExited.Value.ToString();
+        }
+
+        if (!string.IsNullOrWhiteSpace(_lastWireSockProcessExitCode))
+        {
+            details["wireSockProcessExitCode"] =
+                _lastWireSockProcessExitCode;
+        }
+
         return details;
+    }
+
+    private void CaptureWireSockProcessState()
+    {
+        var process = _wireSockProcess;
+        if (process is null)
+        {
+            return;
+        }
+
+        _lastWireSockProcessId =
+            process.ProcessId.ToString(CultureInfo.InvariantCulture);
+        _lastWireSockProcessExited = process.HasExited;
+        if (process.HasExited)
+        {
+            _lastWireSockProcessExitCode =
+                process.ExitCode?.ToString(CultureInfo.InvariantCulture)
+                ?? "unknown";
+            return;
+        }
+
+        _lastWireSockProcessExitCode = null;
     }
 
     private bool IsWireSockHandshakeReady()

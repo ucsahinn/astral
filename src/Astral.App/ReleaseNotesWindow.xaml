@@ -3,9 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Astral sürüm notları"
         Width="720"
-        Height="620"
+        Height="640"
         MinWidth="720"
-        MinHeight="560"
+        MinHeight="580"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner"
         Background="{StaticResource WindowBrush}"
@@ -60,10 +60,12 @@
                                 <GradientStop Color="#A0101D31" Offset="1" />
                             </RadialGradientBrush>
                         </Border.Background>
-                        <Viewbox Width="28"
-                                 Height="28"
+                        <Viewbox Width="26"
+                                 Height="26"
                                  Stretch="Uniform">
-                            <Canvas Width="24" Height="24">
+                            <Canvas Width="24"
+                                    Height="24"
+                                    ClipToBounds="False">
                                 <Path Stroke="{StaticResource PrimaryTextBrush}"
                                       StrokeThickness="1.8"
                                       StrokeStartLineCap="Round"
@@ -80,11 +82,11 @@
                                 VerticalAlignment="Center">
                         <TextBlock FontSize="22"
                                    FontWeight="SemiBold"
-                                   Text="Astral v2.2.8" />
+                                   Text="Astral v2.2.9" />
                         <TextBlock Margin="0,5,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
-                                   Text="Premium hedef grid ve güncelleme sürekliliği" />
+                                   Text="Discorder'dan Astral'a geçiş ve hedef kapsamı hotfix'i" />
                     </StackPanel>
                 </Grid>
 
@@ -107,7 +109,7 @@
                                            FontSize="14"
                                            LineHeight="21"
                                            TextWrapping="Wrap"
-                                           Text="v2.2.8, Astral ana ekranındaki desteklenen hedef panelini yazısız premium logo grid'e taşır, eski marka tanılama izlerini temizler ve güncelleme sürekliliğini korur." />
+                                           Text="Bu sürüm Discorder hattından Astral adına geçişi kullanıcı tarafında tamamlayan geçiş notudur. Uygulama artık tek hedefli Discord aracı gibi davranmaz; seçilen uygulama ve web hedefleri için dar kapsamlı bağlantı yöneticisi olarak çalışır." />
                             </StackPanel>
                         </Border>
 
@@ -121,24 +123,28 @@
                                 <TextBlock FontSize="12"
                                            FontWeight="SemiBold"
                                            Foreground="{StaticResource AccentBrush}"
-                                           Text="NELER DEĞİŞTİ" />
+                                           Text="GEÇİŞTEKİ ANA DEĞİŞİKLİKLER" />
                                 <TextBlock Margin="0,10,0,0"
                                            FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="• Desteklenen hedefler ana ekranda yalnız marka renkli temiz marklarla görünür; isimler erişilebilirlik ve ipuçlarında korunur." />
+                                           Text="&#x2022; Ürün adı, ikon, uygulama başlığı, tanılama klasörü ve güncelleme hattı Astral çizgisine taşındı." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="• Hedef grid'i, GitHub ikonu ve seçili durum işaretleri yüksek DPI'da kırpılmayacak şekilde sıkılaştırıldı." />
+                                           Text="&#x2022; Discord-only ve tarayıcı modu dili kaldırıldı; Discord, Roblox, Wattpad, Bigo Live, Azar, Tango, LiVU, IMVU ve Blogspot hedefleri seçilebilir kapsam olarak yönetiliyor." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="• Legacy portable klasörlerden çalışırken tanılama çıktısı Astral diliyle kalır; güncelleme yine aynı klasöre güvenli şekilde uygulanır." />
+                                           Text="&#x2022; Web hedeflerinde genel tarayıcı exe'leri tünele alınmıyor. Sadece Astral.WebProxy tünele dahil ediliyor ve yalnız seçili domainler proxy/PAC kuralına giriyor." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="• v2.2.7 WebProxy port fallback davranışı korunur; otomatik güncelleme beklenen Astral asset adlarıyla devam eder." />
+                                           Text="&#x2022; Eski Discorder kurulumundan gelen kullanıcılar Astral güncelleme asset'leriyle aynı klasör üzerinde güvenli geçiş alabiliyor." />
+                                <TextBlock FontSize="13"
+                                           LineHeight="22"
+                                           TextWrapping="Wrap"
+                                           Text="&#x2022; Ana ekrandaki hedef kapsamı paneli 5+4 isimli ürün kartlarına döndürüldü; footer release notu ve GitHub ikonları yüksek DPI'da kırpılmayacak şekilde iç boşluk aldı." />
                             </StackPanel>
                         </Border>
 
@@ -152,7 +158,12 @@
                                 <TextBlock FontSize="12"
                                            FontWeight="SemiBold"
                                            Foreground="{StaticResource WarningBrush}"
-                                           Text="BİLİNEN SINIR" />
+                                           Text="BAĞLANTI NOTU" />
+                                <TextBlock Margin="0,8,0,0"
+                                           FontSize="13"
+                                           LineHeight="21"
+                                           TextWrapping="Wrap"
+                                           Text="Astral bağlı demeden önce WireSock sanal adaptörünün aktifleşmesini ve tünel handshake kanıtını bekler. Adaptör Down kalırsa bağlantıyı başarılı saymaz, PAC/proxy kapsamını temizler ve tanılama paketinde kök nedeni görünür bırakır." />
                                 <TextBlock Margin="0,8,0,0"
                                            FontSize="13"
                                            LineHeight="21"
@@ -179,7 +190,7 @@
                     <TextBlock VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource MutedTextBrush}"
-                               Text="Kullanıcıların uygulama içinden hızlıca okuyabilmesi için eklendi." />
+                               Text="Bu not, geçiş sürümünü uygulama içinden hızlıca okuyabilmek için eklendi." />
                     <Button Grid.Column="1"
                             Margin="0,0,10,0"
                             Height="40"

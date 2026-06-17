@@ -29,6 +29,21 @@ Kontrol edin:
 - Tanılama paketinde `AllowedApps` özeti seçili hedefi gösteriyor mu?
 - WireSock kurulum veya readiness aşamasında hata var mı?
 
+## Astral Tünel Adaptörü Aktifleşmedi
+
+Tanılama paketinde şu imza birlikte görünüyorsa sorun hedef seçimi veya tarayıcı kapsamı değildir:
+
+- `tunnelReadiness=wiresock-adapter-inactive`
+- `wireSockAdapterDetected=True`
+- `wireSockAdapterStatus=Down`
+- `wireSockAdapterBytesReceived=0` ve `wireSockAdapterBytesSent=0`
+- `wireSockConnectionEstablished=False`
+- `wireSockProcessExitCode=-1` veya `wiresock-client` sürecinin beklenmeden kapanması
+
+Bu durumda Astral bağlantıyı başarılı saymaz. Önce **Onar** akışını çalıştırın, sonra Windows'u yeniden başlatıp tekrar deneyin. Devam ederse WireSock sürücüsü/adapter kurulumu, güvenlik yazılımı, sanal adaptör çakışması veya Windows ağ yığını ayrıca incelenmelidir.
+
+Bu hata, web hedeflerinin yanlış proxylenmesi anlamına gelmez. Güncel tanılama paketinde `allowedBareBrowserNameCount=0`, `allowedBrowserApplicationCount=0` ve `webProxy=included` görünüyorsa seçili web hedefleri için kapsam planı doğru kurulmuştur; asıl blok tünel adaptörünün aktifleşmemesidir.
+
 ## Proxy/PAC Temizlenmedi Şüphesi
 
 Astral bağlantı kapanırken PAC/proxy state'ini geri alır. Şüphe varsa:

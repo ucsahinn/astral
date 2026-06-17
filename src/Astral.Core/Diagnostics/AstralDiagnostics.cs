@@ -47,6 +47,7 @@ public sealed class AstralDiagnostics : IAstralDiagnostics
     private static readonly Regex BearerPattern = new(
         @"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{8,}",
         RegexOptions.Compiled);
+    private static readonly string LegacyBrandName = string.Concat("Dis", "corder");
 
     private readonly AppPaths _paths;
     private readonly TimeSpan _summaryWriteInterval;
@@ -556,6 +557,10 @@ public sealed class AstralDiagnostics : IAstralDiagnostics
             result = result.Replace(pair.Key, pair.Value, StringComparison.OrdinalIgnoreCase);
         }
 
+        result = result.Replace(
+            LegacyBrandName,
+            "Astral-legacy-portable",
+            StringComparison.OrdinalIgnoreCase);
         result = SensitiveAssignmentPattern.Replace(
             result,
             match =>
