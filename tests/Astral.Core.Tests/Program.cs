@@ -81,27 +81,16 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Denetleyici aktif bağlantıyı kapanışta güvenle temizler", ControllerDisposeCleansActiveConnectionAsync),
     ("Denetleyici WireSock kapanışı doğrulanmazsa süreç işaretini korur", ControllerKeepsWireSockMarkerWhenExitIsUnconfirmedAsync),
     ("Denetleyici yanlış WireSock süreç işaretini temizler", ControllerDeletesMismatchedWireSockMarkerAsync),
-    ("Denetleyici bağlantı kapanınca Discord'u kapatmayı dener", ControllerClosesDiscordOnDisconnectAsync),
+    ("Denetleyici bağlantı kapanınca hedef uygulamaları kapatmaz", ControllerDoesNotCloseTargetProcessesOnDisconnectAsync),
     ("Denetleyici hedef kapsamını bağlıyken kilitler", ControllerLocksTargetScopeWhileConnectedAsync),
-    ("Denetleyici bağlantıyı Discord oturumu sanmadan doğrular", ControllerVerifiesTunnelWithoutClaimingDiscordSessionAsync),
+    ("Denetleyici varsayılan kapsamda hedef uygulama başlatmadan doğrular", ControllerConnectsDefaultScopeWithoutLaunchingTargetProcessAsync),
     ("Denetleyici WireSock adaptörü pasifse hazır demez", ControllerRejectsInactiveWireSockAdapterAsync),
     ("Denetleyici WireSock adaptörü yoksa hazır demez", ControllerRejectsMissingWireSockAdapterAsync),
     ("Denetleyici WireSock adaptörü doğrulanamazsa hazır demez", ControllerRejectsUnavailableWireSockProbeAsync),
     ("Denetleyici WireSock handshake yoksa hazır demez", ControllerRejectsMissingWireSockHandshakeAsync),
     ("Denetleyici WireSock adaptörü gecikirse yeniden dener", ControllerRetriesDelayedWireSockAdapterAsync),
-    ("Denetleyici WireSock doğrulamasını Discord yenilemeden sonra yapar", ControllerChecksWireSockAfterDiscordRestartAsync),
-    ("Windows Discord başlatma planı updater yerine uygulamayı hedefler", WindowsDiscordLaunchPlanUsesAppExecutableAsync),
-    ("Windows Discord başlatma planı updater fallback kullanabilir", WindowsDiscordLaunchPlanCanUseUpdaterFallbackAsync),
-    ("Windows Discord arka plan süreçlerini hazır kabul eder", WindowsDiscordBackgroundProcessesCountAsReadyAsync),
-    ("Denetleyici Discord kapalıyken uygulamayı açmayı dener", ControllerOpensDiscordWhenItIsClosedAsync),
-    ("Denetleyici Discord otomatik yenileme başarısızlığını ayrı durum yapar", ControllerKeepsTunnelActiveWhenDiscordRestartFailsAsync),
-    ("Denetleyici Discord penceresi gecikirse tekrar doğrular", ControllerVerifiesDiscordWhenWindowAppearsLateAsync),
-    ("Denetleyici Discord penceresi görünmezse hazır demeyi bırakır", ControllerRequiresManualActionWhenDiscordWindowIsHiddenAsync),
-    ("Denetleyici Discord updater döngüsünü bağlantıyı yenileyerek kurtarır", ControllerRecoversDiscordUpdaterLoopAsync),
-    ("Denetleyici updater gecikirse tünel dönüşünde tekrar doğrular", ControllerVerifiesDiscordAfterUpdaterDirectRetryStillShowsUpdaterAsync),
-    ("Denetleyici recovery sonrası Discord'u yeniden başlatmadan doğrular", ControllerRequiresManualActionWhenPostRecoveryVerificationFailsAsync),
-    ("Denetleyici Discord updater recovery tamamlanamazsa manuel aksiyon durumunu korur", ControllerKeepsTunnelActiveWhenDiscordUpdaterDirectRestartFailsAsync),
-    ("Denetleyici Discord updater recovery hatasında kilidi geri açar", ControllerRestoresLockWhenDiscordUpdaterRecoveryFailsAsync),
+    ("Denetleyici WireSock doğrulamasını hedef uygulama yenilemeden yapar", ControllerChecksWireSockWithoutTargetProcessRestartAsync),
+    ("Denetleyici tüm yerleşik presetleri hedef uygulama başlatmadan bağlar", ControllerConnectsEveryBuiltInPresetWithoutLaunchingTargetsAsync),
     ("Denetleyici WireSock hazırlık hatasını bildirir", ControllerBootstrapFailureAsync),
     ("Denetleyici GitHub DNS hatasını Türkçe açıklar", ControllerNetworkFailureIsUserFriendlyAsync),
     ("Denetleyici indirme zaman aşımını Türkçe açıklar", ControllerDownloadTimeoutIsUserFriendlyAsync),
@@ -125,6 +114,25 @@ var tests = new (string Name, Func<Task> Run)[]
     ("WireSock süreç logları yazılırken redakte edilir", ProcessLauncherRedactsTunnelLogAndConfirmsExitAsync),
     ("Süreç başlatıcı WireSock ve web proxy için ortak tunnel logunu paylaşır", ProcessLauncherSharesTunnelLogAcrossScopedProcessesAsync),
     ("Tanılama özeti son bilgi durumunu gecikmeli yazar", DiagnosticsFlushesDebouncedSummaryAsync)
+};
+
+_ = new Func<Task>[]
+{
+    ControllerClosesDiscordOnDisconnectAsync,
+    ControllerVerifiesTunnelWithoutClaimingDiscordSessionAsync,
+    ControllerChecksWireSockAfterDiscordRestartAsync,
+    WindowsDiscordLaunchPlanUsesAppExecutableAsync,
+    WindowsDiscordLaunchPlanCanUseUpdaterFallbackAsync,
+    WindowsDiscordBackgroundProcessesCountAsReadyAsync,
+    ControllerOpensDiscordWhenItIsClosedAsync,
+    ControllerKeepsTunnelActiveWhenDiscordRestartFailsAsync,
+    ControllerRequiresManualActionWhenDiscordWindowIsHiddenAsync,
+    ControllerVerifiesDiscordWhenWindowAppearsLateAsync,
+    ControllerRecoversDiscordUpdaterLoopAsync,
+    ControllerRequiresManualActionWhenPostRecoveryVerificationFailsAsync,
+    ControllerVerifiesDiscordAfterUpdaterDirectRetryStillShowsUpdaterAsync,
+    ControllerKeepsTunnelActiveWhenDiscordUpdaterDirectRestartFailsAsync,
+    ControllerRestoresLockWhenDiscordUpdaterRecoveryFailsAsync
 };
 
 var failures = new List<string>();
@@ -2576,6 +2584,242 @@ static async Task ControllerDeletesMismatchedWireSockMarkerAsync()
     }
 }
 
+static async Task ControllerDoesNotCloseTargetProcessesOnDisconnectAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var process = new FakeManagedProcess();
+    var accessLock = new FakeDiscordAccessLock();
+    var diagnostics = new AstralDiagnostics(
+        new AppPaths(root),
+        TimeSpan.Zero);
+    var targetProcessManager = new FakeDiscordProcessManager(
+        new DiscordProcessSnapshot(
+            1,
+            [Path.Combine(root, "Discord", "app-1.0.9999", "Discord.exe")],
+            [100]));
+    var controller = new DiscordTunnelController(
+        new AppPaths(root),
+        new DiscordAppScope(root, root, root),
+        new FakeWireSockBootstrapper(Path.Combine(
+            root,
+            "WireSock VPN Client",
+            "bin",
+            WireSockPackage.CliExecutableFileName)),
+        new FakeProfileProvisioner(Path.Combine(root, "discord.conf")),
+        new FakeProcessLauncher(process),
+        TimeSpan.Zero,
+        accessLock,
+        diagnostics,
+        targetProcessManager);
+
+    try
+    {
+        await controller.ConnectAsync();
+        await controller.DisconnectAsync();
+
+        Assert(controller.Snapshot.State == TunnelState.Disconnected);
+        Assert(process.StopCount == 1);
+        Assert(targetProcessManager.RestartCount == 0);
+        Assert(targetProcessManager.VerifyReadyCount == 0);
+        Assert(targetProcessManager.CloseCount == 0);
+
+        var details = controller.CreateDiagnosticDetails();
+        Assert(!details.ContainsKey("discordRestartStatus"));
+        Assert(!details.ContainsKey("discordProcessCount"));
+        Assert(details["targetLaunchPolicy"] == "not-started-by-astral");
+    }
+    finally
+    {
+        await controller.DisposeAsync();
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task ControllerConnectsDefaultScopeWithoutLaunchingTargetProcessAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var process = new FakeManagedProcess();
+    var accessLock = new FakeDiscordAccessLock();
+    var paths = new AppPaths(root);
+    var diagnostics = new AstralDiagnostics(
+        paths,
+        TimeSpan.Zero);
+    var targetProcessManager = new FakeDiscordProcessManager(
+        new DiscordProcessSnapshot(
+            2,
+            [Path.Combine(root, "Discord", "app-1.0.9999", "Discord.exe")],
+            [100, 101]));
+    var controller = new DiscordTunnelController(
+        paths,
+        new DiscordAppScope(root, root, root),
+        new FakeWireSockBootstrapper(Path.Combine(
+            root,
+            "WireSock VPN Client",
+            "bin",
+            WireSockPackage.CliExecutableFileName)),
+        new FakeProfileProvisioner(Path.Combine(root, "discord.conf")),
+        new FakeProcessLauncher(process, "Connection established"),
+        TimeSpan.Zero,
+        accessLock,
+        diagnostics,
+        targetProcessManager,
+        new FakeTunnelReadinessProbe(TunnelReadinessSnapshot.Ready("Up", 128, 256)),
+        tunnelReadinessRetryDelay: TimeSpan.Zero);
+
+    try
+    {
+        await controller.ConnectAsync();
+
+        Assert(controller.Snapshot.State == TunnelState.Connected);
+        Assert(controller.Snapshot.Message.Contains(
+            "seçili hedefler",
+            StringComparison.OrdinalIgnoreCase));
+        Assert(!controller.Snapshot.Message.Contains(
+            "Discord yenilendi",
+            StringComparison.OrdinalIgnoreCase));
+        Assert(!controller.Snapshot.Message.Contains(
+            "Discord açıldı",
+            StringComparison.OrdinalIgnoreCase));
+        Assert(targetProcessManager.RestartCount == 0);
+        Assert(targetProcessManager.VerifyReadyCount == 0);
+
+        var health = await File.ReadAllTextAsync(paths.HealthReport);
+        Assert(health.Contains("\"status\":\"bağlantı hazır\"", StringComparison.Ordinal));
+        Assert(health.Contains("\"targetLaunchPolicy\":\"not-started-by-astral\"", StringComparison.Ordinal));
+        Assert(!health.Contains("discordProcessCount", StringComparison.OrdinalIgnoreCase));
+        Assert(!health.Contains("discordRestartStatus", StringComparison.OrdinalIgnoreCase));
+        var details = controller.CreateDiagnosticDetails();
+        Assert(details["wireSockRunning"] == "True");
+        Assert(details["targetLaunchPolicy"] == "not-started-by-astral");
+        Assert(details["nextAction"] == "Seçili hedefleri şimdi açabilirsiniz.");
+        Assert(!details.ContainsKey("discordProcessCount"));
+        Assert(!details.ContainsKey("discordRestartStatus"));
+    }
+    finally
+    {
+        await controller.DisposeAsync();
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task ControllerChecksWireSockWithoutTargetProcessRestartAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var process = new FakeManagedProcess();
+    var accessLock = new FakeDiscordAccessLock();
+    var paths = new AppPaths(root);
+    var diagnostics = new AstralDiagnostics(
+        paths,
+        TimeSpan.Zero);
+    var targetProcessManager = new FakeDiscordProcessManager(
+        new DiscordProcessSnapshot(
+            1,
+            [Path.Combine(root, "Discord", "app-1.0.9999", "Discord.exe")],
+            [100]));
+    var readinessProbe = new ObservingTunnelReadinessProbe(() =>
+    {
+        Assert(targetProcessManager.RestartCount == 0);
+        Assert(targetProcessManager.VerifyReadyCount == 0);
+        return TunnelReadinessSnapshot.Ready(
+            "Up",
+            512,
+            1024);
+    });
+    var controller = new DiscordTunnelController(
+        paths,
+        new DiscordAppScope(root, root, root),
+        new FakeWireSockBootstrapper(Path.Combine(
+            root,
+            "WireSock VPN Client",
+            "bin",
+            WireSockPackage.CliExecutableFileName)),
+        new FakeProfileProvisioner(Path.Combine(root, "discord.conf")),
+        new FakeProcessLauncher(process, "Connection established"),
+        TimeSpan.Zero,
+        accessLock,
+        diagnostics,
+        targetProcessManager,
+        readinessProbe,
+        tunnelReadinessRetryDelay: TimeSpan.Zero);
+
+    try
+    {
+        await controller.ConnectAsync();
+
+        Assert(controller.Snapshot.State == TunnelState.Connected);
+        Assert(readinessProbe.CaptureCount == 1);
+        Assert(targetProcessManager.RestartCount == 0);
+        Assert(targetProcessManager.VerifyReadyCount == 0);
+    }
+    finally
+    {
+        await controller.DisposeAsync();
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task ControllerConnectsEveryBuiltInPresetWithoutLaunchingTargetsAsync()
+{
+    var registry = TargetRegistry.CreateDefault();
+    foreach (var target in registry.GetBuiltInTargets())
+    {
+        var root = CreateTemporaryDirectory();
+        var process = new FakeManagedProcess();
+        var paths = new AppPaths(root);
+        var accessLock = new FakeDiscordAccessLock();
+        var webProxyService = new FakeScopedWebProxyService();
+        var profileProvisioner = new FakeProfileProvisioner(
+            Path.Combine(root, $"{target.Id}.conf"));
+        var targetProcessManager = new FakeDiscordProcessManager(
+            new DiscordProcessSnapshot(
+                1,
+                [Path.Combine(root, "Discord", "app-1.0.9999", "Discord.exe")],
+                [100]));
+        var controller = new DiscordTunnelController(
+            paths,
+            new DiscordAppScope(root, root, root),
+            new FakeWireSockBootstrapper(Path.Combine(
+                root,
+                "WireSock VPN Client",
+                "bin",
+                WireSockPackage.CliExecutableFileName)),
+            profileProvisioner,
+            new FakeProcessLauncher(process, "Connection established"),
+            TimeSpan.Zero,
+            accessLock,
+            new AstralDiagnostics(paths, TimeSpan.Zero),
+            targetProcessManager,
+            new FakeTunnelReadinessProbe(TunnelReadinessSnapshot.Ready("Up", 128, 256)),
+            tunnelReadinessRetryDelay: TimeSpan.Zero,
+            targetScopeResolver: null,
+            webProxyService: webProxyService);
+
+        try
+        {
+            Assert(controller.TrySetTargetSelection(new TargetSelection([target.Id])));
+
+            await controller.ConnectAsync();
+
+            Assert(controller.Snapshot.State == TunnelState.Connected);
+            Assert(targetProcessManager.RestartCount == 0);
+            Assert(targetProcessManager.VerifyReadyCount == 0);
+            Assert(targetProcessManager.CloseCount == 0);
+            Assert(profileProvisioner.LastAllowedApplications.All(app =>
+                !RoutingPlan.IsBrowserExecutable(app)));
+            Assert(webProxyService.ApplyCount == 1);
+
+            await controller.DisconnectAsync();
+
+            Assert(targetProcessManager.CloseCount == 0);
+        }
+        finally
+        {
+            await controller.DisposeAsync();
+            Directory.Delete(root, recursive: true);
+        }
+    }
+}
+
 static async Task ControllerClosesDiscordOnDisconnectAsync()
 {
     var root = CreateTemporaryDirectory();
@@ -4627,7 +4871,16 @@ static async Task DiagnosticsWritesDebugBundleOnlyWhenEnabledAsync()
         Assert(debugDocument.RootElement.TryGetProperty("runtime", out _));
         Assert(debugDocument.RootElement.TryGetProperty("cpuSample", out _));
         Assert(debugDocument.RootElement.TryGetProperty("network", out _));
+        Assert(debugDocument.RootElement.GetProperty("processScope").GetString() == "astral-owned-only");
         Assert(debugDocument.RootElement.TryGetProperty("processes", out _));
+        Assert(AstralDiagnostics.IsProcessNameCapturedForDiagnostics("Astral"));
+        Assert(AstralDiagnostics.IsProcessNameCapturedForDiagnostics("Astral.WebProxy"));
+        Assert(AstralDiagnostics.IsProcessNameCapturedForDiagnostics("wiresock-client"));
+        Assert(!AstralDiagnostics.IsProcessNameCapturedForDiagnostics("Discord"));
+        Assert(!AstralDiagnostics.IsProcessNameCapturedForDiagnostics("DiscordPTB"));
+        Assert(!AstralDiagnostics.IsProcessNameCapturedForDiagnostics("chrome"));
+        Assert(!AstralDiagnostics.IsProcessNameCapturedForDiagnostics("msedge"));
+        Assert(!AstralDiagnostics.IsProcessNameCapturedForDiagnostics("firefox"));
 
         var eventLog = await File.ReadAllTextAsync(paths.EventLog);
         Assert(!eventLog.Contains("raw-secret-value", StringComparison.Ordinal));

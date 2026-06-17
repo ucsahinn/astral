@@ -82,11 +82,11 @@
                                 VerticalAlignment="Center">
                         <TextBlock FontSize="22"
                                    FontWeight="SemiBold"
-                                   Text="Astral v2.2.9" />
+                                   Text="Astral v2.2.10" />
                         <TextBlock Margin="0,5,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
-                                   Text="Discorder'dan Astral'a geçiş ve hedef kapsamı hotfix'i" />
+                                   Text="Gerçek hedef ikonları, premium kapsam paneli ve kapanış hotfix'i" />
                     </StackPanel>
                 </Grid>
 
@@ -109,7 +109,7 @@
                                            FontSize="14"
                                            LineHeight="21"
                                            TextWrapping="Wrap"
-                                           Text="Bu sürüm Discorder hattından Astral adına geçişi kullanıcı tarafında tamamlayan geçiş notudur. Uygulama artık tek hedefli Discord aracı gibi davranmaz; seçilen uygulama ve web hedefleri için dar kapsamlı bağlantı yöneticisi olarak çalışır." />
+                                           Text="Bu sürüm Astral'ın seçili uygulama ve web hedefleri için dar kapsamlı bağlantı yöneticisi davranışını güçlendirir. Hedef kartları gerçek ürün ikonları ve açık state bilgisiyle görünür; uygulama hedef programları açmaz veya yenilemez, yalnızca seçili girişlerin tünel kapsamını hazırlar." />
                             </StackPanel>
                         </Border>
 
@@ -123,16 +123,16 @@
                                 <TextBlock FontSize="12"
                                            FontWeight="SemiBold"
                                            Foreground="{StaticResource AccentBrush}"
-                                           Text="GEÇİŞTEKİ ANA DEĞİŞİKLİKLER" />
+                                           Text="ANA DEĞİŞİKLİKLER" />
                                 <TextBlock Margin="0,10,0,0"
                                            FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Ürün adı, ikon, uygulama başlığı, tanılama klasörü ve güncelleme hattı Astral çizgisine taşındı." />
+                                           Text="&#x2022; Discord, Roblox, Wattpad, Bigo Live, Azar, Tango, LiVU, IMVU ve Blogspot için gerçek renkli hedef ikonları eklendi." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Discord-only ve tarayıcı modu dili kaldırıldı; Discord, Roblox, Wattpad, Bigo Live, Azar, Tango, LiVU, IMVU ve Blogspot hedefleri seçilebilir kapsam olarak yönetiliyor." />
+                                           Text="&#x2022; Hedef kartları Hazır, Seçili, Bağlanıyor, Kapsamda, Sorunlu ve Pasif durumlarını tooltip ve durum satırıyla gösterir." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
@@ -140,11 +140,11 @@
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Eski Discorder kurulumundan gelen kullanıcılar Astral güncelleme asset'leriyle aynı klasör üzerinde güvenli geçiş alabiliyor." />
+                                           Text="&#x2022; Kapanış, yeniden başlatma, onarım ve profil temizleme akışlarında timeout ve UI donma riski azaltıldı." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Ana ekrandaki hedef kapsamı paneli 5+4 isimli ürün kartlarına döndürüldü; footer release notu ve GitHub ikonları yüksek DPI'da kırpılmayacak şekilde iç boşluk aldı." />
+                                           Text="&#x2022; Güncelleme asset'leri yalnız Astral adıyla doğrulanıyor ve yeni sürüm yoksa güncelleme butonu görünmez kalıyor." />
                             </StackPanel>
                         </Border>
 
@@ -190,7 +190,7 @@
                     <TextBlock VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource MutedTextBrush}"
-                               Text="Bu not, geçiş sürümünü uygulama içinden hızlıca okuyabilmek için eklendi." />
+                               Text="Bu not, v2.2.10 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
                     <Button Grid.Column="1"
                             Margin="0,0,10,0"
                             Height="40"

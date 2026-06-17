@@ -14,12 +14,12 @@
     <AssemblyName>Astral</AssemblyName>
     <RootNamespace>Astral.App</RootNamespace>
     <AssemblyTitle>Astral</AssemblyTitle>
-    <AssemblyDescription>Astral, Windows icin secili uygulama ve web hedeflerini dar kapsamla yoneten baglanti yoneticisi</AssemblyDescription>
+    <AssemblyDescription>Astral, Windows için seçili uygulama ve web hedeflerini dar kapsamla yöneten bağlantı yöneticisi</AssemblyDescription>
     <AssemblyCompany>ucsahinn</AssemblyCompany>
     <AssemblyProduct>Astral</AssemblyProduct>
     <Copyright>Copyright (c) 2026 ucsahinn</Copyright>
-    <Version>2.2.9</Version>
-    <FileVersion>2.2.9.0</FileVersion>
+    <Version>2.2.10</Version>
+    <FileVersion>2.2.10.0</FileVersion>
     <RepositoryUrl>https://github.com/ucsahinn/astral</RepositoryUrl>
     <PublishTrimmed>false</PublishTrimmed>
     <PublishSingleFile>false</PublishSingleFile>
@@ -34,6 +34,7 @@
   <ItemGroup>
     <Resource Include="Assets\astral-mark.png" />
     <Resource Include="Assets\astral-v2.ico" />
+    <Resource Include="Assets\targets\*.svg" />
   </ItemGroup>
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">

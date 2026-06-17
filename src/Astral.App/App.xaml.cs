@@ -25,6 +25,7 @@ namespace Astral.App;
 public partial class App : System.Windows.Application, IDisposable
 {
     private const string MutexName = @"Local\Astral.ucsahinn.SingleInstance";
+    private static readonly TimeSpan ExitControllerDisposeTimeout = TimeSpan.FromSeconds(5);
 
     private Mutex? _singleInstanceMutex;
     private HttpClient? _httpClient;
@@ -114,7 +115,7 @@ public partial class App : System.Windows.Application, IDisposable
             Timeout = TimeSpan.FromMinutes(10)
         };
         _httpClient.DefaultRequestHeaders.UserAgent.Add(
-            new ProductInfoHeaderValue("Astral", "2.2.9"));
+            new ProductInfoHeaderValue("Astral", "2.2.10"));
 
         var downloader = new VerifiedDownloader(_httpClient, maxAttempts: 5);
         var wireSockLocator = new WireSockLocator();
@@ -149,7 +150,6 @@ public partial class App : System.Windows.Application, IDisposable
             new ProcessLauncher(),
             accessLock: accessLock,
             diagnostics: _diagnostics,
-            discordProcessManager: new WindowsDiscordProcessInspector(),
             tunnelReadinessProbe: new WindowsTunnelReadinessProbe(),
             webProxyService: webProxyService);
         _tunnelController.TrySetTargetSelection(settingsStore.GetTargetSelection());
@@ -194,10 +194,7 @@ public partial class App : System.Windows.Application, IDisposable
         DispatcherUnhandledException -= OnDispatcherUnhandledException;
         AppDomain.CurrentDomain.UnhandledException -= OnUnhandledException;
 
-        if (_tunnelController is not null)
-        {
-            _tunnelController.DisposeAsync().AsTask().GetAwaiter().GetResult();
-        }
+        DisposeTunnelControllerForExit();
 
         _httpClient?.Dispose();
         _diagnostics?.Info("app.exit", "Astral kapatıldı.");
@@ -216,6 +213,62 @@ public partial class App : System.Windows.Application, IDisposable
         }
 
         GC.SuppressFinalize(this);
+    }
+
+    private void DisposeTunnelControllerForExit()
+    {
+        if (_tunnelController is null)
+        {
+            return;
+        }
+
+        if (MainWindow is MainWindow mainWindow
+            && mainWindow.HasAttemptedControllerShutdownCleanup)
+        {
+            _diagnostics?.Info(
+                "app.exit.controller",
+                "Tunnel controller cleanup was already handled by the main window.");
+            return;
+        }
+
+        try
+        {
+            var disposeTask = _tunnelController.DisposeAsync().AsTask();
+            if (!disposeTask.Wait(ExitControllerDisposeTimeout))
+            {
+                _diagnostics?.Warning(
+                    "app.exit.controllerTimeout",
+                    "Tunnel controller dispose timed out during app exit; exit was not blocked.",
+                    new Dictionary<string, string?>
+                    {
+                        ["timeoutMs"] = ExitControllerDisposeTimeout
+                            .TotalMilliseconds
+                            .ToString("0", System.Globalization.CultureInfo.InvariantCulture)
+                    });
+                _ = disposeTask.ContinueWith(
+                    task =>
+                    {
+                        if (task.Exception is not null)
+                        {
+                            _diagnostics?.Failure(
+                                "app.exit.controllerTimeout",
+                                "Delayed tunnel controller dispose failed.",
+                                task.Exception.GetBaseException());
+                        }
+                    },
+                    TaskScheduler.Default);
+                return;
+            }
+
+            disposeTask.GetAwaiter().GetResult();
+        }
+        catch (Exception exception)
+        {
+            _diagnostics?.Failure(
+                "app.exit.controller",
+                "Tunnel controller dispose failed during app exit.",
+                exception);
+        }
     }
 
     private void OnDispatcherUnhandledException(

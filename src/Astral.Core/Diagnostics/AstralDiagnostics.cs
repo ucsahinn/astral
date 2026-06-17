@@ -15,6 +15,12 @@ namespace Astral.Core.Diagnostics;
 public sealed class AstralDiagnostics : IAstralDiagnostics
 {
     private static readonly TimeSpan DefaultSummaryWriteInterval = TimeSpan.FromSeconds(5);
+    private static readonly string[] DiagnosticProcessNames =
+    [
+        "Astral",
+        "Astral.WebProxy",
+        "wiresock-client"
+    ];
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -652,8 +658,16 @@ public sealed class AstralDiagnostics : IAstralDiagnostics
             ["runtime"] = CaptureRuntimeMetrics().ToReport(),
             ["cpuSample"] = CaptureCpuSample(),
             ["network"] = CaptureNetworkSnapshot(),
+            ["processScope"] = "astral-owned-only",
             ["processes"] = CaptureProcessSnapshot()
         };
+    }
+
+    internal static bool IsProcessNameCapturedForDiagnostics(string processName)
+    {
+        return DiagnosticProcessNames.Contains(
+            processName,
+            StringComparer.OrdinalIgnoreCase);
     }
 
     private static Dictionary<string, object?> CaptureCpuSample()
@@ -779,23 +793,7 @@ public sealed class AstralDiagnostics : IAstralDiagnostics
 
     private static Dictionary<string, object?>[] CaptureProcessSnapshot()
     {
-        var names = new[]
-        {
-            "Astral",
-            "wiresock-client",
-            "Discord",
-            "DiscordPTB",
-            "DiscordCanary",
-            "DiscordDevelopment",
-            "chrome",
-            "msedge",
-            "firefox",
-            "brave",
-            "opera",
-            "vivaldi"
-        };
-
-        return names
+        return DiagnosticProcessNames
             .SelectMany(name =>
             {
                 try

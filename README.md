@@ -99,7 +99,7 @@ Release sayfasındaki ZIP paketini manuel indirdiğinizde yanında verilen SHA-2
 | Sorun giderme | [docs/sorun-giderme.md](docs/sorun-giderme.md) |
 | Mimari | [docs/mimari.md](docs/mimari.md) |
 | Kaynak sorun denetimi | [docs/kaynak-sorun-denetimi.md](docs/kaynak-sorun-denetimi.md) |
-| v2.2.9 release notu | [docs/releases/v2.2.9.md](docs/releases/v2.2.9.md) |
+| v2.2.10 release notu | [docs/releases/v2.2.10.md](docs/releases/v2.2.10.md) |
 
 ## Geliştirme
 

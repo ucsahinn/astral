@@ -9,7 +9,10 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
+using System.Windows.Media.Imaging;
+using System.Xml.Linq;
 using Astral.App.Installation;
 using Astral.Core.Configuration;
 using Astral.Core.Connection;
@@ -26,19 +29,26 @@ using MessageBox = System.Windows.MessageBox;
 using WpfBrush = System.Windows.Media.Brush;
 using WpfBrushes = System.Windows.Media.Brushes;
 using WpfCheckBox = System.Windows.Controls.CheckBox;
+using WpfImage = System.Windows.Controls.Image;
 using WpfPath = System.Windows.Shapes.Path;
 using WpfRectangle = System.Windows.Shapes.Rectangle;
+using WpfToolTip = System.Windows.Controls.ToolTip;
 
 namespace Astral.App;
 
 public partial class MainWindow : Window, IDisposable
 {
+    internal static TimeSpan ShutdownCleanupTimeout { get; set; } =
+        TimeSpan.FromSeconds(20);
+    internal bool HasAttemptedControllerShutdownCleanup { get; private set; }
+
     private static readonly TimeSpan LiveDnsRefreshInterval = TimeSpan.FromSeconds(15);
+    private static readonly char[] SvgViewBoxSeparators = new[] { ' ', ',' };
 
     private static readonly Uri RepositoryUri = new(
         "https://github.com/ucsahinn/astral");
     private static readonly Uri ReleaseNotesUri = new(
-        "https://github.com/ucsahinn/astral/releases/tag/v2.2.9");
+        "https://github.com/ucsahinn/astral/releases/tag/v2.2.10");
     private static readonly Uri BackgroundVideoUri = new(
         "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260606_154941_df1a96e1-a06f-450c-bd02-d863414cc1a0.mp4");
     private static readonly string LocalBackgroundVideoPath = Path.Combine(
@@ -57,6 +67,14 @@ public partial class MainWindow : Window, IDisposable
     private readonly IAstralDiagnostics _diagnostics;
     private readonly TargetRegistry _targetRegistry = TargetRegistry.CreateDefault();
     private readonly Dictionary<string, WpfCheckBox> _targetToggles =
+        new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, TextBlock> _targetStatusLabels =
+        new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Border> _targetIconBadges =
+        new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Border> _targetWarningBadges =
+        new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, int> _targetOrder =
         new(StringComparer.OrdinalIgnoreCase);
     private bool _isApplyingSettings;
     private bool _isRunInBackgroundEnabled;
@@ -289,10 +307,15 @@ public partial class MainWindow : Window, IDisposable
         ConnectionDetail.Text = GetConnectionDetail(snapshot);
 
         var routingPlan = _controller.CurrentRoutingPlan;
-        ScopeSummary.Text = routingPlan.Summary;
+        var selectedTargetCount = _controller.TargetSelection.SelectedTargetIds.Count;
+        ScopeSummary.Text = snapshot.IsConnected
+            ? $"{selectedTargetCount} hedef aktif"
+            : $"{selectedTargetCount} hedef seçili";
+        ScopeSummary.ToolTip = routingPlan.Summary;
         ScopeDetail.Text = routingPlan.RequiresWebProxy
             ? "Uygulama + web hedefleri kapsamda"
             : "Yalnızca uygulama hedefleri kapsamda";
+        ScopeDetail.ToolTip = routingPlan.Summary;
     }
 
     private (string Summary, string Detail) GetCachedDnsStatus()
@@ -381,7 +404,7 @@ public partial class MainWindow : Window, IDisposable
     {
         return state switch
         {
-            TunnelState.DiscordRestartRequired => "Discord yenilenmeli",
+            TunnelState.DiscordRestartRequired => "Hedef kontrolü gerekiyor",
             TunnelState.Connected => "Bağlı",
             TunnelState.Verifying => "Doğrulanıyor",
             TunnelState.Preparing => "Hazırlanıyor",
@@ -400,7 +423,7 @@ public partial class MainWindow : Window, IDisposable
 
         return snapshot.State switch
         {
-            TunnelState.DiscordRestartRequired => $"Discord yeniden başlatılmalı, {time}",
+            TunnelState.DiscordRestartRequired => $"Hedef bağlantısı kontrol edilmeli, {time}",
             TunnelState.Connected => $"Tünel aktif, son durum {time}",
             TunnelState.Verifying => $"Seçili hedef kapsamı kontrol ediliyor, {time}",
             TunnelState.Preparing or TunnelState.Connecting
@@ -568,7 +591,7 @@ public partial class MainWindow : Window, IDisposable
         return snapshot.State switch
         {
             TunnelState.Connected => (100, "Bağlandı", 4),
-            TunnelState.DiscordRestartRequired => (96, "Discord yeniden başlatılmalı", 4),
+            TunnelState.DiscordRestartRequired => (96, "Hedef kontrol edilmeli", 4),
             TunnelState.Verifying => (92, "Bağlantı doğrulanıyor", 4),
             TunnelState.Connecting => (82, "Bağlantı açılıyor", 4),
             TunnelState.Disconnecting => (62, "Bağlantı kapatılıyor", 4),
@@ -646,7 +669,7 @@ public partial class MainWindow : Window, IDisposable
         return state switch
         {
             TunnelState.Connected => "Sadece seçili hedefler tünelden çıkıyor.",
-            TunnelState.DiscordRestartRequired => "Discord'u tamamen kapatıp yeniden açın.",
+            TunnelState.DiscordRestartRequired => "Seçili hedef kapsamını kontrol edip tekrar bağlanın.",
             TunnelState.Verifying => "Astral tünel motoru açık, hedef kapsamı kontrol ediliyor.",
             TunnelState.Preparing => "Kurulum, dijital imza ve bağlantı profili doğrulanıyor.",
             TunnelState.Connecting => "Astral tünel motoru başlatılıyor.",
@@ -673,6 +696,10 @@ public partial class MainWindow : Window, IDisposable
         TargetCardsTopPanel.Children.Clear();
         TargetCardsBottomPanel.Children.Clear();
         _targetToggles.Clear();
+        _targetStatusLabels.Clear();
+        _targetIconBadges.Clear();
+        _targetWarningBadges.Clear();
+        _targetOrder.Clear();
 
         var index = 0;
         foreach (var target in _targetRegistry.GetBuiltInTargets())
@@ -682,17 +709,18 @@ public partial class MainWindow : Window, IDisposable
                 Name = "TargetToggle_" + CreateSafeTargetName(target.Id),
                 Tag = target,
                 Width = 116,
-                Height = 60,
+                Height = 58,
                 Margin = new Thickness(3),
-                Padding = new Thickness(5),
+                Padding = new Thickness(6),
                 Style = (Style)FindResource("TargetCardCheckBoxStyle"),
-                ToolTip = $"{target.Label} - {target.ScopeLabel}",
+                ToolTip = $"{target.Label} hedefi hazır",
                 Content = CreateTargetCardContent(target)
             };
             AutomationProperties.SetName(toggle, $"{target.Label} hedefi");
             toggle.Checked += TargetToggle_Changed;
             toggle.Unchecked += TargetToggle_Changed;
             _targetToggles[target.Id] = toggle;
+            _targetOrder[target.Id] = index;
             if (index < 5)
             {
                 TargetCardsTopPanel.Children.Add(toggle);
@@ -782,6 +810,7 @@ public partial class MainWindow : Window, IDisposable
 
     private void RefreshTargetScopeView(bool locked)
     {
+        var snapshot = _controller.Snapshot;
         _isApplyingSettings = true;
         try
         {
@@ -790,9 +819,13 @@ public partial class MainWindow : Window, IDisposable
                 toggle.IsEnabled = !locked;
                 if (toggle.Tag is TargetDefinition target)
                 {
-                    toggle.ToolTip = locked
-                        ? $"{target.Label} - bağlantı açıkken seçim kilitli"
-                        : $"{target.Label} - {target.ScopeLabel}";
+                    var selected = toggle.IsChecked == true;
+                    var state = GetTargetCardState(snapshot, locked, selected);
+                    ApplyTargetCardState(target, state);
+                    toggle.ToolTip = CreateTargetToolTip(target, state);
+                    AutomationProperties.SetHelpText(
+                        toggle,
+                        $"{target.Label} hedefi {GetTargetCardStateText(state).ToLowerInvariant()}");
                 }
             }
         }
@@ -801,6 +834,150 @@ public partial class MainWindow : Window, IDisposable
             _isApplyingSettings = false;
         }
 
+    }
+
+    private static TargetCardState GetTargetCardState(
+        TunnelSnapshot snapshot,
+        bool locked,
+        bool selected)
+    {
+        if (!selected)
+        {
+            return locked ? TargetCardState.Passive : TargetCardState.Ready;
+        }
+
+        return snapshot.State switch
+        {
+            TunnelState.Error or TunnelState.DiscordRestartRequired => TargetCardState.Problem,
+            TunnelState.Connected => TargetCardState.InScope,
+            TunnelState.Preparing
+                or TunnelState.Connecting
+                or TunnelState.Verifying => TargetCardState.Connecting,
+            _ => TargetCardState.Selected
+        };
+    }
+
+    private void ApplyTargetCardState(
+        TargetDefinition target,
+        TargetCardState state)
+    {
+        if (_targetStatusLabels.GetValueOrDefault(target.Id) is { } label)
+        {
+            label.Text = GetTargetCardStateText(state);
+            label.Foreground = GetTargetCardStateBrush(state);
+        }
+
+        if (_targetWarningBadges.GetValueOrDefault(target.Id) is { } warningBadge)
+        {
+            warningBadge.Visibility = state is TargetCardState.Problem
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+
+        if (_targetIconBadges.GetValueOrDefault(target.Id) is not { } iconBadge)
+        {
+            return;
+        }
+
+        iconBadge.BorderBrush = state switch
+        {
+            TargetCardState.Problem => new SolidColorBrush(MediaColor.FromRgb(255, 122, 122)),
+            TargetCardState.InScope => new SolidColorBrush(MediaColor.FromRgb(93, 255, 146)),
+            TargetCardState.Selected or TargetCardState.Connecting => new SolidColorBrush(MediaColor.FromRgb(125, 235, 255)),
+            _ => new SolidColorBrush(MediaColor.FromArgb(172, 245, 247, 251))
+        };
+
+        if (state is TargetCardState.Connecting)
+        {
+            var beginDelay = _targetOrder.TryGetValue(target.Id, out var order)
+                ? TimeSpan.FromMilliseconds(order * 110)
+                : TimeSpan.Zero;
+            iconBadge.BeginAnimation(
+                OpacityProperty,
+                new DoubleAnimation
+                {
+                    From = 0.72,
+                    To = 1,
+                    Duration = TimeSpan.FromMilliseconds(700),
+                    AutoReverse = true,
+                    RepeatBehavior = RepeatBehavior.Forever,
+                    BeginTime = beginDelay
+                });
+        }
+        else
+        {
+            iconBadge.BeginAnimation(OpacityProperty, null);
+            iconBadge.Opacity = state is TargetCardState.Passive ? 0.58 : 1;
+        }
+    }
+
+    private static WpfToolTip CreateTargetToolTip(
+        TargetDefinition target,
+        TargetCardState state)
+    {
+        var stateText = GetTargetCardStateText(state);
+        return new WpfToolTip
+        {
+            Content = new StackPanel
+            {
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = $"{target.Label} hedefi {stateText.ToLowerInvariant()}",
+                        FontWeight = FontWeights.SemiBold
+                    },
+                    new TextBlock
+                    {
+                        Text = target.ScopeLabel,
+                        Margin = new Thickness(0, 3, 0, 0),
+                        Foreground = new SolidColorBrush(MediaColor.FromRgb(170, 211, 226))
+                    },
+                    new TextBlock
+                    {
+                        Text = "Son doğrulama: canlı oturum",
+                        Margin = new Thickness(0, 3, 0, 0),
+                        Foreground = new SolidColorBrush(MediaColor.FromRgb(170, 211, 226))
+                    }
+                }
+            }
+        };
+    }
+
+    private static string GetTargetCardStateText(TargetCardState state)
+    {
+        return state switch
+        {
+            TargetCardState.Selected => "Seçili",
+            TargetCardState.Connecting => "Bağlanıyor",
+            TargetCardState.InScope => "Kapsamda",
+            TargetCardState.Problem => "Sorunlu",
+            TargetCardState.Passive => "Pasif",
+            _ => "Hazır"
+        };
+    }
+
+    private static SolidColorBrush GetTargetCardStateBrush(TargetCardState state)
+    {
+        return state switch
+        {
+            TargetCardState.Selected => new SolidColorBrush(MediaColor.FromRgb(125, 235, 255)),
+            TargetCardState.Connecting => new SolidColorBrush(MediaColor.FromRgb(255, 217, 85)),
+            TargetCardState.InScope => new SolidColorBrush(MediaColor.FromRgb(93, 255, 146)),
+            TargetCardState.Problem => new SolidColorBrush(MediaColor.FromRgb(255, 122, 122)),
+            TargetCardState.Passive => new SolidColorBrush(MediaColor.FromRgb(120, 148, 166)),
+            _ => new SolidColorBrush(MediaColor.FromRgb(170, 211, 226))
+        };
+    }
+
+    private enum TargetCardState
+    {
+        Ready,
+        Selected,
+        Connecting,
+        InScope,
+        Problem,
+        Passive
     }
 
     private void SetTargetCardsEnabled(bool enabled)
@@ -816,7 +993,7 @@ public partial class MainWindow : Window, IDisposable
         return targetId.Replace('-', '_');
     }
 
-    private static Grid CreateTargetCardContent(TargetDefinition target)
+    private Grid CreateTargetCardContent(TargetDefinition target)
     {
         var visual = GetTargetVisual(target.IconKey);
         var grid = new Grid
@@ -826,95 +1003,326 @@ public partial class MainWindow : Window, IDisposable
             SnapsToDevicePixels = true
         };
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
         var iconBadge = new Border
         {
-            Width = 34,
-            Height = 34,
-            HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+            Width = 36,
+            Height = 36,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
             VerticalAlignment = VerticalAlignment.Center,
             CornerRadius = new CornerRadius(10),
-            BorderBrush = new SolidColorBrush(MediaColor.FromArgb(146, 245, 247, 251)),
+            BorderBrush = new SolidColorBrush(MediaColor.FromArgb(172, 245, 247, 251)),
             BorderThickness = new Thickness(1),
-            Background = new LinearGradientBrush(visual.StartColor, visual.EndColor, 42),
-            Child = CreateTargetMark(visual)
+            Background = new SolidColorBrush(MediaColor.FromArgb(210, 245, 247, 251)),
+            Child = CreateTargetMark(target.IconKey, visual)
         };
         iconBadge.Effect = new DropShadowEffect
         {
             BlurRadius = 12,
             Direction = 270,
-            Opacity = 0.40,
+            Opacity = 0.46,
             ShadowDepth = 0,
             Color = visual.EndColor
         };
+        Grid.SetColumn(iconBadge, 0);
         grid.Children.Add(iconBadge);
+        _targetIconBadges[target.Id] = iconBadge;
 
-        var label = new TextBlock
+        var textStack = new StackPanel
+        {
+            Margin = new Thickness(8, 0, 0, 0),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(textStack, 1);
+        textStack.Children.Add(new TextBlock
         {
             Text = target.Label,
-            FontSize = 11.5,
-            LineHeight = 14,
+            FontSize = 10.5,
             FontWeight = FontWeights.SemiBold,
-            Foreground = new SolidColorBrush(MediaColor.FromRgb(245, 247, 251)),
-            HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch,
-            VerticalAlignment = VerticalAlignment.Center,
-            TextAlignment = TextAlignment.Center,
+            Foreground = WpfBrushes.White,
             TextTrimming = TextTrimming.CharacterEllipsis,
-            TextWrapping = TextWrapping.NoWrap,
-            Margin = new Thickness(0, 3, 0, 0)
-        };
-        Grid.SetRow(label, 1);
-        grid.Children.Add(label);
-
-        return grid;
-    }
-
-    private static FrameworkElement CreateTargetMark(TargetVisual visual)
-    {
-        var foreground = new SolidColorBrush(MediaColor.FromRgb(245, 247, 251));
-        return visual.Kind switch
+            MaxWidth = 56
+        });
+        var statusLabel = new TextBlock
         {
-            TargetVisualKind.Discord => CreatePathIcon(
-                "M8,15 C8,10 24,10 24,15 L26,22 C23,25 9,25 6,22 Z M12,17 L12,17.1 M20,17 L20,17.1 M13,22 C15,23 17,23 19,22",
-                foreground,
-                fill: false),
-            TargetVisualKind.Roblox => CreateRobloxIcon(foreground, visual.StartColor),
-            TargetVisualKind.Live => CreatePathIcon(
-                "M7,7 H25 V25 H7 Z M14,12 L22,16 L14,20 Z",
-                foreground,
-                fill: false),
-            TargetVisualKind.Spark => CreatePathIcon(
-                "M16,4 L20,13 L29,16 L20,19 L16,28 L12,19 L3,16 L12,13 Z",
-                foreground,
-                fill: true),
-            TargetVisualKind.Chat => CreatePathIcon(
-                "M6,8 H26 V21 H16 L10,26 V21 H6 Z",
-                foreground,
-                fill: false),
-            TargetVisualKind.Heart => CreatePathIcon(
-                "M16,27 C8,21 5,16 6,11 C7,6 12,5 16,10 C20,5 25,6 26,11 C27,16 24,21 16,27 Z",
-                foreground,
-                fill: true),
-            TargetVisualKind.Cube => CreatePathIcon(
-                "M16,4 L27,10 L27,22 L16,28 L5,22 L5,10 Z M16,4 L16,16 M5,10 L16,16 L27,10 M16,16 L16,28",
-                foreground,
-                fill: false),
-            TargetVisualKind.Blog => CreatePathIcon(
-                "M8,7 H22 C24,7 25,8 25,10 V24 H10 C8,24 7,23 7,21 V9 C7,8 8,7 8,7 Z M12,13 H20 M12,18 H22",
-                foreground,
-                fill: false),
-            _ => new TextBlock
+            Text = "Hazır",
+            Margin = new Thickness(0, 2, 0, 0),
+            FontSize = 8.8,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(MediaColor.FromRgb(170, 211, 226)),
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            MaxWidth = 56
+        };
+        textStack.Children.Add(statusLabel);
+        grid.Children.Add(textStack);
+        _targetStatusLabels[target.Id] = statusLabel;
+
+        var warningBadge = new Border
+        {
+            Width = 14,
+            Height = 14,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Bottom,
+            CornerRadius = new CornerRadius(7),
+            Background = new SolidColorBrush(MediaColor.FromRgb(255, 199, 89)),
+            BorderBrush = WpfBrushes.White,
+            BorderThickness = new Thickness(1),
+            Visibility = Visibility.Collapsed,
+            Child = new TextBlock
             {
-                Text = visual.Mark,
-                FontSize = visual.Mark.Length > 1 ? 16 : 25,
-                FontWeight = FontWeights.Bold,
-                Foreground = foreground,
+                Text = "!",
+                FontSize = 9,
+                FontWeight = FontWeights.Black,
+                Foreground = new SolidColorBrush(MediaColor.FromRgb(19, 20, 28)),
                 HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
                 TextAlignment = TextAlignment.Center
             }
         };
+        Grid.SetColumn(warningBadge, 1);
+        grid.Children.Add(warningBadge);
+        _targetWarningBadges[target.Id] = warningBadge;
+
+        return grid;
+    }
+
+    private static FrameworkElement CreateTargetMark(
+        string iconKey,
+        TargetVisual visual)
+    {
+        if (TryCreateTargetIcon(iconKey, visual, out var icon))
+        {
+            return icon;
+        }
+
+        var foreground = new SolidColorBrush(MediaColor.FromRgb(245, 247, 251));
+        return new Grid
+        {
+            Width = 30,
+            Height = 30,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "!",
+                    FontSize = 20,
+                    FontWeight = FontWeights.Black,
+                    Foreground = foreground,
+                    HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    TextAlignment = TextAlignment.Center
+                }
+            }
+        };
+    }
+
+    internal static bool TryLoadTargetIconForTesting(string iconKey)
+    {
+        return TryCreateTargetIcon(iconKey, GetTargetVisual(iconKey), out _);
+    }
+
+    private static bool TryCreateTargetIcon(
+        string iconKey,
+        TargetVisual visual,
+        out FrameworkElement icon)
+    {
+        icon = new Grid();
+        try
+        {
+            var uri = new Uri(
+                $"pack://application:,,,/Astral;component/Assets/targets/{iconKey}.svg",
+                UriKind.Absolute);
+            var resource = System.Windows.Application.GetResourceStream(uri);
+            if (resource?.Stream is null)
+            {
+                return false;
+            }
+
+            using var stream = resource.Stream;
+            var document = XDocument.Load(stream);
+            var root = document.Root;
+            if (root is null || !string.Equals(
+                    root.Name.LocalName,
+                    "svg",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            var imageElement = root
+                .Descendants()
+                .FirstOrDefault(element => string.Equals(
+                    element.Name.LocalName,
+                    "image",
+                    StringComparison.OrdinalIgnoreCase));
+            if (imageElement is not null
+                && TryCreateEmbeddedImageIcon(imageElement, out icon))
+            {
+                return true;
+            }
+
+            var viewBox = ParseSvgViewBox(root.Attribute("viewBox")?.Value);
+            var canvas = new Canvas
+            {
+                Width = viewBox.Width,
+                Height = viewBox.Height,
+                ClipToBounds = false
+            };
+            var rootFill = root.Attribute("fill")?.Value;
+            var hasPath = false;
+            foreach (var pathElement in root
+                         .Descendants()
+                         .Where(element => string.Equals(
+                             element.Name.LocalName,
+                             "path",
+                             StringComparison.OrdinalIgnoreCase)))
+            {
+                var data = pathElement.Attribute("d")?.Value;
+                if (string.IsNullOrWhiteSpace(data))
+                {
+                    continue;
+                }
+
+                var geometry = Geometry.Parse(data);
+                geometry.Freeze();
+                var fill = CreateSvgBrush(
+                    pathElement.Attribute("fill")?.Value,
+                    rootFill,
+                    visual.StartColor);
+                canvas.Children.Add(new WpfPath
+                {
+                    Data = geometry,
+                    Fill = fill,
+                    Stretch = Stretch.None
+                });
+                hasPath = true;
+            }
+
+            if (!hasPath)
+            {
+                return false;
+            }
+
+            icon = new Viewbox
+            {
+                Width = 30,
+                Height = 30,
+                Stretch = Stretch.Uniform,
+                Child = canvas
+            };
+            return true;
+        }
+        catch (Exception exception) when (exception is IOException
+            or InvalidOperationException
+            or NotSupportedException
+            or System.Xml.XmlException
+            or FormatException)
+        {
+            return false;
+        }
+    }
+
+    private static bool TryCreateEmbeddedImageIcon(
+        XElement imageElement,
+        out FrameworkElement icon)
+    {
+        icon = new Grid();
+        var href = imageElement.Attribute("href")?.Value
+            ?? imageElement.Attribute(XName.Get(
+                "href",
+                "http://www.w3.org/1999/xlink"))?.Value;
+        const string Base64Marker = ";base64,";
+        if (string.IsNullOrWhiteSpace(href))
+        {
+            return false;
+        }
+
+        var markerIndex = href.IndexOf(Base64Marker, StringComparison.OrdinalIgnoreCase);
+        if (markerIndex < 0)
+        {
+            return false;
+        }
+
+        var base64 = href[(markerIndex + Base64Marker.Length)..];
+        var bytes = Convert.FromBase64String(base64);
+        using var stream = new MemoryStream(bytes);
+        var bitmap = new BitmapImage();
+        bitmap.BeginInit();
+        bitmap.CacheOption = BitmapCacheOption.OnLoad;
+        bitmap.StreamSource = stream;
+        bitmap.EndInit();
+        bitmap.Freeze();
+        icon = new WpfImage
+        {
+            Width = 30,
+            Height = 30,
+            Source = bitmap,
+            Stretch = Stretch.Uniform,
+            SnapsToDevicePixels = true
+        };
+        RenderOptions.SetBitmapScalingMode(icon, BitmapScalingMode.HighQuality);
+        return true;
+    }
+
+    private static (double Width, double Height) ParseSvgViewBox(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return (24, 24);
+        }
+
+        var parts = value
+            .Split(SvgViewBoxSeparators, StringSplitOptions.RemoveEmptyEntries)
+            .Select(part => double.TryParse(
+                part,
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out var parsed)
+                ? parsed
+                : double.NaN)
+            .ToArray();
+        if (parts.Length != 4
+            || double.IsNaN(parts[2])
+            || double.IsNaN(parts[3])
+            || parts[2] <= 0
+            || parts[3] <= 0)
+        {
+            return (24, 24);
+        }
+
+        return (parts[2], parts[3]);
+    }
+
+    private static WpfBrush CreateSvgBrush(
+        string? localFill,
+        string? rootFill,
+        MediaColor fallback)
+    {
+        var fill = string.IsNullOrWhiteSpace(localFill)
+            ? rootFill
+            : localFill;
+        if (string.Equals(fill, "none", StringComparison.OrdinalIgnoreCase))
+        {
+            return WpfBrushes.Transparent;
+        }
+
+        if (!string.IsNullOrWhiteSpace(fill)
+            && (fill.StartsWith('#') || fill.StartsWith("sc#", StringComparison.OrdinalIgnoreCase)))
+        {
+            var brush = (WpfBrush)new BrushConverter().ConvertFromString(fill)!;
+            if (brush.CanFreeze)
+            {
+                brush.Freeze();
+            }
+
+            return brush;
+        }
+
+        var fallbackBrush = new SolidColorBrush(fallback);
+        fallbackBrush.Freeze();
+        return fallbackBrush;
     }
 
     private static Canvas CreatePathIcon(string data, WpfBrush foreground, bool fill)
@@ -982,15 +1390,15 @@ public partial class MainWindow : Window, IDisposable
     {
         return iconKey switch
         {
-            "discord" => new("D", TargetVisualKind.Discord, Rgb(88, 101, 242), Rgb(125, 235, 255)),
-            "roblox" => new("R", TargetVisualKind.Roblox, Rgb(26, 31, 43), Rgb(196, 210, 230)),
+            "discord" => new("DC", TargetVisualKind.Letter, Rgb(88, 101, 242), Rgb(125, 235, 255)),
+            "roblox" => new("RB", TargetVisualKind.Letter, Rgb(26, 31, 43), Rgb(196, 210, 230)),
             "wattpad" => new("W", TargetVisualKind.Letter, Rgb(255, 103, 26), Rgb(255, 175, 72)),
-            "bigo-live" => new("B", TargetVisualKind.Live, Rgb(27, 169, 255), Rgb(93, 255, 146)),
-            "azar" => new("A", TargetVisualKind.Spark, Rgb(255, 89, 139), Rgb(125, 235, 255)),
-            "tango" => new("T", TargetVisualKind.Chat, Rgb(255, 124, 50), Rgb(255, 217, 85)),
-            "livu" => new("L", TargetVisualKind.Heart, Rgb(165, 91, 255), Rgb(93, 255, 146)),
-            "imvu" => new("I", TargetVisualKind.Cube, Rgb(35, 215, 162), Rgb(125, 235, 255)),
-            "blogspot" => new("B", TargetVisualKind.Blog, Rgb(245, 132, 31), Rgb(255, 199, 89)),
+            "bigo-live" => new("BG", TargetVisualKind.Letter, Rgb(27, 169, 255), Rgb(93, 255, 146)),
+            "azar" => new("AZ", TargetVisualKind.Letter, Rgb(255, 89, 139), Rgb(125, 235, 255)),
+            "tango" => new("TG", TargetVisualKind.Letter, Rgb(255, 124, 50), Rgb(255, 217, 85)),
+            "livu" => new("LV", TargetVisualKind.Letter, Rgb(165, 91, 255), Rgb(93, 255, 146)),
+            "imvu" => new("IM", TargetVisualKind.Letter, Rgb(35, 215, 162), Rgb(125, 235, 255)),
+            "blogspot" => new("BL", TargetVisualKind.Letter, Rgb(245, 132, 31), Rgb(255, 199, 89)),
             _ => new("A", TargetVisualKind.Letter, Rgb(125, 235, 255), Rgb(93, 255, 146))
         };
     }
@@ -1212,7 +1620,13 @@ public partial class MainWindow : Window, IDisposable
                 || File.Exists(_paths.LegacyWireSockInstallMarker);
             _settingsStore.SetStartWithWindowsEnabled(false);
             _settingsStore.SetRunInBackgroundOnCloseEnabled(false);
-            await _controller.DisposeAsync();
+            if (!await DisposeControllerForShutdownAsync(
+                    "profile-clean",
+                    ShutdownCleanupTimeout))
+            {
+                throw new TimeoutException(
+                    "Astral kapanış temizliği süresinde tamamlanamadı. Lütfen tanılama raporu oluşturup tekrar deneyin.");
+            }
             SetMaintenanceProgress(48, removeWireSock
                 ? "WireSock kaldırılıyor"
                 : "WireSock korunuyor");
@@ -1221,7 +1635,8 @@ public partial class MainWindow : Window, IDisposable
                 CancellationToken.None);
             _settingsStore.SetWireSockInstalledByAstral(installed: false);
             SetMaintenanceProgress(78, "Profil ve yerel veriler temizleniyor");
-            await _cleanupService.CleanProfileAsync(CancellationToken.None);
+            await Task.Run(
+                () => _cleanupService.CleanProfileAsync(CancellationToken.None));
 
             MessageBox.Show(
                 "Astral profili temizlendi. Portable ZIP klasörü korunur; uygulama kapanacak.",
@@ -1278,9 +1693,16 @@ public partial class MainWindow : Window, IDisposable
 
         try
         {
-            await _controller.DisconnectAsync(CancellationToken.None);
+            if (!await DisconnectControllerForMaintenanceAsync(
+                    "repair",
+                    ShutdownCleanupTimeout))
+            {
+                throw new TimeoutException(
+                    "Bağlantı kapatma işlemi süresinde tamamlanamadı. Lütfen tanılama raporu oluşturup tekrar deneyin.");
+            }
             SetMaintenanceProgress(68, "Profil ve önbellek temizleniyor");
-            await _cleanupService.RepairAsync(CancellationToken.None);
+            await Task.Run(
+                () => _cleanupService.RepairAsync(CancellationToken.None));
 
             StatusMessage.Text = "Onarım tamamlandı";
             StatusDetail.Text = "Sonraki Bağlan işleminde profil ve wgcf dosyaları yeniden üretilecek.";
@@ -1677,7 +2099,32 @@ public partial class MainWindow : Window, IDisposable
         window.ShowDialog();
     }
 
-    private void RestartAstral_Click(object sender, RoutedEventArgs e)
+    private void OpenDiagnosticsHistory_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            _paths.EnsureDirectories();
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = _paths.DiagnosticBundleDirectory,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception exception)
+        {
+            _diagnostics.Failure(
+                "ui.diagnostics.history",
+                "Tanılama geçmişi açılamadı.",
+                exception);
+            MessageBox.Show(
+                "Tanılama geçmişi açılamadı.\n\n" + exception.Message,
+                "Astral tanılama",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+    }
+
+    private async void RestartAstral_Click(object sender, RoutedEventArgs e)
     {
         var executablePath = Environment.ProcessPath;
         if (string.IsNullOrWhiteSpace(executablePath)
@@ -1693,6 +2140,18 @@ public partial class MainWindow : Window, IDisposable
 
         try
         {
+            IsEnabled = false;
+            _operationCancellation?.Cancel();
+            StopBackgroundVideo();
+            StatusMessage.Text = "Astral yeniden başlatılıyor";
+            StatusDetail.Text = "Bağlantı ve koruma durumu kapatılıyor.";
+            if (!await DisposeControllerForShutdownAsync(
+                    "restart",
+                    ShutdownCleanupTimeout))
+            {
+                throw new TimeoutException(
+                    "Astral kapanış temizliği süresinde tamamlanamadı. Yeniden başlatma başlatılmadı.");
+            }
             StartRestartHelper(executablePath);
             _diagnostics.Info("ui.restart", "Kullanıcı Astral yeniden başlatma istedi.");
             _allowClose = true;
@@ -1709,6 +2168,7 @@ public partial class MainWindow : Window, IDisposable
                 "Astral",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
+            IsEnabled = true;
         }
     }
 
@@ -1915,7 +2375,13 @@ public partial class MainWindow : Window, IDisposable
             {
                 DiagnosticsStatus.Text = "Bağlantı kapatılıyor. Ardından güncelleme yüklenecek.";
                 SetUpdateStageProgress(8, "Bağlantı kapatılıyor");
-                await _controller.DisconnectAsync(CancellationToken.None);
+                if (!await DisconnectControllerForMaintenanceAsync(
+                        "update-install",
+                        ShutdownCleanupTimeout))
+                {
+                    throw new TimeoutException(
+                        "Güncelleme öncesi bağlantı kapatma işlemi süresinde tamamlanamadı.");
+                }
             }
 
             using var timeoutSource = new CancellationTokenSource(
@@ -2220,7 +2686,9 @@ public partial class MainWindow : Window, IDisposable
 
         try
         {
-            await _controller.DisposeAsync();
+            await DisposeControllerForShutdownAsync(
+                "window-close",
+                ShutdownCleanupTimeout);
         }
         catch (Exception exception)
         {
@@ -2241,6 +2709,85 @@ public partial class MainWindow : Window, IDisposable
         Dispose();
         _allowClose = true;
         _ = Dispatcher.BeginInvoke(new Action(Close));
+    }
+
+    private async Task<bool> DisconnectControllerForMaintenanceAsync(
+        string operation,
+        TimeSpan timeout)
+    {
+        _operationCancellation?.Cancel();
+        using var timeoutSource = new CancellationTokenSource(timeout);
+        var disconnectTask = _controller.DisconnectAsync(timeoutSource.Token);
+        var completed = await AwaitControllerOperationAsync(
+            disconnectTask,
+            operation,
+            timeout);
+        if (!completed)
+        {
+            timeoutSource.Cancel();
+        }
+
+        return completed;
+    }
+
+    private async Task<bool> DisposeControllerForShutdownAsync(
+        string operation,
+        TimeSpan timeout)
+    {
+        HasAttemptedControllerShutdownCleanup = true;
+        var disposeTask = _controller.DisposeAsync().AsTask();
+        return await AwaitControllerOperationAsync(
+            disposeTask,
+            operation,
+            timeout);
+    }
+
+    private async Task<bool> AwaitControllerOperationAsync(
+        Task operationTask,
+        string operation,
+        TimeSpan timeout)
+    {
+        var completedTask = await Task.WhenAny(
+            operationTask,
+            Task.Delay(timeout));
+
+        if (ReferenceEquals(completedTask, operationTask))
+        {
+            await operationTask;
+            return true;
+        }
+
+        _diagnostics.Warning(
+            "ui.shutdown.timeout",
+            "Kapanış temizliği süresinde tamamlanamadı; UI kilitlenmemesi için devam ediliyor.",
+            new Dictionary<string, string?>
+            {
+                ["operation"] = operation,
+                ["timeoutMs"] = timeout.TotalMilliseconds.ToString("0", CultureInfo.InvariantCulture),
+                ["state"] = _controller.Snapshot.State.ToString()
+            });
+        _diagnostics.WriteHealth(
+            "kapanış temizliği zaman aşımı",
+            new Dictionary<string, string?>
+            {
+                ["operation"] = operation,
+                ["timeoutMs"] = timeout.TotalMilliseconds.ToString("0", CultureInfo.InvariantCulture)
+            });
+
+        _ = operationTask.ContinueWith(
+            task =>
+            {
+                if (task.Exception is not null)
+                {
+                    _diagnostics.Failure(
+                        "ui.shutdown.timeout",
+                        "Geciken kapanış temizliği hata ile bitti.",
+                        task.Exception.GetBaseException());
+                }
+            },
+            TaskScheduler.Default);
+
+        return false;
     }
 
     protected override void OnClosed(EventArgs e)

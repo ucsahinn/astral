@@ -153,13 +153,12 @@ static void RenderMainWindow()
             FindVisualChildren<TextBlock>(window).Select(block => block.Text));
         Assert(text.Contains("Astral", StringComparison.Ordinal));
         Assert(text.Contains("Desteklenen hedef kapsamı hazır", StringComparison.Ordinal));
+        Assert(text.Contains("Hedef kapsamı", StringComparison.Ordinal));
+        Assert(text.Contains("9 hedef hazır", StringComparison.Ordinal));
+        Assert(text.Contains("9 hedef hazır · seçili kapsam bağlantıya dahil edilir.", StringComparison.Ordinal));
         Assert(!text.Contains("TÜNEL KAPSAMI", StringComparison.Ordinal));
-        Assert(!text.Contains("Seçili hedefler", StringComparison.Ordinal));
         Assert(!text.Contains("Hedefleri Seç", StringComparison.Ordinal));
         Assert(!text.Contains("Hedef Merkezi", StringComparison.Ordinal));
-        Assert(text.Contains("Bigo Live", StringComparison.Ordinal));
-        Assert(text.Contains("Blogspot", StringComparison.Ordinal));
-        Assert(text.Contains("Wattpad", StringComparison.Ordinal));
         Assert(!text.Contains("Özel EXE", StringComparison.Ordinal));
         Assert(!text.Contains("Özel Domain", StringComparison.Ordinal));
         Assert(!text.Contains("Tarayıcı modu", StringComparison.Ordinal));
@@ -169,6 +168,7 @@ static void RenderMainWindow()
         Assert(text.Contains("Tanılama", StringComparison.Ordinal));
         Assert(text.Contains("Debug tanılama", StringComparison.Ordinal));
         Assert(text.Contains("Kapalı. Normal rapor hafif kalır.", StringComparison.Ordinal));
+        Assert(text.Contains("Rapor hazırla", StringComparison.Ordinal));
         Assert(text.Contains("Hazır", StringComparison.Ordinal));
         Assert(text.Contains("Astral Bağlı Değil", StringComparison.Ordinal));
         Assert(text.Contains(
@@ -208,7 +208,7 @@ static void RenderMainWindow()
         var targetNames = targetToggles
             .Select(AutomationProperties.GetName)
             .ToArray();
-        foreach (var expectedTarget in new[]
+        var expectedTargets = new[]
                  {
                      "Discord hedefi",
                      "Roblox hedefi",
@@ -219,31 +219,49 @@ static void RenderMainWindow()
                      "LiVU hedefi",
                      "IMVU hedefi",
                      "Blogspot hedefi"
-                 })
+                 };
+        foreach (var expectedTarget in expectedTargets)
         {
             Assert(targetNames.Contains(expectedTarget));
         }
-        var expectedVisibleTargetLabels = new[]
+        foreach (var iconKey in new[]
+                 {
+                     "discord",
+                     "roblox",
+                     "wattpad",
+                     "bigo-live",
+                     "azar",
+                     "tango",
+                     "livu",
+                     "imvu",
+                     "blogspot"
+                 })
         {
-            "Discord",
-            "Roblox",
-            "Wattpad",
-            "Bigo Live",
-            "Azar",
-            "Tango",
-            "LiVU",
-            "IMVU",
-            "Blogspot"
-        };
+            Assert(MainWindow.TryLoadTargetIconForTesting(iconKey));
+        }
+
         var visibleTargetCardTexts = targetToggles
             .SelectMany(toggle => FindVisualChildren<TextBlock>(toggle))
             .Select(block => block.Text)
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .ToArray();
-        foreach (var expectedLabel in expectedVisibleTargetLabels)
+        foreach (var expectedTarget in new[]
+                 {
+                     "Discord",
+                     "Roblox",
+                     "Wattpad",
+                     "Bigo Live",
+                     "Azar",
+                     "Tango",
+                     "LiVU",
+                     "IMVU",
+                     "Blogspot"
+                 })
         {
-            Assert(visibleTargetCardTexts.Contains(expectedLabel));
+            Assert(visibleTargetCardTexts.Contains(expectedTarget));
         }
+        Assert(visibleTargetCardTexts.Any(value => value is "Seçili"));
+        Assert(visibleTargetCardTexts.Any(value => value is "Hazır"));
 
         foreach (var targetToggle in targetToggles)
         {
@@ -252,7 +270,7 @@ static void RenderMainWindow()
                 .Where(value => !string.IsNullOrWhiteSpace(value))
                 .ToArray();
             Assert(!cardTexts.Any(cardText => cardText is "Uygulama + Web" or "Web"));
-            Assert(targetToggle.ToolTip?.ToString()?.Length > 0);
+            Assert(targetToggle.ToolTip is ToolTip);
         }
 
         Assert(targetToggles.Any(toggle =>
@@ -293,6 +311,7 @@ static void RenderMainWindow()
         Assert(text.Contains("DNS SUNUCUSU", StringComparison.Ordinal));
         Assert(text.Contains("BAĞLANTI DURUMU", StringComparison.Ordinal));
         Assert(text.Contains("KAPSAM", StringComparison.Ordinal));
+        Assert(text.Contains("1 hedef seçili", StringComparison.Ordinal));
         Assert(!text.Contains("ÖZEL BAĞLANTI", StringComparison.Ordinal));
         Assert(!text.Contains("Discord bağlantısını yönet", StringComparison.Ordinal));
         Assert(!text.Contains("KAPANIŞ", StringComparison.Ordinal));
@@ -338,8 +357,47 @@ static void VerifyWindowLifetimeBehavior()
 {
     VerifyCloseHidesToTrayWhenRunInBackgroundIsEnabled();
     VerifyTrayExitDisposesActiveConnectionWhenRunInBackgroundIsEnabled();
+    VerifyTrayExitDoesNotHangWhenControllerCleanupIsSlow();
 
     Console.WriteLine("GEÇTİ Pencere kapanış ve arka plan davranışı doğrulandı");
+}
+
+static void VerifyTrayExitDoesNotHangWhenControllerCleanupIsSlow()
+{
+    MainWindow? window = null;
+    var root = CreateTemporaryDirectory();
+    var launcher = new FakeProcessLauncher(TimeSpan.FromSeconds(5));
+    var previousTimeout = MainWindow.ShutdownCleanupTimeout;
+
+    try
+    {
+        MainWindow.ShutdownCleanupTimeout = TimeSpan.FromMilliseconds(75);
+        new AppSettingsStore(new AppPaths(root))
+            .SetRunInBackgroundOnCloseEnabled(true);
+        window = CreateMainWindow(root, launcher);
+        var controller = GetController(window);
+        window.Show();
+        window.UpdateLayout();
+        RunDispatcherTask(
+            controller.ConnectAsync(CancellationToken.None),
+            TimeSpan.FromSeconds(3));
+        Assert(launcher.LastProcess is { HasExited: false });
+        var closed = false;
+        window.Closed += (_, _) => closed = true;
+
+        InvokeTrayExit(window);
+        PumpDispatcherUntil(() => closed, TimeSpan.FromSeconds(2));
+
+        Assert(closed);
+        Assert(launcher.LastProcess is { HasExited: false });
+        window = null;
+    }
+    finally
+    {
+        MainWindow.ShutdownCleanupTimeout = previousTimeout;
+        ForceCloseWindow(window);
+        Directory.Delete(root, recursive: true);
+    }
 }
 
 static void VerifyPortableInstallDiagnosticsSanitizesLegacyBrand()
@@ -717,7 +775,7 @@ file sealed class FakeCommandRunner : ICommandRunner
     }
 }
 
-file sealed class FakeProcessLauncher : IProcessLauncher
+file sealed class FakeProcessLauncher(TimeSpan? stopDelay = null) : IProcessLauncher
 {
     public FakeManagedProcess? LastProcess { get; private set; }
 
@@ -727,12 +785,12 @@ file sealed class FakeProcessLauncher : IProcessLauncher
         string workingDirectory,
         string logPath)
     {
-        LastProcess = new FakeManagedProcess();
+        LastProcess = new FakeManagedProcess(stopDelay);
         return LastProcess;
     }
 }
 
-file sealed class FakeManagedProcess : IManagedProcess
+file sealed class FakeManagedProcess(TimeSpan? stopDelay = null) : IManagedProcess
 {
     public int ProcessId { get; } = 1;
 
@@ -746,11 +804,15 @@ file sealed class FakeManagedProcess : IManagedProcess
 
     public int? ExitCode => HasExited ? 0 : null;
 
-    public Task StopAsync(TimeSpan timeout, CancellationToken cancellationToken)
+    public async Task StopAsync(TimeSpan timeout, CancellationToken cancellationToken)
     {
+        if (stopDelay is { } delay && delay > TimeSpan.Zero)
+        {
+            await Task.Delay(delay, cancellationToken);
+        }
+
         HasExited = true;
         Exited?.Invoke(this, EventArgs.Empty);
-        return Task.CompletedTask;
     }
 
     public ValueTask DisposeAsync()

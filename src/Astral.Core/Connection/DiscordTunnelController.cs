@@ -19,7 +19,6 @@ namespace Astral.Core.Connection;
 
 public sealed class DiscordTunnelController : IAsyncDisposable
 {
-    private const int MaxDiscordReadinessChecks = 2;
     private const int MaxTunnelReadinessChecks = 60;
     private const int MaxWireSockLogReadBytes = 64 * 1024;
     private const string WireSockConnectionEstablishedMessage =
@@ -34,7 +33,6 @@ public sealed class DiscordTunnelController : IAsyncDisposable
     private readonly IProcessLauncher _processLauncher;
     private readonly IDiscordAccessLock _accessLock;
     private readonly IAstralDiagnostics _diagnostics;
-    private readonly IDiscordProcessManager _discordProcessManager;
     private readonly ITunnelReadinessProbe _tunnelReadinessProbe;
     private readonly TargetScopeResolver _targetScopeResolver;
     private readonly IScopedWebProxyService _webProxyService;
@@ -50,13 +48,11 @@ public sealed class DiscordTunnelController : IAsyncDisposable
     private bool _disposed;
     private bool _intentionalStop;
     private bool _accessLockConfirmed;
-    private DiscordProcessSnapshot _lastDiscordProcessSnapshot = new(0, []);
     private TargetSelection _targetSelection = TargetSelection.Default;
     private RoutingPlan? _lastRoutingPlan;
     private string? _lastProfilePath;
     private string? _lastRoutingProfileSha256;
     private string? _lastNextAction;
-    private string? _lastDiscordRestartStatus;
     private TunnelReadinessSnapshot _lastTunnelReadiness =
         TunnelReadinessSnapshot.ProbeUnavailable("Tunnel readiness probe has not run.");
     private bool _lastWireSockConnectionEstablished;
@@ -93,8 +89,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             ?? throw new ArgumentNullException(nameof(processLauncher));
         _accessLock = accessLock ?? new NullDiscordAccessLock();
         _diagnostics = diagnostics ?? NullAstralDiagnostics.Instance;
-        _discordProcessManager = discordProcessManager
-            ?? new NullDiscordProcessManager();
+        _ = discordProcessManager;
         _tunnelReadinessProbe = tunnelReadinessProbe
             ?? NullTunnelReadinessProbe.Instance;
         _targetScopeResolver = targetScopeResolver
@@ -221,7 +216,6 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
     public IReadOnlyDictionary<string, string?> CreateDiagnosticDetails()
     {
-        var liveDiscordProcesses = _discordProcessManager.Capture();
         var wireSockRunning = _wireSockProcess is not null
             && !_wireSockProcess.HasExited;
         var routingPlan = CurrentRoutingPlan;
@@ -234,16 +228,8 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             ["message"] = _snapshot.Message,
             ["diagnostic"] = _snapshot.Diagnostic,
             ["wireSockRunning"] = wireSockRunning.ToString(),
-            ["discordProcessCount"] =
-                liveDiscordProcesses.RunningProcessCount.ToString(CultureInfo.InvariantCulture),
-            ["discordExecutablePathCount"] =
-                liveDiscordProcesses.KnownExecutablePathCount.ToString(CultureInfo.InvariantCulture),
-            ["lastDiscordProcessCount"] =
-                _lastDiscordProcessSnapshot.RunningProcessCount.ToString(CultureInfo.InvariantCulture),
-            ["lastDiscordExecutablePathCount"] =
-                _lastDiscordProcessSnapshot.KnownExecutablePathCount.ToString(CultureInfo.InvariantCulture),
             ["nextAction"] = _lastNextAction,
-            ["discordRestartStatus"] = _lastDiscordRestartStatus,
+            ["targetLaunchPolicy"] = "not-started-by-astral",
             ["profilePath"] = _lastProfilePath,
             ["routingProfileSha256"] = _lastRoutingProfileSha256,
             ["profileHashScope"] = "sanitized-routing-lines",
@@ -362,118 +348,16 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 cancellationToken);
             LogConnectPhase("web-proxy-ready");
 
-            TunnelState finalState;
-            string nextAction;
-            string connectionMessage;
-            string restartStatus;
-            DiscordProcessSnapshot discordProcesses;
-            var managesDiscordProcess = ManagesDiscordProcess(routingPlan);
+            SetStatus(TunnelState.Verifying, "Hedef kapsamı doğrulanıyor");
+            await VerifyTunnelReadinessAsync(
+                _lastTunnelLogStartPosition,
+                cancellationToken);
+            LogConnectPhase("tunnel-ready");
 
-            if (managesDiscordProcess)
-            {
-                discordProcesses = _discordProcessManager.Capture();
-                _lastDiscordProcessSnapshot = discordProcesses;
-
-                SetStatus(
-                    TunnelState.Verifying,
-                    discordProcesses.HasRunningProcesses
-                        ? "Discord yenileniyor"
-                        : "Discord açılıyor");
-                var restart = await _discordProcessManager.RestartAsync(
-                    discordProcesses,
-                    TimeSpan.FromSeconds(4),
-                    cancellationToken);
-                LogConnectPhase("discord-restart-attempted");
-                restartStatus = restart.Message;
-                _lastDiscordRestartStatus = restartStatus;
-                discordProcesses = _discordProcessManager.Capture();
-                _lastDiscordProcessSnapshot = discordProcesses;
-
-                if (!restart.Restarted
-                    && restart.FailureKind is DiscordRestartFailureKind.UpdaterWindow)
-                {
-                    restart = await TryRecoverDiscordUpdaterAsync(
-                        wireSockExecutable,
-                        profilePath,
-                        routingPlan,
-                        cancellationToken);
-                    LogConnectPhase("discord-updater-recovery-attempted");
-                    restartStatus = restart.Message;
-                    _lastDiscordRestartStatus = restartStatus;
-                    discordProcesses = _discordProcessManager.Capture();
-                    _lastDiscordProcessSnapshot = discordProcesses;
-                }
-                else if (ShouldRetryDiscordReadiness(restart))
-                {
-                    restart = await VerifyDiscordReadinessAsync(
-                        "controller.discordReadiness",
-                        "Discord penceresi bekleniyor",
-                        cancellationToken);
-                    restartStatus = restart.Message;
-                    _lastDiscordRestartStatus = restartStatus;
-                    discordProcesses = _discordProcessManager.Capture();
-                    _lastDiscordProcessSnapshot = discordProcesses;
-                }
-
-                if (restart.Restarted)
-                {
-                    await VerifyTunnelReadinessAsync(
-                        _lastTunnelLogStartPosition,
-                        cancellationToken);
-                    LogConnectPhase("tunnel-ready");
-                }
-
-                if (restart.Restarted)
-                {
-                    finalState = TunnelState.Connected;
-                    if (restart.Message.Contains("şimdi açın", StringComparison.OrdinalIgnoreCase)
-                        || restart.Message.Contains("kapalıydı", StringComparison.OrdinalIgnoreCase))
-                    {
-                        nextAction = "Discord'u şimdi açın.";
-                        connectionMessage = "Bağlantı hazır. Discord'u şimdi açın";
-                    }
-                    else if (restart.Message.Contains("açıldı", StringComparison.OrdinalIgnoreCase))
-                    {
-                        nextAction = "Discord açıldı. Bağlantı hazır.";
-                        connectionMessage = "Discord açıldı. Bağlantı hazır";
-                    }
-                    else
-                    {
-                        nextAction = "Discord yenilendi. Bağlantı hazır.";
-                        connectionMessage = "Discord yenilendi. Bağlantı hazır";
-                    }
-                }
-                else
-                {
-                    finalState = TunnelState.DiscordRestartRequired;
-                    nextAction = restart.Message;
-                    connectionMessage = restart.Message;
-                    _diagnostics.Warning(
-                        "controller.discordRestart",
-                        "Discord otomatik açılamadı.",
-                        new Dictionary<string, string?>
-                        {
-                            ["message"] = restart.Message,
-                            ["diagnostic"] = restart.Diagnostic
-                        });
-                }
-            }
-            else
-            {
-                SetStatus(TunnelState.Verifying, "Hedef kapsamı doğrulanıyor");
-                await VerifyTunnelReadinessAsync(
-                    _lastTunnelLogStartPosition,
-                    cancellationToken);
-                LogConnectPhase("tunnel-ready");
-
-                discordProcesses = new DiscordProcessSnapshot(0, []);
-                _lastDiscordProcessSnapshot = discordProcesses;
-                restartStatus = "Bu hedef seçimi Discord süreci gerektirmiyor.";
-                _lastDiscordRestartStatus = restartStatus;
-                finalState = TunnelState.Connected;
-                nextAction = "Seçili hedefleri kullanabilirsiniz.";
-                connectionMessage = "Sadece seçili hedefler tünelden çıkıyor";
-            }
+            var finalState = TunnelState.Connected;
+            var nextAction = "Seçili hedefleri şimdi açabilirsiniz.";
+            var connectionMessage = "Sadece seçili hedefler tünelden çıkıyor";
+            const string targetLaunchPolicy = "not-started-by-astral";
 
             _lastNextAction = nextAction;
             connectStopwatch.Stop();
@@ -491,11 +375,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     ["selectedTargets"] = routingPlan.Summary,
                     ["routingScope"] = CreateRoutingScopeDescription(routingPlan),
                     ["routingSummary"] = FormatRoutingSummary(_lastRoutingSummary),
-                    ["discordRestartStatus"] = restartStatus,
-                    ["discordProcessCount"] =
-                        discordProcesses.RunningProcessCount.ToString(CultureInfo.InvariantCulture),
-                    ["discordExecutablePathCount"] =
-                        discordProcesses.KnownExecutablePathCount.ToString(CultureInfo.InvariantCulture),
+                    ["targetLaunchPolicy"] = targetLaunchPolicy,
                     ["nextAction"] = nextAction,
                     ["connectElapsedMs"] = connectStopwatch.ElapsedMilliseconds
                         .ToString(CultureInfo.InvariantCulture),
@@ -511,11 +391,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     ["selectedTargets"] = routingPlan.Summary,
                     ["routingScope"] = CreateRoutingScopeDescription(routingPlan),
                     ["routingSummary"] = FormatRoutingSummary(_lastRoutingSummary),
-                    ["discordRestartStatus"] = restartStatus,
-                    ["discordProcessCount"] =
-                        discordProcesses.RunningProcessCount.ToString(CultureInfo.InvariantCulture),
-                    ["discordExecutablePathCount"] =
-                        discordProcesses.KnownExecutablePathCount.ToString(CultureInfo.InvariantCulture),
+                    ["targetLaunchPolicy"] = targetLaunchPolicy,
                     ["nextAction"] = nextAction,
                     ["profilePath"] = profilePath,
                     ["routingProfileSha256"] = routingProfileHash,
@@ -789,174 +665,6 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             return 0;
         }
     }
-
-    private async Task<DiscordRestartResult> TryRecoverDiscordUpdaterAsync(
-        string wireSockExecutable,
-        string profilePath,
-        RoutingPlan routingPlan,
-        CancellationToken cancellationToken)
-    {
-        _diagnostics.Info(
-            "controller.discordUpdaterRecovery",
-            "Discord güncelleme ekranında kaldı; bağlantı geçici olarak yenileniyor.");
-        SetStatus(
-            TunnelState.Verifying,
-            "Discord güncellemesi tamamlanıyor",
-            "Discord güncelleme ekranında kaldı; bağlantı kısa süre yenileniyor.");
-
-        await DisposeProcessAsync();
-        await TryClearTunnelScopeAsync("DiscordUpdaterRecovery");
-        await TryClearWebProxyScopeAsync("DiscordUpdaterRecovery");
-
-        var directSnapshot = _discordProcessManager.Capture();
-        _lastDiscordProcessSnapshot = directSnapshot;
-        var directRestart = await _discordProcessManager.RestartAsync(
-            directSnapshot,
-            TimeSpan.FromSeconds(4),
-            cancellationToken);
-        _diagnostics.Info(
-            "controller.discordUpdaterRecovery",
-            "Discord güncelleme recovery denemesi tamamlandı.",
-            new Dictionary<string, string?>
-            {
-                ["message"] = directRestart.Message,
-                ["diagnostic"] = directRestart.Diagnostic,
-                ["restarted"] = directRestart.Restarted.ToString()
-            });
-
-        await _accessLock.ApplyTunnelScopeAsync(
-            routingPlan,
-            cancellationToken);
-        await StartWireSockProcessAsync(
-            wireSockExecutable,
-            profilePath,
-            cancellationToken);
-        await _webProxyService.ApplyAsync(
-            routingPlan,
-            null,
-            cancellationToken);
-
-        if (!directRestart.Restarted)
-        {
-            if (ShouldRetryDiscordReadiness(directRestart))
-            {
-                var verifyAfterResume = await VerifyDiscordReadinessAsync(
-                    "controller.discordUpdaterRecovery",
-                    "Discord hedefi doğrulanıyor",
-                    cancellationToken);
-                _diagnostics.Info(
-                    "controller.discordUpdaterRecovery",
-                    "Discord updater sonrasında tünel üstünden tekrar doğrulandı.",
-                    new Dictionary<string, string?>
-                    {
-                        ["message"] = verifyAfterResume.Message,
-                        ["diagnostic"] = verifyAfterResume.Diagnostic,
-                        ["ready"] = verifyAfterResume.Restarted.ToString()
-                    });
-
-                if (verifyAfterResume.Restarted)
-                {
-                    return verifyAfterResume;
-                }
-
-                return new DiscordRestartResult(
-                    false,
-                    "Discord güncelleme bağlantısı tamamlanamadı. Discord'u kapatıp tekrar deneyin.",
-                    verifyAfterResume.Diagnostic ?? directRestart.Diagnostic,
-                    verifyAfterResume.FailureKind);
-            }
-
-            return new DiscordRestartResult(
-                false,
-                "Discord güncelleme bağlantısı tamamlanamadı. Discord'u kapatıp tekrar deneyin.",
-                directRestart.Diagnostic,
-                directRestart.FailureKind);
-        }
-
-        _diagnostics.Info(
-            "controller.discordUpdaterRecovery",
-            "Discord güncellemesi tamamlandı; bağlantı yeniden açılıyor.",
-            new Dictionary<string, string?>
-            {
-                ["directMessage"] = directRestart.Message,
-                ["recoveryMode"] = "DirectRestartThenTunnelResume",
-                ["tunnelRestart"] = "Skipped"
-            });
-
-        SetStatus(TunnelState.Verifying, "Discord hedefi doğrulanıyor");
-        var verifyReady = await VerifyDiscordReadinessAsync(
-            "controller.discordUpdaterRecovery",
-            "Discord hedefi doğrulanıyor",
-            cancellationToken);
-        _diagnostics.Info(
-            "controller.discordUpdaterRecovery",
-            "Discord hedefi yeniden başlatmadan doğrulandı.",
-            new Dictionary<string, string?>
-            {
-                ["message"] = verifyReady.Message,
-                ["diagnostic"] = verifyReady.Diagnostic,
-                ["ready"] = verifyReady.Restarted.ToString()
-            });
-
-        if (verifyReady.Restarted)
-        {
-            return verifyReady;
-        }
-
-        return new DiscordRestartResult(
-            false,
-            verifyReady.Message,
-            verifyReady.Diagnostic,
-            verifyReady.FailureKind);
-    }
-
-    private async Task<DiscordRestartResult> VerifyDiscordReadinessAsync(
-        string diagnosticSource,
-        string statusMessage,
-        CancellationToken cancellationToken)
-    {
-        DiscordRestartResult? lastResult = null;
-        for (var attempt = 1; attempt <= MaxDiscordReadinessChecks; attempt++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            SetStatus(TunnelState.Verifying, statusMessage);
-
-            var snapshot = _discordProcessManager.Capture();
-            _lastDiscordProcessSnapshot = snapshot;
-            lastResult = await _discordProcessManager.VerifyReadyAsync(
-                snapshot,
-                cancellationToken);
-            _diagnostics.Info(
-                diagnosticSource,
-                "Discord hazır olma durumu kontrol edildi.",
-                new Dictionary<string, string?>
-                {
-                    ["attempt"] = attempt.ToString(CultureInfo.InvariantCulture),
-                    ["maxAttempts"] = MaxDiscordReadinessChecks.ToString(CultureInfo.InvariantCulture),
-                    ["message"] = lastResult.Message,
-                    ["diagnostic"] = lastResult.Diagnostic,
-                    ["ready"] = lastResult.Restarted.ToString(),
-                    ["failureKind"] = lastResult.FailureKind.ToString()
-                });
-
-            if (lastResult.Restarted || !ShouldRetryDiscordReadiness(lastResult))
-            {
-                return lastResult;
-            }
-        }
-
-        return lastResult
-            ?? new DiscordRestartResult(
-                false,
-                "Discord açıldı ama pencere görünmedi. Görev çubuğundan Discord'u açın.",
-                "Discord readiness verification did not run.",
-                DiscordRestartFailureKind.WindowNotVisible);
-    }
-
-    private static bool ShouldRetryDiscordReadiness(DiscordRestartResult result) =>
-        !result.Restarted
-        && result.FailureKind is DiscordRestartFailureKind.UpdaterWindow
-            or DiscordRestartFailureKind.WindowNotVisible;
 
     private static Task<IReadOnlyList<string>> PrepareWireSockArgumentsAsync(
         string wireSockExecutable,
@@ -1290,12 +998,6 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             || name.Equals("DiscordDevelopment.exe", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool ManagesDiscordProcess(RoutingPlan routingPlan)
-    {
-        return routingPlan.SelectedTargets.Any(target =>
-            target.Id.Equals(TargetIds.Discord, StringComparison.OrdinalIgnoreCase));
-    }
-
     private sealed record WireSockProcessMarker(
         int ProcessId,
         DateTimeOffset? StartTime,
@@ -1315,7 +1017,6 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 await TryClearTunnelScopeAsync("DisconnectWithoutProcess");
                 await _accessLock.EnableAsync(CurrentRoutingPlan, cancellationToken);
                 _accessLockConfirmed = true;
-                await CloseManagedTargetProcessesAfterDisconnectAsync(cancellationToken);
                 SetStatus(TunnelState.Disconnected, "Astral Bağlı Değil");
                 return;
             }
@@ -1336,7 +1037,6 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             await TryClearTunnelScopeAsync("Disconnect");
             await _accessLock.EnableAsync(CurrentRoutingPlan, cancellationToken);
             _accessLockConfirmed = true;
-            await CloseManagedTargetProcessesAfterDisconnectAsync(cancellationToken);
 
             SetStatus(TunnelState.Disconnected, "Astral Bağlı Değil");
             _lastNextAction = null;
@@ -1371,53 +1071,6 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         {
             _intentionalStop = false;
             _operationGate.Release();
-        }
-    }
-
-    private async Task CloseManagedTargetProcessesAfterDisconnectAsync(
-        CancellationToken cancellationToken)
-    {
-        if (!ManagesDiscordProcess(_lastRoutingPlan ?? CurrentRoutingPlan))
-        {
-            _lastDiscordRestartStatus =
-                "Bu hedef seçimi Discord süreci gerektirmiyor.";
-            return;
-        }
-
-        await CloseDiscordAfterDisconnectAsync(cancellationToken);
-    }
-
-    private async Task CloseDiscordAfterDisconnectAsync(CancellationToken cancellationToken)
-    {
-        var discordProcesses = _discordProcessManager.Capture();
-        _lastDiscordProcessSnapshot = discordProcesses;
-        if (!discordProcesses.HasRunningProcesses)
-        {
-            _lastDiscordRestartStatus = "Discord zaten kapalıydı.";
-            return;
-        }
-
-        var close = await _discordProcessManager.CloseAsync(
-            discordProcesses,
-            TimeSpan.FromSeconds(3),
-            cancellationToken);
-        _lastDiscordRestartStatus = close.Message;
-        if (!close.Restarted)
-        {
-            _diagnostics.Warning(
-                "controller.discordClose",
-                "Discord otomatik kapatılamadı.",
-                new Dictionary<string, string?>
-                {
-                    ["message"] = close.Message,
-                    ["diagnostic"] = close.Diagnostic
-                });
-        }
-        else
-        {
-            _diagnostics.Info(
-                "controller.discordClose",
-                close.Message);
         }
     }
 

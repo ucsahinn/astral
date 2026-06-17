@@ -176,8 +176,7 @@ public sealed class ProcessLauncher : IProcessLauncher
                 if (!gracefulStopRequested)
                 {
                     _process.Kill(entireProcessTree: true);
-                    await _process.WaitForExitAsync(cancellationToken);
-                    _exitConfirmed = true;
+                    await WaitForExitAfterKillAsync(timeout, cancellationToken);
                     return;
                 }
 
@@ -193,9 +192,28 @@ public sealed class ProcessLauncher : IProcessLauncher
                 if (!HasExited)
                 {
                     _process.Kill(entireProcessTree: true);
-                    await _process.WaitForExitAsync(cancellationToken);
-                    _exitConfirmed = true;
+                    await WaitForExitAfterKillAsync(timeout, cancellationToken);
                 }
+            }
+        }
+
+        private async Task WaitForExitAfterKillAsync(
+            TimeSpan timeout,
+            CancellationToken cancellationToken)
+        {
+            using var timeoutSource = new CancellationTokenSource(timeout);
+            using var linkedSource = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken,
+                timeoutSource.Token);
+            try
+            {
+                await _process.WaitForExitAsync(linkedSource.Token);
+                _exitConfirmed = true;
+            }
+            catch (OperationCanceledException) when (timeoutSource.IsCancellationRequested
+                && !cancellationToken.IsCancellationRequested)
+            {
+                WriteLog("SYS", $"{_processName} zorla kapatma bekleme suresini asti.");
             }
         }
 

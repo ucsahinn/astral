@@ -16,21 +16,22 @@ Bu doküman, GitHub Releases yüzeyindeki sürüm kararlarını ve yayın kapıs
 
 ## Güncel Sürüm Kararı
 
-Güncel patch hedef `v2.2.9` olarak belirlendi.
+Güncel patch hedef `v2.2.10` olarak belirlendi.
 
-Neden `v2.2.9`?
+Neden `v2.2.10`?
 
-- v2.2.8 yayını hedef panelini icon-only hale getirdi; son kullanıcı geri bildirimi isimlerin tekrar görünür olması ve kartların 5+4 düzende düzgün oturması yönünde.
-- Footer release note ve GitHub ikonlarında yüksek DPI/kırpılma riski görüldü; v2.2.9 bu ikonları daha güvenli iç boşlukla çizer.
-- Uygulama içi release notu artık Discorder hattından Astral'a geçişi ana release notu gibi net anlatır.
-- Güncel tanılama paketi update ve scoped routing tarafını doğruladı; bağlantı başarısızlığı WireSock adaptörünün `Down` kalması ve `wiresock-client` çıkış kodu `-1` ile sınıflandırılır.
+- v2.2.9 üstüne gerçek hedef ikonları, premium kart state sistemi ve scope özeti eklendi.
+- Kapanış, yeniden başlatma, onarım ve profil temizleme akışlarında timeout ve UI donma riski azaltıldı.
+- Uygulama içi release notu Astral hedef kapsamını, update hattını ve lifecycle hotfixlerini net anlatır.
+- Güncel tanılama paketi update ve scoped routing tarafını doğruladı; Astral hedef uygulamaları başlatmadan yalnız seçili kapsamı yönetir.
 - Güncelleme hattı yalnız `Astral-*` assetleriyle devam eder; eski istemci geçişi ayrı köprü repo/yayın yüzeyinin sorumluluğudur.
 
 ## Public Release Yüzeyi
 
 | Release | Canlı durum | Asset durumu | Karar | Gerekçe |
 | --- | --- | --- | --- | --- |
-| `v2.2.9` | Yayın adayı | Bekliyor | Yayınla | İsimli 5+4 hedef kartları, kırpılmayan footer ikonları ve geçiş release notu. |
+| `v2.2.10` | Yayın adayı | Bekliyor | Yayınla | Gerçek hedef ikonları, state sistemi, lifecycle hotfixleri ve Astral-only update hattı. |
+| `v2.2.9` | Tarihsel aday | Yerine geçti | Koru | İsimli 5+4 hedef kartları ve geçiş release notu v2.2.10 tarafından genişletildi. |
 | `v2.2.8` | Yayında | 4 asset | Koru | Icon-only hedef grid, legacy tanılama temizliği ve güncelleme sürekliliği. |
 | `v2.2.7` | Yayında | 4 asset | Koru | WebProxy port fallback, proxy readiness doğrulaması ve isimli hedef kartları hotfixleri. |
 | `v2.2.6` | Yayında | 4 asset | Koru | WireSock/WebProxy ortak log paylaşımı ve hedef paneli hotfixleri. |
@@ -44,12 +45,12 @@ Neden `v2.2.9`?
 
 ## Yayın Kapısı
 
-`v2.2.9` yayınından önce tamamlanması gereken koşullar:
+`v2.2.10` yayınından önce tamamlanması gereken koşullar:
 
-- Proje, updater ve web proxy sürümü `2.2.9` ile aynı.
-- `Astral-2.2.9-win-x64.zip` ve sabit `Astral-win-x64.zip` aynı içeriği gösterir.
+- Proje, updater ve web proxy sürümü `2.2.10` ile aynı.
+- `Astral-2.2.10-win-x64.zip` ve sabit `Astral-win-x64.zip` aynı içeriği gösterir.
 - ZIP içinde `Astral.exe`, `Astral.Updater.exe`, `Astral.WebProxy.exe`, update manifest'i ve gerekli runtime dosyaları bulunur.
-- ZIP içindeki update manifest sürümü `2.2.9`.
+- ZIP içindeki update manifest sürümü `2.2.10`.
 - Astral release içinde eski isimli uyumluluk ZIP'i yayınlanmaz.
 - Kod imzalama sertifikası yapılandırılmadıysa paket imzasız olduğu açıkça not edilir.
 - `dotnet build`, Core tests, Windows tests, `scripts/verify.ps1`, `scripts/build-release.ps1`, `git diff --check` ve Gitleaks geçer.
