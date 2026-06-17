@@ -26,23 +26,23 @@ Kontrol edin:
 
 - Preset seçili mi?
 - Uygulama farklı bir launcher veya updater exe üzerinden mi çalışıyor?
-- Tanılama paketinde `AllowedApps` özeti seçili hedefi gösteriyor mu?
+- Tanılama paketinde `#@ws:AllowedApps` özeti seçili hedefi gösteriyor mu?
 - WireSock kurulum veya readiness aşamasında hata var mı?
 
-## Astral Tünel Adaptörü Aktifleşmedi
+## WireSock Hazırlığı Doğrulanamadı
 
-Tanılama paketinde şu imza birlikte görünüyorsa sorun hedef seçimi veya tarayıcı kapsamı değildir:
+Astral WireSock'u varsayılan transparent mode ile başlatır. Bu modda sanal adaptörün `Up` görünmesi zorunlu değildir; bu yüzden `tunnelReadiness=wiresock-adapter-inactive` tek başına hata kanıtı değildir.
 
-- `tunnelReadiness=wiresock-adapter-inactive`
-- `wireSockAdapterDetected=True`
-- `wireSockAdapterStatus=Down`
-- `wireSockAdapterBytesReceived=0` ve `wireSockAdapterBytesSent=0`
-- `wireSockConnectionEstablished=False`
-- `wireSockProcessExitCode=-1` veya `wiresock-client` sürecinin beklenmeden kapanması
+Tanılama paketinde şu imzalar birlikte görünüyorsa bağlantı motoru gerçekten hazır olmadan kapanmıştır:
 
-Bu durumda Astral bağlantıyı başarılı saymaz. Önce **Onar** akışını çalıştırın, sonra Windows'u yeniden başlatıp tekrar deneyin. Devam ederse WireSock sürücüsü/adapter kurulumu, güvenlik yazılımı, sanal adaptör çakışması veya Windows ağ yığını ayrıca incelenmelidir.
+- `wireSockProcessExited=True`
+- `wireSockProcessExitCode` değerinin beklenmeyen şekilde dolu olması
+- `wireSockMode=transparent`
+- `tunnelReadiness` değerinin `transparent-process-running` olmaması
 
-Bu hata, web hedeflerinin yanlış proxylenmesi anlamına gelmez. Güncel tanılama paketinde `allowedBareBrowserNameCount=0`, `allowedBrowserApplicationCount=0` ve `webProxy=included` görünüyorsa seçili web hedefleri için kapsam planı doğru kurulmuştur; asıl blok tünel adaptörünün aktifleşmemesidir.
+Bu durumda Astral bağlantıyı başarılı saymaz. Önce **Onar** akışını çalıştırın, ardından tekrar deneyin. Devam ederse WireSock kurulumu, güvenlik yazılımı, profil üretimi veya Windows ağ yığını ayrıca incelenmelidir.
+
+Güncel tanılama paketinde `wireSockMode=transparent`, `tunnelReadiness=transparent-process-running`, `allowedBareBrowserNameCount=0`, `allowedBrowserApplicationCount=0` ve `webProxy=included` görünüyorsa seçili web hedefleri için kapsam planı dar ve beklenen biçimde kurulmuştur.
 
 ## Proxy/PAC Temizlenmedi Şüphesi
 

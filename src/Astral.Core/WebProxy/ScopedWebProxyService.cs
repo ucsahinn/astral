@@ -2,6 +2,7 @@ using Astral.Core.Configuration;
 using Astral.Core.Diagnostics;
 using Astral.Core.Infrastructure;
 using Astral.Core.Targets;
+using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
@@ -109,6 +110,9 @@ public sealed class WindowsScopedWebProxyService : IScopedWebProxyService, IAsyn
         }
 
         _paths.EnsureDirectories();
+        await StopProxyProcessAsync(cancellationToken);
+        await StopOwnedOrphanProxyProcessesAsync(cancellationToken);
+
         var proxyPort = SelectAvailableProxyPort(_preferredProxyPort);
         if (proxyPort != _preferredProxyPort)
         {
@@ -129,7 +133,6 @@ public sealed class WindowsScopedWebProxyService : IScopedWebProxyService, IAsyn
         await File.WriteAllTextAsync(_paths.WebProxyPacFile, pacScript, cancellationToken);
         var pacUri = new Uri(_paths.WebProxyPacFile).AbsoluteUri;
 
-        await StopProxyProcessAsync(cancellationToken);
         var arguments = new List<string>
         {
             "--port",
@@ -167,6 +170,7 @@ public sealed class WindowsScopedWebProxyService : IScopedWebProxyService, IAsyn
     {
         cancellationToken.ThrowIfCancellationRequested();
         await StopProxyProcessAsync(cancellationToken);
+        await StopOwnedOrphanProxyProcessesAsync(cancellationToken);
         await RunScriptAsync(BuildRestorePacScript(), cancellationToken);
 
         try
@@ -204,6 +208,105 @@ public sealed class WindowsScopedWebProxyService : IScopedWebProxyService, IAsyn
         await _proxyProcess.StopAsync(TimeSpan.FromSeconds(2), cancellationToken);
         await _proxyProcess.DisposeAsync();
         _proxyProcess = null;
+    }
+
+    private async Task StopOwnedOrphanProxyProcessesAsync(CancellationToken cancellationToken)
+    {
+        var currentProxyProcessId = _proxyProcess?.ProcessId;
+        Process[] processes;
+        try
+        {
+            processes = Process.GetProcessesByName(
+                Path.GetFileNameWithoutExtension(_webProxyExecutable));
+        }
+        catch (Exception exception)
+            when (exception is InvalidOperationException
+                or System.ComponentModel.Win32Exception)
+        {
+            _diagnostics.Warning(
+                "webProxy.orphan",
+                "Astral web proxy surec listesi okunamadi.",
+                new Dictionary<string, string?>
+                {
+                    ["diagnostic"] = exception.Message
+                });
+            return;
+        }
+
+        foreach (var process in processes)
+        {
+            using (process)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (currentProxyProcessId == process.Id
+                    || !IsSameExecutablePath(process, _webProxyExecutable))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    _diagnostics.Warning(
+                        "webProxy.orphan",
+                        "Onceki oturumdan kalan Astral.WebProxy sureci kapatiliyor.",
+                        new Dictionary<string, string?>
+                        {
+                            ["processId"] = process.Id.ToString(CultureInfo.InvariantCulture)
+                        });
+                    process.Kill(entireProcessTree: true);
+                    using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                    using var linked = CancellationTokenSource.CreateLinkedTokenSource(
+                        cancellationToken,
+                        timeout.Token);
+                    await process.WaitForExitAsync(linked.Token);
+                }
+                catch (OperationCanceledException)
+                    when (!cancellationToken.IsCancellationRequested)
+                {
+                    _diagnostics.Warning(
+                        "webProxy.orphan",
+                        "Astral.WebProxy orphan sureci kapanma zaman asimina ugradi.",
+                        new Dictionary<string, string?>
+                        {
+                            ["processId"] = process.Id.ToString(CultureInfo.InvariantCulture)
+                        });
+                }
+                catch (Exception exception)
+                    when (exception is InvalidOperationException
+                        or System.ComponentModel.Win32Exception)
+                {
+                    _diagnostics.Warning(
+                        "webProxy.orphan",
+                        "Astral.WebProxy orphan sureci kapatilamadi.",
+                        new Dictionary<string, string?>
+                        {
+                            ["processId"] = process.Id.ToString(CultureInfo.InvariantCulture),
+                            ["diagnostic"] = exception.Message
+                        });
+                }
+            }
+        }
+    }
+
+    private static bool IsSameExecutablePath(Process process, string executablePath)
+    {
+        try
+        {
+            var processPath = process.MainModule?.FileName;
+            return !string.IsNullOrWhiteSpace(processPath)
+                && string.Equals(
+                    Path.GetFullPath(processPath),
+                    Path.GetFullPath(executablePath),
+                    StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception exception)
+            when (exception is InvalidOperationException
+                or NotSupportedException
+                or System.ComponentModel.Win32Exception
+                or IOException)
+        {
+            return false;
+        }
     }
 
     private async Task EnsureProxyProcessStartedAsync(

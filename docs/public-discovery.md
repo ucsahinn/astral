@@ -17,7 +17,7 @@ Astral, Discord, Roblox, Wattpad, Blogspot ve diğer hazır hedefleri ana ekrand
 ## Özellik Mesajları
 
 - Hazır hedefler ana ekrandaki kartlardan seçilir.
-- Uygulama hedefleri WireSock `AllowedApps` kapsamına yalnız kendi exe'leriyle girer.
+- Uygulama hedefleri WireSock `#@ws:AllowedApps` kapsamına yalnız kendi exe'leriyle girer.
 - Web hedeflerinde genel tarayıcı süreçleri profile eklenmez; yalnız seçili domainler `Astral.WebProxy` allowlist'iyle taşınır.
 - Portable ZIP olarak çalışır; kullanıcı çıkarılmış klasörü kontrol eder.
 

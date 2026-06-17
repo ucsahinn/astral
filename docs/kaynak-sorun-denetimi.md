@@ -6,10 +6,10 @@ Astral, eski geniş kapsamlı bağlantı yaklaşımlarını büyütmek yerine he
 
 | Risk | Yeni davranış |
 | --- | --- |
-| Tüm tarayıcı sürecinin tünele girmesi | Web hedeflerinde tarayıcı exe `AllowedApps` içine yazılmaz; yalnız `Astral.WebProxy.exe` kullanılır. |
+| Tüm tarayıcı sürecinin tünele girmesi | Web hedeflerinde tarayıcı exe `#@ws:AllowedApps` içine yazılmaz; yalnız `Astral.WebProxy.exe` kullanılır. |
 | Seçilmemiş uygulamaların etkilenmesi | `TargetScopeResolver` yalnız seçili presetlerden plan üretir. |
 | Eski özel hedef alanlarının yanlışlıkla taşınması | Migration eski `CustomExecutables` ve `CustomDomains` alanlarını route planına almaz. |
-| Profil bozulması veya geniş `AllowedApps` | Profil yeniden yazılır; eski `AllowedApps` satırları kaldırılır. |
+| Profil bozulması veya geniş `AllowedApps` | Profil yeniden yazılır; eski `AllowedApps` ve `#@ws:AllowedApps` satırları kaldırılır. |
 | Proxy/PAC state kalması | Apply öncesi state alınır; disconnect/error/dispose yollarında restore denenir. |
 | Release asset adı uyuşmazlığı | Astral release hattı yalnız `Astral-*` ZIP ve SHA assetlerini doğrular. |
 

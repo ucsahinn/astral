@@ -51,7 +51,7 @@ Web hedeflerinde genel tarayıcı süreçleri WireSock profiline eklenmez. Astra
 
 1. Seçili domainler için PAC kuralı üretir.
 2. `Astral.WebProxy.exe` sürecini allowlist ile başlatır.
-3. WireSock `AllowedApps` satırına tarayıcıyı değil yalnız `Astral.WebProxy.exe` sürecini ekler.
+3. WireSock `#@ws:AllowedApps` satırına tarayıcıyı değil yalnız `Astral.WebProxy.exe` sürecini ekler.
 4. PAC içinde seçili domainlere PROXY, diğer tüm domainlere DIRECT döndürür.
 
 HTTPS içeriği çözülmez. Astral sertifika kurmaz, TLS MITM yapmaz ve sayfa içeriğini okumaz.

@@ -20,7 +20,10 @@ namespace Astral.Core.Connection;
 public sealed class DiscordTunnelController : IAsyncDisposable
 {
     private const int MaxTunnelReadinessChecks = 60;
+    private const int MinTransparentReadinessChecks = 4;
     private const int MaxWireSockLogReadBytes = 64 * 1024;
+    private const string WireSockTransparentMode = "transparent";
+    private const string WireSockVirtualAdapterMode = "virtual-adapter";
     private const string WireSockConnectionEstablishedMessage =
         "Connection established";
     private static readonly TimeSpan TunnelReadinessRetryDelay =
@@ -61,6 +64,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
     private string? _lastWireSockProcessId;
     private bool? _lastWireSockProcessExited;
     private string? _lastWireSockProcessExitCode;
+    private string _lastWireSockMode = WireSockTransparentMode;
     private long _lastTunnelLogStartPosition;
     private IReadOnlyDictionary<string, string?> _lastRoutingSummary =
         new Dictionary<string, string?>();
@@ -280,6 +284,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             _lastWireSockConnectionEstablished = false;
             _lastWireSockHandshakeDiagnostic =
                 "WireSock handshake has not been checked.";
+            _lastWireSockMode = WireSockTransparentMode;
             var routingPlan = _targetScopeResolver.Resolve(_targetSelection);
             _lastRoutingPlan = routingPlan;
             SetStatus(TunnelState.Preparing, "Hedef bağlantısı hazırlanıyor");
@@ -497,6 +502,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             CaptureWireSockProcessState();
             _lastWireSockConnectionEstablished =
                 HasWireSockConnectionEstablished(tunnelLogStartPosition);
+            var ready = TryMarkTunnelReadyForCurrentMode(attempt);
             var details = CreateTunnelReadinessDetails();
             details["attempt"] = attempt.ToString(CultureInfo.InvariantCulture);
             details["maxAttempts"] =
@@ -507,10 +513,14 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 "Astral tünel adaptörü denetleniyor.",
                 details);
 
-            if (!_lastTunnelReadiness.BlocksConnection
-                && IsWireSockHandshakeReady())
+            if (ready)
             {
                 return;
+            }
+
+            if (_lastWireSockProcessExited == true)
+            {
+                break;
             }
 
             if (attempt < MaxTunnelReadinessChecks)
@@ -521,21 +531,36 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
         _diagnostics.Warning(
             "controller.tunnelReadiness",
-            "Astral tünel adaptörü aktifleşmedi.",
+            "Astral bağlantı motoru hazır duruma geçmedi.",
             CreateTunnelReadinessDetails());
+        if (_lastWireSockProcessExited == true)
+        {
+            throw new InvalidOperationException(
+                "Astral bağlantı motoru bağlantı doğrulanmadan kapandı. " +
+                "Çıkış kodu: " +
+                $"{_lastWireSockProcessExitCode ?? "bilinmiyor"}.");
+        }
+
         if (!_lastTunnelReadiness.BlocksConnection)
         {
             throw new InvalidOperationException(
                 "Astral tünel bağlantısı doğrulanamadı. Cloudflare WARP tüneli bağlantıyı tamamlamadı; farklı ağ, DNS veya ISP engeli olabilir.");
         }
 
+        if (!UsesVirtualAdapterMode())
+        {
+            throw new InvalidOperationException(
+                "Astral bağlantı motoru hazır duruma geçmedi. Bağlantı motorunu onarın veya bilgisayarı yeniden başlatıp tekrar bağlanın.");
+        }
+
         throw new InvalidOperationException(
-            "Astral tünel adaptörü aktifleşmedi. Bağlantı motorunu onarın veya bilgisayarı yeniden başlatıp tekrar bağlanın.");
+            "Astral bağlantı motoru hazır duruma geçmedi. Bağlantı motorunu onarın veya bilgisayarı yeniden başlatıp tekrar bağlanın.");
     }
 
     private Dictionary<string, string?> CreateTunnelReadinessDetails()
     {
         var details = _lastTunnelReadiness.ToDiagnosticDetails();
+        details["wireSockMode"] = _lastWireSockMode;
         details["wireSockConnectionEstablished"] =
             _lastWireSockConnectionEstablished.ToString();
         details["wireSockHandshakeDiagnostic"] =
@@ -558,6 +583,46 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         }
 
         return details;
+    }
+
+    private bool TryMarkTunnelReadyForCurrentMode(int attempt)
+    {
+        if (_lastWireSockProcessExited == true)
+        {
+            return false;
+        }
+
+        if (!_lastTunnelReadiness.BlocksConnection
+            && IsWireSockHandshakeReady())
+        {
+            return true;
+        }
+
+        if (UsesVirtualAdapterMode())
+        {
+            return false;
+        }
+
+        if (attempt < MinTransparentReadinessChecks)
+        {
+            return false;
+        }
+
+        _lastTunnelReadiness = TunnelReadinessSnapshot.TransparentProcessRunning(
+            _lastTunnelReadiness,
+            "WireSock transparent mode is running; virtual adapter status is not required.");
+
+        if (_lastWireSockConnectionEstablished)
+        {
+            _lastWireSockHandshakeDiagnostic = null;
+        }
+        else
+        {
+            _lastWireSockHandshakeDiagnostic =
+                "WireSock transparent mode does not expose virtual-adapter readiness; process stayed running past startup validation.";
+        }
+
+        return true;
     }
 
     private void CaptureWireSockProcessState()
@@ -592,6 +657,12 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
         return _lastWireSockConnectionEstablished;
     }
+
+    private bool UsesVirtualAdapterMode() =>
+        string.Equals(
+            _lastWireSockMode,
+            WireSockVirtualAdapterMode,
+            StringComparison.OrdinalIgnoreCase);
 
     private bool HasWireSockConnectionEstablished(long startPosition)
     {
@@ -694,6 +765,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         {
             var trimmed = line.Trim();
             if (trimmed.StartsWith("AllowedApps", StringComparison.OrdinalIgnoreCase)
+                || trimmed.StartsWith("#@ws:AllowedApps", StringComparison.OrdinalIgnoreCase)
                 || trimmed.StartsWith("AllowedIPs", StringComparison.OrdinalIgnoreCase)
                 || trimmed.StartsWith("Endpoint", StringComparison.OrdinalIgnoreCase)
                 || trimmed.StartsWith("DNS", StringComparison.OrdinalIgnoreCase))

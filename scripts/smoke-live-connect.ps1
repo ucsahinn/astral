@@ -238,13 +238,24 @@ function Copy-HealthResult {
         [string]$Health.details.wireSockAdapterBytesSent
     $result.HealthWireSockConnectionEstablished =
         [string]$Health.details.wireSockConnectionEstablished
+    $result.HealthWireSockMode =
+        [string]$Health.details.wireSockMode
+    $result.HealthWireSockProcessExited =
+        [string]$Health.details.wireSockProcessExited
+    $result.HealthWireSockProcessExitCode =
+        [string]$Health.details.wireSockProcessExitCode
     $result.HealthWireSockHandshakeDiagnostic =
         [string]$Health.details.wireSockHandshakeDiagnostic
-    $result.HealthTunnelReady =
+    $adapterReady =
         $result.HealthTunnelReadiness -eq 'ready' -and
         $result.HealthWireSockAdapterDetected -eq 'True' -and
         $result.HealthWireSockAdapterUp -eq 'True' -and
         $result.HealthWireSockConnectionEstablished -eq 'True'
+    $transparentReady =
+        $result.HealthTunnelReadiness -eq 'transparent-process-running' -and
+        $result.HealthWireSockMode -eq 'transparent' -and
+        $result.HealthWireSockProcessExited -ne 'True'
+    $result.HealthTunnelReady = $adapterReady -or $transparentReady
 }
 
 function Stop-AstralProcess {
@@ -402,6 +413,9 @@ $result = [ordered]@{
     HealthWireSockAdapterBytesReceived = ''
     HealthWireSockAdapterBytesSent = ''
     HealthWireSockConnectionEstablished = ''
+    HealthWireSockMode = ''
+    HealthWireSockProcessExited = ''
+    HealthWireSockProcessExitCode = ''
     HealthWireSockHandshakeDiagnostic = ''
     HealthTunnelReady = $false
     HostsLockRemovedWhileConnected = $false
@@ -462,7 +476,7 @@ try {
         if (Test-Path -LiteralPath $profilePath) {
             $allowedAppsLine = Select-String `
                 -Path $profilePath `
-                -Pattern '^AllowedApps\s*=' |
+                -Pattern '^(?:#@ws:)?AllowedApps\s*=' |
                 Select-Object -First 1
             $allowedAppsText = [string]$allowedAppsLine.Line
             $result.ProfileHasDiscord =
@@ -547,7 +561,6 @@ $criticalChecks = @(
     'ConnectClicked',
     'WireSockProcessSeen',
     'WireSockStayedRunningAfterGrace',
-    'ConnectionEstablishedLog',
     'HealthFresh',
     'HealthTunnelReady',
     'HostsLockRemovedWhileConnected',

@@ -13,8 +13,8 @@
     <AssemblyCompany>ucsahinn</AssemblyCompany>
     <AssemblyProduct>Astral</AssemblyProduct>
     <Copyright>Copyright (c) 2026 ucsahinn</Copyright>
-    <Version>2.2.10</Version>
-    <FileVersion>2.2.10.0</FileVersion>
+    <Version>2.2.11</Version>
+    <FileVersion>2.2.11.0</FileVersion>
     <RepositoryUrl>https://github.com/ucsahinn/astral</RepositoryUrl>
   </PropertyGroup>
   <ItemGroup>

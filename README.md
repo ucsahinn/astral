@@ -25,7 +25,7 @@
 
 Astral, Windows'ta yalnızca kullanıcının seçtiği uygulama veya web hedefleri için bağlantı kapsamı oluşturan portable bir masaüstü uygulamasıdır. Tüm PC'yi, tüm tarayıcıyı veya sistem genelini VPN'e almayı amaçlamaz.
 
-Uygulama hedefleri WireSock `AllowedApps` satırına dar kapsamla yazılır. Web hedeflerinde genel tarayıcı süreçleri profile eklenmez; seçili domainler `Astral.WebProxy.exe` ve PAC allowlist üzerinden yönlendirilir, diğer domainler DIRECT kalır.
+Uygulama hedefleri WireSock uyumlu `#@ws:AllowedApps` satırına dar kapsamla yazılır. Web hedeflerinde genel tarayıcı süreçleri profile eklenmez; seçili domainler `Astral.WebProxy.exe` ve PAC allowlist üzerinden yönlendirilir, diğer domainler DIRECT kalır.
 
 Astral resmi bir Discord, Roblox, Cloudflare, WireSock veya diğer marka sahibi ürünü değildir. Presetler yalnızca hedef kapsamını tanımlar; erişim durumu zamanla değişebilir.
 
@@ -70,7 +70,7 @@ Başlangıç presetleri:
 ## Neden Güvenli?
 
 - Sistem DNS ayarını kalıcı değiştirmez.
-- Genel tarayıcı exe'lerini WireSock `AllowedApps` kapsamına almaz.
+- Genel tarayıcı exe'lerini WireSock `#@ws:AllowedApps` kapsamına almaz.
 - HTTPS içeriğini çözmez, TLS MITM yapmaz ve sertifika kurmaz; proxy yalnızca CONNECT host/Host allowlist kontrolü yapar.
 - WireSock ve wgcf ikili dosyalarını repoya gömmez; release paketindeki WireSock fallback kurucusu varsa hash, imza, yayıncı ve sürümle doğrulanır.
 - Otomatik güncelleme paketini GitHub release asset bilgisi, `.sha256.txt`, GitHub digest ve manifest kontrolleriyle eşleştirir.
@@ -99,7 +99,7 @@ Release sayfasındaki ZIP paketini manuel indirdiğinizde yanında verilen SHA-2
 | Sorun giderme | [docs/sorun-giderme.md](docs/sorun-giderme.md) |
 | Mimari | [docs/mimari.md](docs/mimari.md) |
 | Kaynak sorun denetimi | [docs/kaynak-sorun-denetimi.md](docs/kaynak-sorun-denetimi.md) |
-| v2.2.10 release notu | [docs/releases/v2.2.10.md](docs/releases/v2.2.10.md) |
+| v2.2.11 release notu | [docs/releases/v2.2.11.md](docs/releases/v2.2.11.md) |
 
 ## Geliştirme
 

@@ -936,7 +936,7 @@
                                VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource SecondaryTextBrush}"
-                               Text="v2.2.10" />
+                               Text="v2.2.11" />
 
                     <Button Grid.Column="4"
                             x:Name="AutoUpdateButton"

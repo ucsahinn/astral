@@ -41,7 +41,7 @@ public static class WireGuardProfileBuilder
         foreach (var sourceLine in sourceLines)
         {
             var trimmed = sourceLine.Trim();
-            if (trimmed.StartsWith("AllowedApps", StringComparison.OrdinalIgnoreCase))
+            if (IsAllowedAppsDirective(trimmed))
             {
                 continue;
             }
@@ -50,7 +50,7 @@ public static class WireGuardProfileBuilder
 
             if (!inserted && trimmed.StartsWith("Endpoint", StringComparison.OrdinalIgnoreCase))
             {
-                result.Add($"AllowedApps = {string.Join(", ", apps)}");
+                result.Add($"#@ws:AllowedApps = {string.Join(", ", apps)}");
                 inserted = true;
             }
         }
@@ -88,5 +88,11 @@ public static class WireGuardProfileBuilder
         }
 
         return "\"" + value + "\"";
+    }
+
+    private static bool IsAllowedAppsDirective(string value)
+    {
+        return value.StartsWith("AllowedApps", StringComparison.OrdinalIgnoreCase)
+            || value.StartsWith("#@ws:AllowedApps", StringComparison.OrdinalIgnoreCase);
     }
 }

@@ -34,6 +34,7 @@ public sealed record TunnelReadinessSnapshot(
     public const string ReadyStatus = "ready";
     public const string WireSockAdapterInactiveStatus = "wiresock-adapter-inactive";
     public const string WireSockAdapterNotDetectedStatus = "wiresock-adapter-not-detected";
+    public const string TransparentProcessRunningStatus = "transparent-process-running";
     public const string ProbeUnavailableStatus = "probe-unavailable";
     public const string ProbeNotConfiguredStatus = "probe-not-configured";
 
@@ -78,6 +79,18 @@ public sealed record TunnelReadinessSnapshot(
             WireSockAdapterBytesReceived: null,
             WireSockAdapterBytesSent: null,
             Diagnostic: "WireSock network adapter was not detected.");
+
+    public static TunnelReadinessSnapshot TransparentProcessRunning(
+        TunnelReadinessSnapshot captured,
+        string? diagnostic) =>
+        new(
+            TransparentProcessRunningStatus,
+            captured.WireSockAdapterDetected,
+            captured.WireSockAdapterUp,
+            captured.WireSockAdapterStatus,
+            captured.WireSockAdapterBytesReceived,
+            captured.WireSockAdapterBytesSent,
+            diagnostic);
 
     public static TunnelReadinessSnapshot ProbeUnavailable(string? diagnostic) =>
         new(

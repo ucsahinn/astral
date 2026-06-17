@@ -16,21 +16,22 @@ Bu doküman, GitHub Releases yüzeyindeki sürüm kararlarını ve yayın kapıs
 
 ## Güncel Sürüm Kararı
 
-Güncel patch hedef `v2.2.10` olarak belirlendi.
+Güncel patch hedef `v2.2.11` olarak belirlendi.
 
-Neden `v2.2.10`?
+Neden `v2.2.11`?
 
-- v2.2.9 üstüne gerçek hedef ikonları, premium kart state sistemi ve scope özeti eklendi.
-- Kapanış, yeniden başlatma, onarım ve profil temizleme akışlarında timeout ve UI donma riski azaltıldı.
-- Uygulama içi release notu Astral hedef kapsamını, update hattını ve lifecycle hotfixlerini net anlatır.
-- Güncel tanılama paketi update ve scoped routing tarafını doğruladı; Astral hedef uygulamaları başlatmadan yalnız seçili kapsamı yönetir.
-- Güncelleme hattı yalnız `Astral-*` assetleriyle devam eder; eski istemci geçişi ayrı köprü repo/yayın yüzeyinin sorumluluğudur.
+- v2.2.10 üstüne WireSock transparent mode readiness düzeltmesi eklendi.
+- Transparent mode'da sanal adaptör zorunlu kabul edilmiyor; WireSock süreci erken kapanırsa hata, sağlıklı kalırsa hedef kapsamı hazır sayılıyor.
+- Profil üretimi WireSock uyumlu `#@ws:AllowedApps` direktifiyle yazılıyor ve eski/geniş satırları temizliyor.
+- WebProxy başlatmadan önce aynı executable path'e ait orphan proxy süreçleri temizleniyor; port fallback ihtiyacı ve kapanma takılması azalıyor.
+- Güncel tanılama ve smoke scripti `wireSockMode`, `wireSockProcessExited` ve `transparent-process-running` alanlarıyla aynı doğrulama modelini kullanır.
 
 ## Public Release Yüzeyi
 
 | Release | Canlı durum | Asset durumu | Karar | Gerekçe |
 | --- | --- | --- | --- | --- |
-| `v2.2.10` | Yayın adayı | Bekliyor | Yayınla | Gerçek hedef ikonları, state sistemi, lifecycle hotfixleri ve Astral-only update hattı. |
+| `v2.2.11` | Yayın adayı | Bekliyor | Yayınla | WireSock transparent readiness, `#@ws:AllowedApps` ve WebProxy orphan cleanup hotfixleri. |
+| `v2.2.10` | Tarihsel aday | Yerine geçti | Koru | Gerçek hedef ikonları, state sistemi, lifecycle hotfixleri ve Astral-only update hattı. |
 | `v2.2.9` | Tarihsel aday | Yerine geçti | Koru | İsimli 5+4 hedef kartları ve geçiş release notu v2.2.10 tarafından genişletildi. |
 | `v2.2.8` | Yayında | 4 asset | Koru | Icon-only hedef grid, legacy tanılama temizliği ve güncelleme sürekliliği. |
 | `v2.2.7` | Yayında | 4 asset | Koru | WebProxy port fallback, proxy readiness doğrulaması ve isimli hedef kartları hotfixleri. |
@@ -45,12 +46,12 @@ Neden `v2.2.10`?
 
 ## Yayın Kapısı
 
-`v2.2.10` yayınından önce tamamlanması gereken koşullar:
+`v2.2.11` yayınından önce tamamlanması gereken koşullar:
 
-- Proje, updater ve web proxy sürümü `2.2.10` ile aynı.
-- `Astral-2.2.10-win-x64.zip` ve sabit `Astral-win-x64.zip` aynı içeriği gösterir.
+- Proje, updater ve web proxy sürümü `2.2.11` ile aynı.
+- `Astral-2.2.11-win-x64.zip` ve sabit `Astral-win-x64.zip` aynı içeriği gösterir.
 - ZIP içinde `Astral.exe`, `Astral.Updater.exe`, `Astral.WebProxy.exe`, update manifest'i ve gerekli runtime dosyaları bulunur.
-- ZIP içindeki update manifest sürümü `2.2.10`.
+- ZIP içindeki update manifest sürümü `2.2.11`.
 - Astral release içinde eski isimli uyumluluk ZIP'i yayınlanmaz.
 - Kod imzalama sertifikası yapılandırılmadıysa paket imzasız olduğu açıkça not edilir.
 - `dotnet build`, Core tests, Windows tests, `scripts/verify.ps1`, `scripts/build-release.ps1`, `git diff --check` ve Gitleaks geçer.

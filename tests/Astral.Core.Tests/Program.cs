@@ -84,10 +84,10 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Denetleyici bağlantı kapanınca hedef uygulamaları kapatmaz", ControllerDoesNotCloseTargetProcessesOnDisconnectAsync),
     ("Denetleyici hedef kapsamını bağlıyken kilitler", ControllerLocksTargetScopeWhileConnectedAsync),
     ("Denetleyici varsayılan kapsamda hedef uygulama başlatmadan doğrular", ControllerConnectsDefaultScopeWithoutLaunchingTargetProcessAsync),
-    ("Denetleyici WireSock adaptörü pasifse hazır demez", ControllerRejectsInactiveWireSockAdapterAsync),
-    ("Denetleyici WireSock adaptörü yoksa hazır demez", ControllerRejectsMissingWireSockAdapterAsync),
-    ("Denetleyici WireSock adaptörü doğrulanamazsa hazır demez", ControllerRejectsUnavailableWireSockProbeAsync),
-    ("Denetleyici WireSock handshake yoksa hazır demez", ControllerRejectsMissingWireSockHandshakeAsync),
+    ("Denetleyici transparent modda WireSock adaptörü pasifken süreç sağlıklıysa bağlanır", ControllerAcceptsInactiveWireSockAdapterInTransparentModeAsync),
+    ("Denetleyici transparent modda WireSock adaptörü yokken süreç sağlıklıysa bağlanır", ControllerAcceptsMissingWireSockAdapterInTransparentModeAsync),
+    ("Denetleyici transparent modda WireSock probe yokken süreç sağlıklıysa bağlanır", ControllerAcceptsUnavailableWireSockProbeInTransparentModeAsync),
+    ("Denetleyici transparent modda handshake logu yokken süreç sağlıklıysa bağlanır", ControllerAcceptsMissingWireSockHandshakeInTransparentModeAsync),
     ("Denetleyici WireSock adaptörü gecikirse yeniden dener", ControllerRetriesDelayedWireSockAdapterAsync),
     ("Denetleyici WireSock doğrulamasını hedef uygulama yenilemeden yapar", ControllerChecksWireSockWithoutTargetProcessRestartAsync),
     ("Denetleyici tüm yerleşik presetleri hedef uygulama başlatmadan bağlar", ControllerConnectsEveryBuiltInPresetWithoutLaunchingTargetsAsync),
@@ -685,13 +685,14 @@ static Task ProfileBuilderIsStrictAsync()
             @"C:\Users\test\AppData\Local\Discord"
         ]);
 
-    Assert(profile.Contains("AllowedApps = ", StringComparison.Ordinal));
+    Assert(profile.Contains("#@ws:AllowedApps = ", StringComparison.Ordinal));
     Assert(profile.Contains("Discord.exe", StringComparison.Ordinal));
     Assert(profile.Contains("chrome.exe", StringComparison.OrdinalIgnoreCase));
     Assert(profile.Contains("msedge.exe", StringComparison.OrdinalIgnoreCase));
     Assert(!profile.Contains("roblox.exe", StringComparison.OrdinalIgnoreCase));
     Assert(!profile.Contains("Update.exe", StringComparison.OrdinalIgnoreCase));
-    Assert(profile.Split("AllowedApps =", StringSplitOptions.None).Length == 2);
+    Assert(profile.Split("#@ws:AllowedApps =", StringSplitOptions.None).Length == 2);
+    Assert(!profile.Contains("\r\nAllowedApps =", StringComparison.Ordinal));
     return Task.CompletedTask;
 }
 
@@ -722,13 +723,13 @@ static Task ProfileBuilderQuotesApplicationsWithSpacesAsync()
 
     var allowedAppsLine = profile
         .Split(["\r\n", "\n"], StringSplitOptions.None)
-        .Single(line => line.StartsWith("AllowedApps =", StringComparison.Ordinal));
+        .Single(line => line.StartsWith("#@ws:AllowedApps =", StringComparison.Ordinal));
 
     Assert(allowedAppsLine.Contains("Discord.exe", StringComparison.Ordinal));
     Assert(allowedAppsLine.Contains($"\"{chromePath}\"", StringComparison.Ordinal));
     Assert(allowedAppsLine.Contains($"\"{bravePath}\"", StringComparison.Ordinal));
     Assert(!allowedAppsLine.Contains(
-        "AllowedApps = C:\\Program Files\\",
+        "#@ws:AllowedApps = C:\\Program Files\\",
         StringComparison.Ordinal));
     return Task.CompletedTask;
 }
@@ -774,7 +775,7 @@ static async Task WgcfProvisionerBuildsDiscordAccessProfileAsync()
         Assert(File.Exists(paths.WgcfExecutable));
         var allowedAppsLine = profile
             .Split(["\r\n", "\n"], StringSplitOptions.None)
-            .Single(line => line.StartsWith("AllowedApps =", StringComparison.Ordinal));
+            .Single(line => line.StartsWith("#@ws:AllowedApps =", StringComparison.Ordinal));
         Assert(allowedAppsLine.Contains("Discord.exe", StringComparison.Ordinal));
         Assert(allowedAppsLine.Contains("chrome.exe", StringComparison.OrdinalIgnoreCase));
         Assert(allowedAppsLine.Contains("msedge.exe", StringComparison.OrdinalIgnoreCase));
@@ -846,6 +847,7 @@ static async Task WgcfProvisionerUsesCachedProfileWhenRefreshFailsAsync()
             ["generate"],
             StringComparer.Ordinal));
         Assert(profile.Contains("Discord.exe", StringComparison.Ordinal));
+        Assert(profile.Contains("#@ws:AllowedApps", StringComparison.Ordinal));
         Assert(!profile.Contains("Update.exe", StringComparison.OrdinalIgnoreCase));
         Assert(progressMessages.Any(message => message.Contains(
             "mevcut profil",
@@ -2973,9 +2975,9 @@ static async Task ControllerVerifiesTunnelWithoutClaimingDiscordSessionAsync()
     }
 }
 
-static async Task ControllerRejectsInactiveWireSockAdapterAsync()
+static async Task ControllerAcceptsInactiveWireSockAdapterInTransparentModeAsync()
 {
-    await ControllerRejectsBlockedTunnelReadinessAsync(
+    await ControllerAcceptsTransparentTunnelReadinessAsync(
         TunnelReadinessSnapshot.WireSockAdapterInactive(
             "Down",
             0,
@@ -2985,22 +2987,22 @@ static async Task ControllerRejectsInactiveWireSockAdapterAsync()
         "Down");
 }
 
-static async Task ControllerRejectsMissingWireSockAdapterAsync()
+static async Task ControllerAcceptsMissingWireSockAdapterInTransparentModeAsync()
 {
-    await ControllerRejectsBlockedTunnelReadinessAsync(
+    await ControllerAcceptsTransparentTunnelReadinessAsync(
         TunnelReadinessSnapshot.WireSockAdapterNotDetected(),
         "wiresock-adapter-not-detected");
 }
 
-static async Task ControllerRejectsUnavailableWireSockProbeAsync()
+static async Task ControllerAcceptsUnavailableWireSockProbeInTransparentModeAsync()
 {
-    await ControllerRejectsBlockedTunnelReadinessAsync(
+    await ControllerAcceptsTransparentTunnelReadinessAsync(
         TunnelReadinessSnapshot.ProbeUnavailable(
             "WireSock adapter inventory is unavailable."),
         "probe-unavailable");
 }
 
-static async Task ControllerRejectsMissingWireSockHandshakeAsync()
+static async Task ControllerAcceptsMissingWireSockHandshakeInTransparentModeAsync()
 {
     var root = CreateTemporaryDirectory();
     var process = new FakeManagedProcess();
@@ -3040,17 +3042,19 @@ static async Task ControllerRejectsMissingWireSockHandshakeAsync()
     {
         await controller.ConnectAsync();
 
-        Assert(controller.Snapshot.State == TunnelState.Error);
-        Assert(controller.Snapshot.Message.Contains(
-            "Astral tünel bağlantısı doğrulanamadı",
-            StringComparison.Ordinal));
-        Assert(process.HasExited);
+        Assert(controller.Snapshot.State == TunnelState.Connected);
+        Assert(!process.HasExited);
 
         var details = controller.CreateDiagnosticDetails();
-        Assert(details["tunnelReadiness"] == "ready");
+        Assert(details["tunnelReadiness"] == "transparent-process-running");
+        Assert(details["wireSockMode"] == "transparent");
         Assert(details["wireSockConnectionEstablished"] == "False");
 
         var health = await File.ReadAllTextAsync(paths.HealthReport);
+        Assert(health.Contains("\"status\":\"bağlantı hazır\"", StringComparison.Ordinal));
+        Assert(health.Contains(
+            "\"tunnelReadiness\":\"transparent-process-running\"",
+            StringComparison.Ordinal));
         Assert(health.Contains(
             "\"wireSockConnectionEstablished\":\"False\"",
             StringComparison.Ordinal));
@@ -3174,7 +3178,7 @@ static async Task ControllerChecksWireSockAfterDiscordRestartAsync()
     }
 }
 
-static async Task ControllerRejectsBlockedTunnelReadinessAsync(
+static async Task ControllerAcceptsTransparentTunnelReadinessAsync(
     TunnelReadinessSnapshot readinessSnapshot,
     string expectedStatus,
     string? expectedAdapterStatus = null)
@@ -3214,16 +3218,15 @@ static async Task ControllerRejectsBlockedTunnelReadinessAsync(
     {
         await controller.ConnectAsync();
 
-        Assert(controller.Snapshot.State == TunnelState.Error);
-        Assert(controller.Snapshot.Message.Contains(
-            "Astral tünel adaptörü aktifleşmedi",
-            StringComparison.Ordinal));
-        Assert(process.HasExited);
-        Assert(accessLock.ClearTunnelScopeCount == 1);
-        Assert(accessLock.EnableCount == 1);
+        Assert(controller.Snapshot.State == TunnelState.Connected);
+        Assert(!process.HasExited);
+        Assert(accessLock.ClearTunnelScopeCount == 0);
+        Assert(accessLock.EnableCount == 0);
 
         var details = controller.CreateDiagnosticDetails();
-        Assert(details["tunnelReadiness"] == expectedStatus);
+        Assert(details["tunnelReadiness"] == "transparent-process-running");
+        Assert(details["wireSockMode"] == "transparent");
+        Assert(details["wireSockConnectionEstablished"] == "True");
         Assert(!string.IsNullOrWhiteSpace(details["wireSockProcessId"]));
         Assert(details["wireSockProcessExited"] == "False");
         if (expectedAdapterStatus is not null)
@@ -3232,11 +3235,9 @@ static async Task ControllerRejectsBlockedTunnelReadinessAsync(
         }
 
         var health = await File.ReadAllTextAsync(paths.HealthReport);
+        Assert(health.Contains("\"status\":\"bağlantı hazır\"", StringComparison.Ordinal));
         Assert(health.Contains(
-            "Astral tünel adaptörü aktifleşmedi",
-            StringComparison.Ordinal));
-        Assert(health.Contains(
-            $"\"tunnelReadiness\":\"{expectedStatus}\"",
+            "\"tunnelReadiness\":\"transparent-process-running\"",
             StringComparison.Ordinal));
         Assert(health.Contains(
             "\"wireSockProcessExited\":\"False\"",

@@ -82,11 +82,11 @@
                                 VerticalAlignment="Center">
                         <TextBlock FontSize="22"
                                    FontWeight="SemiBold"
-                                   Text="Astral v2.2.10" />
+                                   Text="Astral v2.2.11" />
                         <TextBlock Margin="0,5,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
-                                   Text="Gerçek hedef ikonları, premium kapsam paneli ve kapanış hotfix'i" />
+                                   Text="WireSock transparent mode readiness, kapsam doğrulaması ve bağlantı hotfix'i" />
                     </StackPanel>
                 </Grid>
 
@@ -144,6 +144,10 @@
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
+                                           Text="&#x2022; WireSock varsayılan transparent mode artık sanal adaptör zorunluluğu gibi yorumlanmıyor; süreç sağlıklı kaldığında hedef kapsamı hazır sayılıyor." />
+                                <TextBlock FontSize="13"
+                                           LineHeight="22"
+                                           TextWrapping="Wrap"
                                            Text="&#x2022; Güncelleme asset'leri yalnız Astral adıyla doğrulanıyor ve yeni sürüm yoksa güncelleme butonu görünmez kalıyor." />
                             </StackPanel>
                         </Border>
@@ -163,7 +167,7 @@
                                            FontSize="13"
                                            LineHeight="21"
                                            TextWrapping="Wrap"
-                                           Text="Astral bağlı demeden önce WireSock sanal adaptörünün aktifleşmesini ve tünel handshake kanıtını bekler. Adaptör Down kalırsa bağlantıyı başarılı saymaz, PAC/proxy kapsamını temizler ve tanılama paketinde kök nedeni görünür bırakır." />
+                                           Text="Astral varsayılan WireSock transparent mode'da sanal adaptör zorunluymuş gibi davranmaz. WireSock süreci erken kapanırsa bağlantıyı hata sayar; süreç sağlıklı kalırsa seçili hedef kapsamı ve proxy/PAC planını hazır kabul eder." />
                                 <TextBlock Margin="0,8,0,0"
                                            FontSize="13"
                                            LineHeight="21"
@@ -190,7 +194,7 @@
                     <TextBlock VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource MutedTextBrush}"
-                               Text="Bu not, v2.2.10 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
+                               Text="Bu not, v2.2.11 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
                     <Button Grid.Column="1"
                             Margin="0,0,10,0"
                             Height="40"
