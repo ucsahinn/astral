@@ -38,7 +38,7 @@ public partial class MainWindow : Window, IDisposable
     private static readonly Uri RepositoryUri = new(
         "https://github.com/ucsahinn/astral");
     private static readonly Uri ReleaseNotesUri = new(
-        "https://github.com/ucsahinn/astral/releases/tag/v2.2.5");
+        "https://github.com/ucsahinn/astral/releases/tag/v2.2.6");
     private static readonly Uri BackgroundVideoUri = new(
         "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260606_154941_df1a96e1-a06f-450c-bd02-d863414cc1a0.mp4");
     private static readonly string LocalBackgroundVideoPath = Path.Combine(
@@ -679,13 +679,12 @@ public partial class MainWindow : Window, IDisposable
             {
                 Name = "TargetToggle_" + CreateSafeTargetName(target.Id),
                 Tag = target,
-                Width = 184,
-                Height = 50,
-                Margin = new Thickness(0, 0, 10, 4),
+                Width = 58,
+                Height = 58,
+                Margin = new Thickness(4),
+                Padding = new Thickness(4),
                 Style = (Style)FindResource("TargetCardCheckBoxStyle"),
-                ToolTip = target.Metadata.TryGetValue("note", out var note)
-                    ? note
-                    : target.Label,
+                ToolTip = $"{target.Label} - {target.ScopeLabel}",
                 Content = CreateTargetCardContent(target)
             };
             AutomationProperties.SetName(toggle, $"{target.Label} hedefi");
@@ -716,7 +715,6 @@ public partial class MainWindow : Window, IDisposable
             .ToArray();
         if (selectedIds.Length == 0)
         {
-            TargetValidationMessage.Text = "En az bir hedef seçili kalmalı.";
             _isApplyingSettings = true;
             try
             {
@@ -749,7 +747,6 @@ public partial class MainWindow : Window, IDisposable
             {
                 ["selectedTargets"] = _controller.CurrentRoutingPlan.Summary
             });
-        TargetValidationMessage.Text = string.Empty;
         RefreshTargetScopeView(locked: false);
         RefreshLiveStatusCards(_controller.Snapshot);
     }
@@ -777,25 +774,15 @@ public partial class MainWindow : Window, IDisposable
         _isApplyingSettings = true;
         try
         {
-            var routingPlan = _controller.CurrentRoutingPlan;
-            TargetSummaryChips.Text = FormatTargetChips(routingPlan);
-            TargetScopeStatus.Text = locked
-                ? "Bu oturumda değişmez. Değiştirmek için önce bağlantıyı kes."
-                : "Seçilen uygulama ve web hedefleri tünele alınır. Diğer tüm trafik normal bağlantıda kalır.";
-            if (locked)
-            {
-                TargetValidationMessage.Text = "Bağlantı açıkken hedef seçimi kilitli.";
-            }
-            else if (string.Equals(
-                         TargetValidationMessage.Text,
-                         "Bağlantı açıkken hedef seçimi kilitli.",
-                         StringComparison.Ordinal))
-            {
-                TargetValidationMessage.Text = string.Empty;
-            }
             foreach (var toggle in _targetToggles.Values)
             {
                 toggle.IsEnabled = !locked;
+                if (toggle.Tag is TargetDefinition target)
+                {
+                    toggle.ToolTip = locked
+                        ? $"{target.Label} - bağlantı açıkken seçim kilitli"
+                        : $"{target.Label} - {target.ScopeLabel}";
+                }
             }
         }
         finally
@@ -813,41 +800,22 @@ public partial class MainWindow : Window, IDisposable
         }
     }
 
-    private static string FormatTargetChips(RoutingPlan routingPlan)
-    {
-        var labels = routingPlan.SelectedTargets
-            .Select(target => target.Label)
-            .ToArray();
-        if (labels.Length == 0)
-        {
-            return "[Discord]";
-        }
-
-        var visible = labels.Take(3).Select(label => "[" + label + "]");
-        var suffix = labels.Length > 3
-            ? " [+" + (labels.Length - 3).ToString(CultureInfo.InvariantCulture) + "]"
-            : string.Empty;
-        return string.Join(" ", visible) + suffix;
-    }
-
     private static string CreateSafeTargetName(string targetId)
     {
         return targetId.Replace('-', '_');
     }
 
-    private static Grid CreateTargetCardContent(TargetDefinition target)
+    private static Border CreateTargetCardContent(TargetDefinition target)
     {
         var visual = GetTargetVisual(target.IconKey);
-        var grid = new Grid();
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-
         var iconBadge = new Border
         {
-            Width = 34,
-            Height = 34,
-            CornerRadius = new CornerRadius(8),
-            BorderBrush = new SolidColorBrush(MediaColor.FromArgb(116, 245, 247, 251)),
+            Width = 46,
+            Height = 46,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            CornerRadius = new CornerRadius(12),
+            BorderBrush = new SolidColorBrush(MediaColor.FromArgb(132, 245, 247, 251)),
             BorderThickness = new Thickness(1),
             Background = new LinearGradientBrush(visual.StartColor, visual.EndColor, 42),
             Child = CreateTargetMark(visual)
@@ -860,33 +828,7 @@ public partial class MainWindow : Window, IDisposable
             ShadowDepth = 0,
             Color = visual.EndColor
         };
-        grid.Children.Add(iconBadge);
-
-        var textPanel = new StackPanel
-        {
-            Margin = new Thickness(9, 0, 18, 0),
-            VerticalAlignment = VerticalAlignment.Center
-        };
-        Grid.SetColumn(textPanel, 1);
-        textPanel.Children.Add(new TextBlock
-        {
-            Text = target.Label,
-            FontSize = 11.6,
-            FontWeight = FontWeights.SemiBold,
-            TextTrimming = TextTrimming.CharacterEllipsis
-        });
-        textPanel.Children.Add(new TextBlock
-        {
-            Text = target.ScopeLabel,
-            Margin = new Thickness(0, 4, 0, 0),
-            FontSize = 9.2,
-            FontWeight = FontWeights.SemiBold,
-            Foreground = new SolidColorBrush(MediaColor.FromRgb(142, 200, 255)),
-            TextTrimming = TextTrimming.CharacterEllipsis
-        });
-        grid.Children.Add(textPanel);
-
-        return grid;
+        return iconBadge;
     }
 
     private static FrameworkElement CreateTargetMark(TargetVisual visual)
@@ -926,7 +868,7 @@ public partial class MainWindow : Window, IDisposable
             _ => new TextBlock
             {
                 Text = visual.Mark,
-                FontSize = visual.Mark.Length > 1 ? 12 : 20,
+                FontSize = visual.Mark.Length > 1 ? 16 : 25,
                 FontWeight = FontWeights.Bold,
                 Foreground = foreground,
                 HorizontalAlignment = System.Windows.HorizontalAlignment.Center,

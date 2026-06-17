@@ -118,6 +118,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Debug tanılama yalnızca açıkken ayrıntılı paket üretir", DiagnosticsWritesDebugBundleOnlyWhenEnabledAsync),
     ("Tanılama kalıcı hata loglarını redakte eder", DiagnosticsRedactsPersistentErrorLogAsync),
     ("WireSock süreç logları yazılırken redakte edilir", ProcessLauncherRedactsTunnelLogAndConfirmsExitAsync),
+    ("Süreç başlatıcı WireSock ve web proxy için ortak tunnel logunu paylaşır", ProcessLauncherSharesTunnelLogAcrossScopedProcessesAsync),
     ("Tanılama özeti son bilgi durumunu gecikmeli yazar", DiagnosticsFlushesDebouncedSummaryAsync)
 };
 
@@ -4554,6 +4555,57 @@ static async Task ProcessLauncherRedactsTunnelLogAndConfirmsExitAsync()
         Assert(!text.Contains("fake-private-key", StringComparison.Ordinal));
         Assert(text.Contains("access_token = [REDACTED]", StringComparison.Ordinal));
         Assert(text.Contains("PrivateKey = [REDACTED]", StringComparison.Ordinal));
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task ProcessLauncherSharesTunnelLogAcrossScopedProcessesAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var logPath = Path.Combine(root, "logs", "tunnel.log");
+    var systemDirectory = Environment.GetFolderPath(Environment.SpecialFolder.System);
+    var commandShell = Environment.GetEnvironmentVariable("ComSpec");
+    if (string.IsNullOrWhiteSpace(commandShell))
+    {
+        commandShell = Path.Combine(systemDirectory, "cmd.exe");
+    }
+
+    try
+    {
+        Assert(File.Exists(commandShell));
+        var launcher = new ProcessLauncher();
+        await using var wireSockProcess = launcher.Start(
+            commandShell,
+            [
+                "/c",
+                "ping -n 3 127.0.0.1 > nul"
+            ],
+            Path.GetDirectoryName(commandShell)!,
+            logPath);
+        await using var webProxyProcess = launcher.Start(
+            commandShell,
+            [
+                "/c",
+                "echo Astral.WebProxy ready"
+            ],
+            Path.GetDirectoryName(commandShell)!,
+            logPath);
+
+        for (var index = 0; index < 50 && !webProxyProcess.HasExited; index++)
+        {
+            await Task.Delay(50);
+        }
+
+        Assert(webProxyProcess.HasExited);
+        await webProxyProcess.DisposeAsync();
+        await wireSockProcess.DisposeAsync();
+
+        var text = await File.ReadAllTextAsync(logPath);
+        Assert(text.Contains("Astral.WebProxy ready", StringComparison.Ordinal));
+        Assert(text.Contains("cmd süreci başladı", StringComparison.Ordinal));
     }
     finally
     {

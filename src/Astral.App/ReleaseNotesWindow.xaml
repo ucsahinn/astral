@@ -80,7 +80,7 @@
                                 VerticalAlignment="Center">
                         <TextBlock FontSize="22"
                                    FontWeight="SemiBold"
-                                   Text="Astral v2.2.5" />
+                                   Text="Astral v2.2.6" />
                         <TextBlock Margin="0,5,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
@@ -107,7 +107,7 @@
                                            FontSize="14"
                                            LineHeight="21"
                                            TextWrapping="Wrap"
-                                           Text="v2.2.5, bağlantı koruması temizliğini sağlamlaştırır ve hedef kartlarının okunurluğunu artırır." />
+                                           Text="v2.2.6, web hedefleri için WireSock ve yerel proxy süreçlerinin aynı tünel logunu güvenle paylaşmasını sağlar." />
                             </StackPanel>
                         </Border>
 
@@ -126,15 +126,15 @@
                                            FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="• Astral açılışta güncellemeyi sessizce denetler; yeni sürüm yoksa ana ekranda güncelleme düğmesi görünmez." />
+                                           Text="• WireSock ve Astral.WebProxy aynı tünel logunu eş zamanlı yazabilir; web hedefleri artık log dosyası kilidine takılmaz." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="• Yeni sürüm bulunursa tek güçlü Güncelle düğmesi görünür ve denetlenmiş aynı paketi indirip doğrular." />
+                                           Text="• Tünel kapsamı alanı ürün odaklı logo tile yüzeyine sadeleştirildi." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="• Bağlantı kilidi kapanışında DNS flush komutu boş native çıkış koduyla başarısız görünürse tünel akışı artık kırılmaz." />
+                                           Text="• Hedef tile padding, seçili tik ve GitHub ikonu yüksek DPI'da kırpılmayacak şekilde düzenlendi." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"

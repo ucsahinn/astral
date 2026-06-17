@@ -3,6 +3,7 @@ using System.Net.Http;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -150,14 +151,12 @@ static void RenderMainWindow()
             FindVisualChildren<TextBlock>(window).Select(block => block.Text));
         Assert(text.Contains("Astral", StringComparison.Ordinal));
         Assert(text.Contains("Seçili hedef kapsamı hazır", StringComparison.Ordinal));
-        Assert(text.Contains("TÜNEL KAPSAMI", StringComparison.Ordinal));
-        Assert(text.Contains("Seçili hedefler", StringComparison.Ordinal));
+        Assert(!text.Contains("TÜNEL KAPSAMI", StringComparison.Ordinal));
+        Assert(!text.Contains("Seçili hedefler", StringComparison.Ordinal));
         Assert(!text.Contains("Hedefleri Seç", StringComparison.Ordinal));
         Assert(!text.Contains("Hedef Merkezi", StringComparison.Ordinal));
         Assert(text.Contains("Discord", StringComparison.Ordinal));
-        Assert(text.Contains("Roblox", StringComparison.Ordinal));
-        Assert(text.Contains("Wattpad", StringComparison.Ordinal));
-        Assert(text.Contains("Blogspot", StringComparison.Ordinal));
+        Assert(!text.Contains("Uygulama + Web", StringComparison.Ordinal));
         Assert(!text.Contains("Özel EXE", StringComparison.Ordinal));
         Assert(!text.Contains("Özel Domain", StringComparison.Ordinal));
         Assert(!text.Contains("Tarayıcı modu", StringComparison.Ordinal));
@@ -197,6 +196,25 @@ static void RenderMainWindow()
                 StringComparison.Ordinal))
             .ToArray();
         Assert(targetToggles.Length == 9);
+        var targetNames = targetToggles
+            .Select(AutomationProperties.GetName)
+            .ToArray();
+        foreach (var expectedTarget in new[]
+                 {
+                     "Discord hedefi",
+                     "Roblox hedefi",
+                     "Wattpad hedefi",
+                     "Bigo Live hedefi",
+                     "Azar hedefi",
+                     "Tango hedefi",
+                     "LiVU hedefi",
+                     "IMVU hedefi",
+                     "Blogspot hedefi"
+                 })
+        {
+            Assert(targetNames.Contains(expectedTarget));
+        }
+
         Assert(targetToggles.Any(toggle =>
             toggle.Name == "TargetToggle_discord"
             && toggle.IsChecked == true));

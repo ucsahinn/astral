@@ -46,33 +46,47 @@ public sealed class ProcessLauncher : IProcessLauncher
                 $"{Path.GetFileName(executable)} başlatılamadı.");
         }
 
-        return new ManagedProcess(process, logPath);
+        return new ManagedProcess(
+            process,
+            logPath,
+            Path.GetFileNameWithoutExtension(executable));
     }
 
     private sealed class ManagedProcess : IManagedProcess
     {
         private readonly Process _process;
+        private readonly string _processName;
         private readonly StreamWriter _log;
         private readonly Task _stdoutPump;
         private readonly Task _stderrPump;
         private bool _disposed;
         private bool _exitConfirmed;
 
-        public ManagedProcess(Process process, string logPath)
+        public ManagedProcess(
+            Process process,
+            string logPath,
+            string? processName)
         {
             _process = process;
+            _processName = string.IsNullOrWhiteSpace(processName)
+                ? "Hedef"
+                : processName;
             Directory.CreateDirectory(Path.GetDirectoryName(logPath)!);
             _log = new StreamWriter(
-                new FileStream(logPath, FileMode.Append, FileAccess.Write, FileShare.Read),
+                new FileStream(
+                    logPath,
+                    FileMode.Append,
+                    FileAccess.Write,
+                    FileShare.ReadWrite | FileShare.Delete),
                 new UTF8Encoding(encoderShouldEmitUTF8Identifier: false))
             {
                 AutoFlush = true
             };
 
             _process.Exited += OnExited;
-            _stdoutPump = PumpAsync(_process.StandardOutput, "OUT");
-            _stderrPump = PumpAsync(_process.StandardError, "ERR");
-            WriteLog("SYS", $"WireSock süreci başladı. PID={_process.Id}");
+            _stdoutPump = PumpAsync(_process.StandardOutput, _processName + ":OUT");
+            _stderrPump = PumpAsync(_process.StandardError, _processName + ":ERR");
+            WriteLog("SYS", $"{_processName} süreci başladı. PID={_process.Id}");
         }
 
         public event EventHandler? Exited;
@@ -206,7 +220,7 @@ public sealed class ProcessLauncher : IProcessLauncher
                 }
                 catch (OperationCanceledException)
                 {
-                    WriteLog("SYS", "WireSock süreci kapanma bekleme süresini aştı.");
+                    WriteLog("SYS", $"{_processName} süreci kapanma bekleme süresini aştı.");
                 }
                 catch (InvalidOperationException)
                 {
@@ -225,11 +239,11 @@ public sealed class ProcessLauncher : IProcessLauncher
             }
             catch (TimeoutException)
             {
-                WriteLog("SYS", "WireSock log akışı kapanma bekleme süresini aştı.");
+                WriteLog("SYS", $"{_processName} log akışı kapanma bekleme süresini aştı.");
             }
             WriteLog(
                 "SYS",
-                $"WireSock süreci kapandı. Kod={ExitCode?.ToString(CultureInfo.InvariantCulture) ?? "bilinmiyor"}");
+                $"{_processName} süreci kapandı. Kod={ExitCode?.ToString(CultureInfo.InvariantCulture) ?? "bilinmiyor"}");
             _exitConfirmed = _exitConfirmed || HasExited;
             await _log.DisposeAsync();
             _process.Dispose();

@@ -467,20 +467,20 @@
                             <ContentPresenter HorizontalAlignment="Stretch"
                                               VerticalAlignment="Center" />
                             <Border x:Name="CheckMark"
-                                    Width="20"
-                                    Height="20"
+                                    Width="16"
+                                    Height="16"
                                     HorizontalAlignment="Right"
                                     VerticalAlignment="Top"
-                                    CornerRadius="10"
+                                    CornerRadius="8"
                                     Background="{StaticResource AccentBrush}"
                                     BorderBrush="#F5F7FB"
                                     BorderThickness="1"
                                     Opacity="0">
                                 <Path Stroke="#07120C"
-                                      StrokeThickness="2"
+                                      StrokeThickness="1.7"
                                       StrokeStartLineCap="Round"
                                       StrokeEndLineCap="Round"
-                                      Data="M5,10 L9,14 L15,6" />
+                                      Data="M4,8 L7,11 L12,5" />
                             </Border>
                         </Grid>
                     </Border>
