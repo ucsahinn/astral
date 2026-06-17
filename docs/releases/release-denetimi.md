@@ -16,22 +16,22 @@ Bu doküman, GitHub Releases yüzeyindeki sürüm kararlarını ve yayın kapıs
 
 ## Güncel Sürüm Kararı
 
-Güncel patch hedef `v2.2.6` olarak belirlendi.
+Güncel patch hedef `v2.2.7` olarak belirlendi.
 
-Neden `v2.2.6`?
+Neden `v2.2.7`?
 
-- v2.2.5 tanılama paketlerinde bağlantının access-lock ve profil aşamalarını geçtiği, ancak `Astral.WebProxy` başlarken `tunnel.log` dosya paylaşımı yüzünden düştüğü görüldü.
-- WireSock ve Astral.WebProxy artık aynı tünel logunu eş zamanlı yazabilir; log redaksiyonu ve süreç kapanış doğrulaması korunur.
-- Ortak log satırlarında süreç adı görünür, böylece WireSock ve WebProxy çıktıları tanılamada karışmaz.
-- Tünel kapsamı paneli görünür açıklama metinlerinden arındırıldı; desteklenen ürünler logo odaklı tile yüzeyiyle gösterilir.
-- GitHub ve hedef tile ikonlarında kenara dayanan viewport/padding düzeni iyileştirildi.
+- v2.2.6 tanılama paketlerinde eski oturumdan kalan `Astral.WebProxy` sürecinin varsayılan portu tuttuğu ve yeni proxy sürecinin `SocketException 10048` ile kapandığı görüldü.
+- WebProxy artık varsayılan port doluysa güvenli yedek port seçer ve PAC dosyasını aynı porta göre üretir.
+- Proxy süreci başlatılamazsa PAC uygulanmadan hata verilir; çöken proxy süreci hazır sayılmaz.
+- Hedef kartları isim, kapsam etiketi ve marka renkli işaretlerle yeniden okunur hale getirildi; seçili tik ve GitHub ikonu kırpılmayacak şekilde düzenlendi.
 - Astral ana release hattı yalnız Astral assetlerini üretir; eski istemci geçişi ayrı köprü repo yüzeyinin sorumluluğudur.
 
 ## Public Release Yüzeyi
 
 | Release | Canlı durum | Asset durumu | Karar | Gerekçe |
 | --- | --- | --- | --- | --- |
-| `v2.2.6` | Yayın adayı | Bekliyor | Yayınla | WireSock/WebProxy ortak log paylaşımı ve logo-only hedef paneli hotfixleri. |
+| `v2.2.7` | Yayın adayı | Bekliyor | Yayınla | WebProxy port fallback, proxy readiness doğrulaması ve isimli hedef kartları hotfixleri. |
+| `v2.2.6` | Yayında | 4 asset | Koru | WireSock/WebProxy ortak log paylaşımı ve hedef paneli hotfixleri. |
 | `v2.2.5` | Yayında | 4 asset | Koru | Access-lock disable dayanıklılığı, seçili hedef koruması ve hedef kartı okunurluğu hotfixleri. |
 | `v2.2.4` | Yayında | 4 asset | Koru | Inline hedef kartları, Astral-only release assetleri ve update görünürlüğü hotfixleri. |
 | `v2.2.3` | Yayında | 8 asset | Koru | Önceki hedef seçim yüzeyi polish, WireSock readiness ve DNS flush hotfix. |
@@ -42,12 +42,12 @@ Neden `v2.2.6`?
 
 ## Yayın Kapısı
 
-`v2.2.6` yayınından önce tamamlanması gereken koşullar:
+`v2.2.7` yayınından önce tamamlanması gereken koşullar:
 
-- Proje, updater ve web proxy sürümü `2.2.6` ile aynı.
-- `Astral-2.2.6-win-x64.zip` ve sabit `Astral-win-x64.zip` aynı içeriği gösterir.
+- Proje, updater ve web proxy sürümü `2.2.7` ile aynı.
+- `Astral-2.2.7-win-x64.zip` ve sabit `Astral-win-x64.zip` aynı içeriği gösterir.
 - ZIP içinde `Astral.exe`, `Astral.Updater.exe`, `Astral.WebProxy.exe`, update manifest'i ve gerekli runtime dosyaları bulunur.
-- ZIP içindeki update manifest sürümü `2.2.6`.
+- ZIP içindeki update manifest sürümü `2.2.7`.
 - Astral release içinde eski isimli uyumluluk ZIP'i yayınlanmaz.
 - Kod imzalama sertifikası yapılandırılmadıysa paket imzasız olduğu açıkça not edilir.
 - `dotnet build`, Core tests, Windows tests, `scripts/verify.ps1`, `scripts/build-release.ps1`, `git diff --check` ve Gitleaks geçer.

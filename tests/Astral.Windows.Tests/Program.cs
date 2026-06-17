@@ -155,8 +155,24 @@ static void RenderMainWindow()
         Assert(!text.Contains("Seçili hedefler", StringComparison.Ordinal));
         Assert(!text.Contains("Hedefleri Seç", StringComparison.Ordinal));
         Assert(!text.Contains("Hedef Merkezi", StringComparison.Ordinal));
-        Assert(text.Contains("Discord", StringComparison.Ordinal));
-        Assert(!text.Contains("Uygulama + Web", StringComparison.Ordinal));
+        foreach (var expectedLabel in new[]
+                 {
+                     "Discord",
+                     "Roblox",
+                     "Wattpad",
+                     "Bigo Live",
+                     "Azar",
+                     "Tango",
+                     "LiVU",
+                     "IMVU",
+                     "Blogspot"
+                 })
+        {
+            Assert(text.Contains(expectedLabel, StringComparison.Ordinal));
+        }
+
+        Assert(text.Contains("Uygulama + Web", StringComparison.Ordinal));
+        Assert(text.Contains("Web", StringComparison.Ordinal));
         Assert(!text.Contains("Özel EXE", StringComparison.Ordinal));
         Assert(!text.Contains("Özel Domain", StringComparison.Ordinal));
         Assert(!text.Contains("Tarayıcı modu", StringComparison.Ordinal));
@@ -180,6 +196,7 @@ static void RenderMainWindow()
         Assert(buttons.Contains("🛠 Onar"));
         Assert(buttons.Contains("⛔ Profil Temizle"));
         Assert(buttons.Contains("🧾 Tanılama"));
+        Assert(!buttons.Any(button => button.Contains("WireSock", StringComparison.OrdinalIgnoreCase)));
         Assert(!buttons.Any(button =>
             button.Contains("Denetle", StringComparison.Ordinal)
             || button.Contains("Güncelle", StringComparison.Ordinal)

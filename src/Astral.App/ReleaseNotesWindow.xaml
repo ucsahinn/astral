@@ -80,7 +80,7 @@
                                 VerticalAlignment="Center">
                         <TextBlock FontSize="22"
                                    FontWeight="SemiBold"
-                                   Text="Astral v2.2.6" />
+                                   Text="Astral v2.2.7" />
                         <TextBlock Margin="0,5,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
@@ -107,7 +107,7 @@
                                            FontSize="14"
                                            LineHeight="21"
                                            TextWrapping="Wrap"
-                                           Text="v2.2.6, web hedefleri için WireSock ve yerel proxy süreçlerinin aynı tünel logunu güvenle paylaşmasını sağlar." />
+                                           Text="v2.2.7, eski oturumdan kalan yerel WebProxy port çakışmasını ve hedef kartı görsel hizasını düzelten hotfix sürümüdür." />
                             </StackPanel>
                         </Border>
 
@@ -126,15 +126,15 @@
                                            FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="• WireSock ve Astral.WebProxy aynı tünel logunu eş zamanlı yazabilir; web hedefleri artık log dosyası kilidine takılmaz." />
+                                           Text="• Varsayılan yerel proxy portu kullanımda ise Astral bu oturum için güvenli yedek port seçer ve PAC dosyasını aynı porta göre yazar." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="• Tünel kapsamı alanı ürün odaklı logo tile yüzeyine sadeleştirildi." />
+                                           Text="• Astral.WebProxy başlatılamazsa PAC uygulanmadan hata verilir; uygulama artık çöken proxy sürecini hazır saymaz." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="• Hedef tile padding, seçili tik ve GitHub ikonu yüksek DPI'da kırpılmayacak şekilde düzenlendi." />
+                                           Text="• Hedef kartları isim, kapsam etiketi ve marka renkli işaretlerle daha okunur hale getirildi; seçili tik ve GitHub ikonu kırpılmayacak şekilde düzenlendi." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"

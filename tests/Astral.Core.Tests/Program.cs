@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.IO.Compression;
+using System.Globalization;
 using Astral.Core.Configuration;
 using Astral.Core.Connection;
 using Astral.Core.Diagnostics;
@@ -25,9 +26,12 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Hedef kayıt defteri yerleşik presetleri güvenli kapsamla tanımlar", TargetRegistryDefinesBuiltInPresetsAsync),
     ("Hedef seçimi varsayılan Discord kapsamını ve eski tarayıcı ayarını güvenli taşır", TargetSelectionStoreDefaultsAndMigratesLegacyBrowserAsync),
     ("Hedef çözümleyici web hedeflerinde tarayıcıları değil web proxy sürecini kapsar", TargetScopeResolverUsesWebProxyForWebTargetsAsync),
+    ("Hedef çözümleyici tüm presetleri tek tek ve toplu güvenli kapsar", TargetScopeResolverCoversEveryPresetWithoutBrowsersAsync),
     ("Hedef çözümleyici eski özel hedef girdilerini kapsama almaz", TargetScopeResolverIgnoresLegacyCustomTargetsAsync),
     ("Web proxy politikası yalnızca seçili domainleri kabul eder", WebProxyPolicyAllowsOnlySelectedDomainsAsync),
     ("PAC üretici yalnızca seçili domainleri proxyye yönlendirir", ProxyPacRoutesOnlySelectedDomainsAsync),
+    ("Web proxy varsayılan port doluyken yedek porta geçer", ScopedWebProxyUsesFallbackPortWhenPreferredPortIsBusyAsync),
+    ("Web proxy erken kapanırsa PAC uygulanmaz", ScopedWebProxyRejectsExitedProcessBeforeApplyingPacAsync),
     ("Discord kapsamı parametresiz çağrıda sadece uygulamayı içerir", DiscordScopeDefaultsToAppOnlyAsync),
     ("Eski web kapsamı çağrısı tarayıcıları profile eklemez", DiscordScopeDoesNotIncludeBrowsersWhenLegacyFlagIsEnabledAsync),
     ("Web kapsamı PATH üzerindeki sahte tarayıcıları kapsama almaz", DiscordScopeIgnoresPathSpoofedBrowsersAsync),
@@ -156,6 +160,18 @@ static Task TargetRegistryDefinesBuiltInPresetsAsync()
     var targets = registry.GetBuiltInTargets().ToArray();
 
     Assert(targets.Length == 9);
+    Assert(targets.Select(target => target.Id).SequenceEqual(
+        [
+            TargetIds.Discord,
+            TargetIds.Roblox,
+            TargetIds.Wattpad,
+            TargetIds.Azar,
+            TargetIds.BigoLive,
+            TargetIds.IMVU,
+            TargetIds.LiVU,
+            TargetIds.Tango,
+            TargetIds.Blogspot
+        ]));
     Assert(registry.TryGet(TargetIds.Discord, out var discord));
     Assert(discord.Label == "Discord");
     Assert(discord.ScopeKind == TargetScopeKind.ApplicationAndWeb);
@@ -300,6 +316,69 @@ static Task TargetScopeResolverUsesWebProxyForWebTargetsAsync()
     return Task.CompletedTask;
 }
 
+static Task TargetScopeResolverCoversEveryPresetWithoutBrowsersAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var webProxyPath = Path.Combine(root, "Astral.WebProxy.exe");
+    Directory.CreateDirectory(Path.GetDirectoryName(webProxyPath)!);
+    File.WriteAllText(webProxyPath, "proxy");
+
+    try
+    {
+        var discordAppDirectory = Path.Combine(root, "Discord", "app-1.0.9999");
+        Directory.CreateDirectory(discordAppDirectory);
+        File.WriteAllText(Path.Combine(discordAppDirectory, "Discord.exe"), "discord");
+
+        var registry = TargetRegistry.CreateDefault();
+        var resolver = new TargetScopeResolver(
+            registry,
+            new DiscordAppScope(root, root, root),
+            webProxyPath);
+        var targets = registry.GetBuiltInTargets();
+
+        foreach (var target in targets)
+        {
+            var plan = resolver.Resolve(new TargetSelection([target.Id]));
+            Assert(plan.SelectedTargets.SequenceEqual([target]));
+            Assert(plan.AllowedApplications.All(app => !RoutingPlan.IsBrowserExecutable(app)));
+
+            if (target.HasWebScope)
+            {
+                Assert(plan.AllowedApplications.Contains(webProxyPath, StringComparer.OrdinalIgnoreCase));
+                foreach (var domain in target.Domains)
+                {
+                    Assert(plan.ProxyRules.Any(rule => rule.Pattern == domain.Pattern));
+                }
+            }
+            else
+            {
+                Assert(!plan.AllowedApplications.Contains(webProxyPath, StringComparer.OrdinalIgnoreCase));
+                Assert(plan.ProxyRules.Count == 0);
+            }
+
+            if (!target.Id.Equals(TargetIds.Discord, StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (var other in targets.Where(other => other.Id != target.Id))
+                {
+                    Assert(!plan.ProxyRules.Any(rule =>
+                        other.Domains.Any(domain => domain.Pattern == rule.Pattern)));
+                }
+            }
+        }
+
+        var allPlan = resolver.Resolve(new TargetSelection(targets.Select(target => target.Id).ToArray()));
+        Assert(allPlan.SelectedTargets.Count == targets.Count);
+        Assert(allPlan.AllowedApplications.Contains(webProxyPath, StringComparer.OrdinalIgnoreCase));
+        Assert(allPlan.AllowedApplications.All(app => !RoutingPlan.IsBrowserExecutable(app)));
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+
+    return Task.CompletedTask;
+}
+
 static Task TargetScopeResolverIgnoresLegacyCustomTargetsAsync()
 {
     var root = CreateTemporaryDirectory();
@@ -369,6 +448,85 @@ static Task ProxyPacRoutesOnlySelectedDomainsAsync()
     Assert(!script.Contains("discord.com", StringComparison.OrdinalIgnoreCase));
 
     return Task.CompletedTask;
+}
+
+static async Task ScopedWebProxyUsesFallbackPortWhenPreferredPortIsBusyAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var paths = new AppPaths(root);
+    var preferredPort = ReserveTcpPort();
+    using var listener = new TcpListener(IPAddress.Loopback, preferredPort);
+    listener.Start();
+    var runner = new RecordingCommandRunner();
+    var process = new FakeManagedProcess();
+    var launcher = new FakeProcessLauncher(process, logLines: []);
+    var service = new WindowsScopedWebProxyService(
+        paths,
+        runner,
+        launcher,
+        Path.Combine(root, "Astral.WebProxy.exe"),
+        powerShellPath: "powershell.exe",
+        preferredProxyPort: preferredPort);
+    File.WriteAllText(Path.Combine(root, "Astral.WebProxy.exe"), "proxy");
+    var plan = CreateWebProxyRoutingPlan(root);
+
+    try
+    {
+        await service.ApplyAsync(plan, progress: null, CancellationToken.None);
+
+        var portIndex = launcher.LastArguments
+            .Select((value, index) => (value, index))
+            .Single(item => item.value == "--port")
+            .index + 1;
+        var selectedPort = int.Parse(
+            launcher.LastArguments[portIndex],
+            CultureInfo.InvariantCulture);
+        Assert(selectedPort != preferredPort);
+        var pacScript = await File.ReadAllTextAsync(paths.WebProxyPacFile);
+        Assert(pacScript.Contains(
+            $"PROXY 127.0.0.1:{selectedPort.ToString(CultureInfo.InvariantCulture)}",
+            StringComparison.Ordinal));
+        Assert(runner.Commands.Count == 1);
+    }
+    finally
+    {
+        await service.ClearAsync(CancellationToken.None);
+        listener.Stop();
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task ScopedWebProxyRejectsExitedProcessBeforeApplyingPacAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var paths = new AppPaths(root);
+    var runner = new RecordingCommandRunner();
+    var process = new FakeManagedProcess(initialHasExited: true);
+    var service = new WindowsScopedWebProxyService(
+        paths,
+        runner,
+        new FakeProcessLauncher(process, logLines: []),
+        Path.Combine(root, "Astral.WebProxy.exe"),
+        powerShellPath: "powershell.exe");
+    File.WriteAllText(Path.Combine(root, "Astral.WebProxy.exe"), "proxy");
+    var plan = CreateWebProxyRoutingPlan(root);
+
+    try
+    {
+        var exception = await AssertThrowsAsync<InvalidOperationException>(
+            () => service.ApplyAsync(plan, progress: null, CancellationToken.None));
+
+        Assert(exception.Message.Contains(
+            "yerel web proxy başlatılamadı",
+            StringComparison.OrdinalIgnoreCase));
+        Assert(runner.Commands.Count == 0);
+        Assert(process.StopCount == 1);
+    }
+    finally
+    {
+        await service.ClearAsync(CancellationToken.None);
+        Directory.Delete(root, recursive: true);
+    }
 }
 
 static Task DiscordScopeDefaultsToAppOnlyAsync()
@@ -2639,7 +2797,7 @@ static async Task ControllerRejectsMissingWireSockHandshakeAsync()
 
         Assert(controller.Snapshot.State == TunnelState.Error);
         Assert(controller.Snapshot.Message.Contains(
-            "WireSock bağlantısı doğrulanamadı",
+            "Astral tünel bağlantısı doğrulanamadı",
             StringComparison.Ordinal));
         Assert(process.HasExited);
 
@@ -2813,7 +2971,7 @@ static async Task ControllerRejectsBlockedTunnelReadinessAsync(
 
         Assert(controller.Snapshot.State == TunnelState.Error);
         Assert(controller.Snapshot.Message.Contains(
-            "WireSock sanal adaptörü aktifleşmedi",
+            "Astral tünel adaptörü aktifleşmedi",
             StringComparison.Ordinal));
         Assert(process.HasExited);
         Assert(accessLock.ClearTunnelScopeCount == 1);
@@ -2828,7 +2986,7 @@ static async Task ControllerRejectsBlockedTunnelReadinessAsync(
 
         var health = await File.ReadAllTextAsync(paths.HealthReport);
         Assert(health.Contains(
-            "WireSock sanal adaptörü aktifleşmedi",
+            "Astral tünel adaptörü aktifleşmedi",
             StringComparison.Ordinal));
         Assert(health.Contains(
             $"\"tunnelReadiness\":\"{expectedStatus}\"",
@@ -4656,6 +4814,26 @@ static string CreateTemporaryDirectory()
     return path;
 }
 
+static RoutingPlan CreateWebProxyRoutingPlan(string root)
+{
+    var registry = TargetRegistry.CreateDefault();
+    var resolver = new TargetScopeResolver(
+        registry,
+        new DiscordAppScope(root, root, root),
+        Path.Combine(root, "Astral.WebProxy.exe"));
+
+    return resolver.Resolve(new TargetSelection([TargetIds.Wattpad]));
+}
+
+static int ReserveTcpPort()
+{
+    using var listener = new TcpListener(IPAddress.Loopback, 0);
+    listener.Start();
+    var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+    listener.Stop();
+    return port;
+}
+
 static void ResetReadOnlyAttribute(string path)
 {
     if (!File.Exists(path))
@@ -5587,24 +5765,29 @@ file sealed class FakeManagedProcess : IManagedProcess
     private static int _nextProcessId = 1000;
     private readonly bool _exitOnStop;
     private readonly bool _exitOnDispose;
+    private readonly int _exitCode;
 
     public event EventHandler? Exited;
 
     public FakeManagedProcess(
+        bool initialHasExited = false,
         bool exitOnStop = true,
-        bool exitOnDispose = true)
+        bool exitOnDispose = true,
+        int exitCode = 0)
     {
         _exitOnStop = exitOnStop;
         _exitOnDispose = exitOnDispose;
+        _exitCode = exitCode;
         ProcessId = Interlocked.Increment(ref _nextProcessId);
         StartTime = DateTimeOffset.Now;
+        HasExited = initialHasExited;
     }
 
     public bool HasExited { get; private set; }
 
     public bool ExitConfirmed => HasExited;
 
-    public int? ExitCode => HasExited ? 0 : null;
+    public int? ExitCode => HasExited ? _exitCode : null;
 
     public int ProcessId { get; }
 

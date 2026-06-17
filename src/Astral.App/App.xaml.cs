@@ -114,7 +114,7 @@ public partial class App : System.Windows.Application, IDisposable
             Timeout = TimeSpan.FromMinutes(10)
         };
         _httpClient.DefaultRequestHeaders.UserAgent.Add(
-            new ProductInfoHeaderValue("Astral", "2.2.6"));
+            new ProductInfoHeaderValue("Astral", "2.2.7"));
 
         var downloader = new VerifiedDownloader(_httpClient, maxAttempts: 5);
         var wireSockLocator = new WireSockLocator();

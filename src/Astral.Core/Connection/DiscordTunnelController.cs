@@ -622,7 +622,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
             _diagnostics.Info(
                 "controller.tunnelReadiness",
-                "WireSock sanal adaptörü denetleniyor.",
+                "Astral tünel adaptörü denetleniyor.",
                 details);
 
             if (!_lastTunnelReadiness.BlocksConnection
@@ -639,16 +639,16 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
         _diagnostics.Warning(
             "controller.tunnelReadiness",
-            "WireSock sanal adaptörü aktifleşmedi.",
+            "Astral tünel adaptörü aktifleşmedi.",
             CreateTunnelReadinessDetails());
         if (!_lastTunnelReadiness.BlocksConnection)
         {
             throw new InvalidOperationException(
-                "WireSock bağlantısı doğrulanamadı. Cloudflare WARP tüneli bağlantıyı tamamlamadı; farklı ağ, DNS veya ISP engeli olabilir.");
+                "Astral tünel bağlantısı doğrulanamadı. Cloudflare WARP tüneli bağlantıyı tamamlamadı; farklı ağ, DNS veya ISP engeli olabilir.");
         }
 
         throw new InvalidOperationException(
-            "WireSock sanal adaptörü aktifleşmedi. WireSock sürücüsünü onarın veya bilgisayarı yeniden başlatıp tekrar bağlanın.");
+            "Astral tünel adaptörü aktifleşmedi. Bağlantı motorunu onarın veya bilgisayarı yeniden başlatıp tekrar bağlanın.");
     }
 
     private Dictionary<string, string?> CreateTunnelReadinessDetails()

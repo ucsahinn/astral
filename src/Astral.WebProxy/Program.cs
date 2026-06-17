@@ -20,7 +20,21 @@ Console.CancelKeyPress += (_, eventArgs) =>
     shutdown.Cancel();
 };
 
-listener.Start();
+try
+{
+    listener.Start();
+    Console.WriteLine(
+        $"Astral.WebProxy listening on 127.0.0.1:{options.Port.ToString(CultureInfo.InvariantCulture)}");
+}
+catch (SocketException exception)
+    when (exception.SocketErrorCode is SocketError.AddressAlreadyInUse)
+{
+    Console.Error.WriteLine(
+        "Astral.WebProxy local port is already in use: " +
+        options.Port.ToString(CultureInfo.InvariantCulture));
+    return 72;
+}
+
 try
 {
     while (!shutdown.IsCancellationRequested)

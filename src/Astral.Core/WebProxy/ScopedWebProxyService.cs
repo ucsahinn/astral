@@ -3,6 +3,8 @@ using Astral.Core.Diagnostics;
 using Astral.Core.Infrastructure;
 using Astral.Core.Targets;
 using System.Globalization;
+using System.Net;
+using System.Net.Sockets;
 
 namespace Astral.Core.WebProxy;
 
@@ -42,8 +44,10 @@ public sealed class NullScopedWebProxyService : IScopedWebProxyService
 
 public sealed class WindowsScopedWebProxyService : IScopedWebProxyService, IAsyncDisposable
 {
-    private const int ProxyPort = 18088;
+    private const int DefaultProxyPort = 18088;
     private static readonly TimeSpan ScriptTimeout = TimeSpan.FromSeconds(20);
+    private static readonly TimeSpan ProcessStartupValidationDelay =
+        TimeSpan.FromMilliseconds(450);
 
     private readonly AppPaths _paths;
     private readonly ICommandRunner _commandRunner;
@@ -51,6 +55,7 @@ public sealed class WindowsScopedWebProxyService : IScopedWebProxyService, IAsyn
     private readonly string _webProxyExecutable;
     private readonly IAstralDiagnostics _diagnostics;
     private readonly string _powerShellPath;
+    private readonly int _preferredProxyPort;
     private IManagedProcess? _proxyProcess;
 
     public WindowsScopedWebProxyService(
@@ -59,7 +64,8 @@ public sealed class WindowsScopedWebProxyService : IScopedWebProxyService, IAsyn
         IProcessLauncher processLauncher,
         string webProxyExecutable,
         IAstralDiagnostics? diagnostics = null,
-        string? powerShellPath = null)
+        string? powerShellPath = null,
+        int preferredProxyPort = DefaultProxyPort)
     {
         _paths = paths ?? throw new ArgumentNullException(nameof(paths));
         _commandRunner = commandRunner ?? throw new ArgumentNullException(nameof(commandRunner));
@@ -71,6 +77,14 @@ public sealed class WindowsScopedWebProxyService : IScopedWebProxyService, IAsyn
         _powerShellPath = string.IsNullOrWhiteSpace(powerShellPath)
             ? GetDefaultPowerShellPath()
             : powerShellPath;
+        if (preferredProxyPort is <= 0 or > 65535)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(preferredProxyPort),
+                "Proxy portu 1-65535 aralığında olmalıdır.");
+        }
+
+        _preferredProxyPort = preferredProxyPort;
     }
 
     public async Task ApplyAsync(
@@ -95,10 +109,23 @@ public sealed class WindowsScopedWebProxyService : IScopedWebProxyService, IAsyn
         }
 
         _paths.EnsureDirectories();
+        var proxyPort = SelectAvailableProxyPort(_preferredProxyPort);
+        if (proxyPort != _preferredProxyPort)
+        {
+            _diagnostics.Warning(
+                "webProxy.portFallback",
+                "Varsayılan yerel proxy portu kullanımda; bu oturum için yedek port seçildi.",
+                new Dictionary<string, string?>
+                {
+                    ["preferredPort"] = _preferredProxyPort.ToString(CultureInfo.InvariantCulture),
+                    ["selectedPort"] = proxyPort.ToString(CultureInfo.InvariantCulture)
+                });
+        }
+
         var pacScript = ProxyPacScriptBuilder.Build(
             routingPlan.ProxyRules,
             "127.0.0.1",
-            ProxyPort);
+            proxyPort);
         await File.WriteAllTextAsync(_paths.WebProxyPacFile, pacScript, cancellationToken);
         var pacUri = new Uri(_paths.WebProxyPacFile).AbsoluteUri;
 
@@ -106,7 +133,7 @@ public sealed class WindowsScopedWebProxyService : IScopedWebProxyService, IAsyn
         var arguments = new List<string>
         {
             "--port",
-            ProxyPort.ToString(CultureInfo.InvariantCulture)
+            proxyPort.ToString(CultureInfo.InvariantCulture)
         };
         foreach (var rule in routingPlan.ProxyRules)
         {
@@ -119,6 +146,7 @@ public sealed class WindowsScopedWebProxyService : IScopedWebProxyService, IAsyn
             arguments,
             Path.GetDirectoryName(_webProxyExecutable)!,
             _paths.TunnelLog);
+        await EnsureProxyProcessStartedAsync(proxyPort, cancellationToken);
         progress?.Report("Seçili web hedefleri için yerel proxy hazır");
 
         await RunScriptAsync(
@@ -130,6 +158,7 @@ public sealed class WindowsScopedWebProxyService : IScopedWebProxyService, IAsyn
             new Dictionary<string, string?>
             {
                 ["proxyRuleCount"] = routingPlan.ProxyRules.Count.ToString(CultureInfo.InvariantCulture),
+                ["proxyPort"] = proxyPort.ToString(CultureInfo.InvariantCulture),
                 ["pac"] = "file"
             });
     }
@@ -175,6 +204,31 @@ public sealed class WindowsScopedWebProxyService : IScopedWebProxyService, IAsyn
         await _proxyProcess.StopAsync(TimeSpan.FromSeconds(2), cancellationToken);
         await _proxyProcess.DisposeAsync();
         _proxyProcess = null;
+    }
+
+    private async Task EnsureProxyProcessStartedAsync(
+        int proxyPort,
+        CancellationToken cancellationToken)
+    {
+        if (_proxyProcess is null)
+        {
+            throw new InvalidOperationException(
+                "Astral yerel web proxy başlatılamadı.");
+        }
+
+        await Task.Delay(ProcessStartupValidationDelay, cancellationToken);
+        if (!_proxyProcess.HasExited)
+        {
+            return;
+        }
+
+        var exitCode = _proxyProcess.ExitCode;
+        await StopProxyProcessAsync(cancellationToken);
+        throw new InvalidOperationException(
+            "Astral yerel web proxy başlatılamadı. " +
+            $"Port {proxyPort.ToString(CultureInfo.InvariantCulture)} dinlenemedi; " +
+            "önceki oturumdan kalan proxy süreci veya başka bir yerel servis portu kullanıyor olabilir. " +
+            $"Çıkış kodu: {exitCode?.ToString(CultureInfo.InvariantCulture) ?? "bilinmiyor"}.");
     }
 
     private async Task RunScriptAsync(
@@ -254,6 +308,35 @@ public sealed class WindowsScopedWebProxyService : IScopedWebProxyService, IAsyn
     private static string QuotePowerShell(string value)
     {
         return value.Replace("'", "''", StringComparison.Ordinal);
+    }
+
+    private static int SelectAvailableProxyPort(int preferredPort)
+    {
+        if (CanBindLoopback(preferredPort))
+        {
+            return preferredPort;
+        }
+
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+        return port;
+    }
+
+    private static bool CanBindLoopback(int port)
+    {
+        try
+        {
+            using var listener = new TcpListener(IPAddress.Loopback, port);
+            listener.Start();
+            listener.Stop();
+            return true;
+        }
+        catch (SocketException)
+        {
+            return false;
+        }
     }
 
     private static string GetDefaultPowerShellPath()

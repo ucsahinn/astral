@@ -4,6 +4,19 @@ namespace Astral.Core.Targets;
 
 public sealed class TargetRegistry
 {
+    private static readonly IReadOnlyList<string> BuiltInTargetOrder =
+    [
+        TargetIds.Discord,
+        TargetIds.Roblox,
+        TargetIds.Wattpad,
+        TargetIds.Azar,
+        TargetIds.BigoLive,
+        TargetIds.IMVU,
+        TargetIds.LiVU,
+        TargetIds.Tango,
+        TargetIds.Blogspot
+    ];
+
     private static readonly IReadOnlyDictionary<string, string> NeutralMetadata =
         new Dictionary<string, string>
         {
@@ -100,9 +113,9 @@ public sealed class TargetRegistry
 
     public IReadOnlyList<TargetDefinition> GetBuiltInTargets()
     {
-        return _targets.Values
-            .OrderBy(target => target.Category)
-            .ThenBy(target => target.Label, StringComparer.CurrentCultureIgnoreCase)
+        return BuiltInTargetOrder
+            .Where(_targets.ContainsKey)
+            .Select(id => _targets[id])
             .ToArray();
     }
 

@@ -1,6 +1,6 @@
 # Güvenlik Politikası
 
-Astral dar kapsamlı bir Windows aracıdır: yalnızca Discord trafiğini tüneller ve sistem ağ ayarlarını kalıcı olarak değiştirmez.
+Astral dar kapsamlı bir Windows aracıdır: yalnızca kullanıcının seçtiği uygulama ve web hedefleri için bağlantı kapsamı oluşturur; tüm PC'yi, tüm tarayıcıyı veya sistem genelini VPN'e almayı amaçlamaz.
 
 ## Desteklenen Sürüm
 
@@ -16,7 +16,7 @@ Güvenlik açıklarını herkese açık bildirim olarak paylaşmayın. Şu durum
 
 - İmza, hash veya yayıncı doğrulamasını atlatan açıklar.
 - WireSock veya wgcf indirme zincirinde bütünlük zayıflığı.
-- Discord dışı uygulamaların tünele alınmasına yol açan hatalar.
+- Seçili olmayan uygulama veya domainlerin tünele alınmasına yol açan hatalar.
 - Gizli profil, hesap veya anahtar sızıntısı.
 - TLS doğrulamasını zayıflatan regresyonlar.
 
