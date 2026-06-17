@@ -104,6 +104,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Denetleyici duran indirme zaman aşımını Türkçe açıklar", ControllerDirectDownloadTimeoutIsUserFriendlyAsync),
     ("Denetleyici bağlantı koruması hatasını Türkçe açıklar", ControllerAccessLockFailureIsUserFriendlyAsync),
     ("Windows Firewall koruması sessiz PowerShell hatasını operasyonla açıklar", WindowsFirewallAccessLockLabelsSilentPowerShellFailureAsync),
+    ("Windows Firewall koruması seçili hedef domainleriyle kilit üretir", WindowsFirewallAccessLockUsesSelectedTargetDomainsAsync),
     ("Windows Firewall koruması Discord alan adı kuralını yönetir", WindowsFirewallAccessLockBuildsExpectedCommandsAsync),
     ("Windows Firewall koruması DNS temizleme hatasını kritik çıkış kodu yapmaz", WindowsFirewallAccessLockIgnoresDnsFlushExitCodeAsync),
     ("WireSock hazırlık denetimi wt WireGuard adaptörünü tanır", TunnelReadinessRecognizesWireSockWireGuardAdapterAsync),
@@ -3738,7 +3739,10 @@ static async Task WindowsFirewallAccessLockLabelsSilentPowerShellFailureAsync()
 {
     var root = CreateTemporaryDirectory();
     var runner = new RecordingCommandRunner(
-        new CommandResult(1, string.Empty, string.Empty));
+        new CommandResult(
+            1,
+            "astral-phase=FirewallRule:Astral.BlockDiscordDomains",
+            string.Empty));
     var accessLock = new WindowsFirewallDiscordAccessLock(
         new AppPaths(root),
         runner,
@@ -3756,6 +3760,49 @@ static async Task WindowsFirewallAccessLockLabelsSilentPowerShellFailureAsync()
             StringComparison.Ordinal));
         Assert(exception.Message.Contains(
             "PowerShell exit code 1",
+            StringComparison.Ordinal));
+        Assert(exception.Message.Contains(
+            "FirewallRule:Astral.BlockDiscordDomains",
+            StringComparison.Ordinal));
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task WindowsFirewallAccessLockUsesSelectedTargetDomainsAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var runner = new RecordingCommandRunner();
+    var accessLock = new WindowsFirewallDiscordAccessLock(
+        new AppPaths(root),
+        runner,
+        "powershell.exe");
+    var registry = TargetRegistry.CreateDefault();
+    var resolver = new TargetScopeResolver(
+        registry,
+        new DiscordAppScope(root, root, root),
+        Path.Combine(root, "Astral.WebProxy.exe"));
+    var plan = resolver.Resolve(new TargetSelection(
+        [TargetIds.Wattpad, TargetIds.Blogspot]));
+
+    try
+    {
+        await accessLock.EnableAsync(plan, CancellationToken.None);
+
+        Assert(runner.Commands.Count == 1);
+        Assert(runner.Commands[0].Contains(
+            "'wattpad.com'",
+            StringComparison.Ordinal));
+        Assert(runner.Commands[0].Contains(
+            "'blogspot.com'",
+            StringComparison.Ordinal));
+        Assert(!runner.Commands[0].Contains(
+            "'*.blogspot.com'",
+            StringComparison.Ordinal));
+        Assert(!runner.Commands[0].Contains(
+            "'discord.com'",
             StringComparison.Ordinal));
     }
     finally
@@ -3872,8 +3919,8 @@ static async Task WindowsFirewallAccessLockBuildsExpectedCommandsAsync()
             "Get-Process -Name $processName",
             StringComparison.Ordinal));
         Assert(!runner.Commands[2].Contains(
-            "Get-Command",
-            StringComparison.Ordinal));
+            "Get-Command chrome",
+            StringComparison.OrdinalIgnoreCase));
         Assert(!runner.Commands[2].Contains(
             "HKCU:\\",
             StringComparison.Ordinal));

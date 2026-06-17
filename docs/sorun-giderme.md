@@ -41,7 +41,7 @@ Manuel registry temizliği veya sistem proxy ayarı değiştirme işlemleri kull
 
 ## Otomatik Güncelleme Görünmüyor
 
-v2.2.4 ile **Güncelle** düğmesi yalnız yeni sürüm bulunduğunda görünür. Yeni sürüm yoksa bu düğmenin görünmemesi normaldir. Güncelleme hatası varsa tanılama paketindeki `ui.update.backgroundCheck` ve update log kayıtlarını kontrol edin.
+v2.2.4 ve sonrası sürümlerde **Güncelle** düğmesi yalnız yeni sürüm bulunduğunda görünür. Yeni sürüm yoksa bu düğmenin görünmemesi normaldir. Güncelleme hatası varsa tanılama paketindeki `ui.update.backgroundCheck` ve update log kayıtlarını kontrol edin.
 
 ## Tanılama İçin Gerekli Bilgiler
 

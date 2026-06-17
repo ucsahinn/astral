@@ -80,7 +80,7 @@
                                 VerticalAlignment="Center">
                         <TextBlock FontSize="22"
                                    FontWeight="SemiBold"
-                                   Text="Astral v2.2.4" />
+                                   Text="Astral v2.2.5" />
                         <TextBlock Margin="0,5,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
@@ -107,7 +107,7 @@
                                            FontSize="14"
                                            LineHeight="21"
                                            TextWrapping="Wrap"
-                                           Text="v2.2.4, hedef seçimini ana ekrandaki kartlara taşır ve güncelleme düğmesini yalnızca yeni sürüm bulunduğunda gösterir." />
+                                           Text="v2.2.5, bağlantı koruması temizliğini sağlamlaştırır ve hedef kartlarının okunurluğunu artırır." />
                             </StackPanel>
                         </Border>
 

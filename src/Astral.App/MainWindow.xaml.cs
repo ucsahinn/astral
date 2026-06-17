@@ -38,7 +38,7 @@ public partial class MainWindow : Window, IDisposable
     private static readonly Uri RepositoryUri = new(
         "https://github.com/ucsahinn/astral");
     private static readonly Uri ReleaseNotesUri = new(
-        "https://github.com/ucsahinn/astral/releases/tag/v2.2.4");
+        "https://github.com/ucsahinn/astral/releases/tag/v2.2.5");
     private static readonly Uri BackgroundVideoUri = new(
         "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260606_154941_df1a96e1-a06f-450c-bd02-d863414cc1a0.mp4");
     private static readonly string LocalBackgroundVideoPath = Path.Combine(
@@ -217,8 +217,8 @@ public partial class MainWindow : Window, IDisposable
             ? "Devam eden işlem bitince onarım kullanılabilir."
             : "Bağlantı dosyalarını güvenle yenile";
         ApplyUpdateControls(snapshot.IsBusy);
-        StatusMessage.Text = snapshot.Message;
-        StatusDetail.Text = GetDetail(snapshot.State);
+        StatusMessage.Text = GetStatusMessage(snapshot);
+        StatusDetail.Text = GetDetail(snapshot);
         RefreshTargetScopeView(snapshot.IsBusy || snapshot.IsConnected);
         RefreshLiveStatusCards(snapshot);
         UpdateBackgroundVideoForSnapshot(snapshot);
@@ -610,6 +610,37 @@ public partial class MainWindow : Window, IDisposable
         textBlock.Opacity = isActive ? 1 : 0.58;
     }
 
+    private static string GetStatusMessage(TunnelSnapshot snapshot)
+    {
+        if (snapshot.State is TunnelState.Error)
+        {
+            if (snapshot.Message.Contains(
+                    "Hedef bağlantı koruması",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return "Hedef bağlantı koruması güncellenemedi";
+            }
+
+            if (snapshot.Message.Length > 72)
+            {
+                return "Bağlantı tamamlanamadı";
+            }
+        }
+
+        return snapshot.Message;
+    }
+
+    private static string GetDetail(TunnelSnapshot snapshot)
+    {
+        if (snapshot.State is TunnelState.Error
+            && !string.IsNullOrWhiteSpace(snapshot.Message))
+        {
+            return snapshot.Message;
+        }
+
+        return GetDetail(snapshot.State);
+    }
+
     private static string GetDetail(TunnelState state)
     {
         return state switch
@@ -649,7 +680,7 @@ public partial class MainWindow : Window, IDisposable
                 Name = "TargetToggle_" + CreateSafeTargetName(target.Id),
                 Tag = target,
                 Width = 184,
-                Height = 46,
+                Height = 50,
                 Margin = new Thickness(0, 0, 10, 4),
                 Style = (Style)FindResource("TargetCardCheckBoxStyle"),
                 ToolTip = target.Metadata.TryGetValue("note", out var note)
@@ -813,8 +844,8 @@ public partial class MainWindow : Window, IDisposable
 
         var iconBadge = new Border
         {
-            Width = 32,
-            Height = 32,
+            Width = 34,
+            Height = 34,
             CornerRadius = new CornerRadius(8),
             BorderBrush = new SolidColorBrush(MediaColor.FromArgb(116, 245, 247, 251)),
             BorderThickness = new Thickness(1),
@@ -840,15 +871,15 @@ public partial class MainWindow : Window, IDisposable
         textPanel.Children.Add(new TextBlock
         {
             Text = target.Label,
-            FontSize = 11,
+            FontSize = 11.6,
             FontWeight = FontWeights.SemiBold,
             TextTrimming = TextTrimming.CharacterEllipsis
         });
         textPanel.Children.Add(new TextBlock
         {
             Text = target.ScopeLabel,
-            Margin = new Thickness(0, 3, 0, 0),
-            FontSize = 8.5,
+            Margin = new Thickness(0, 4, 0, 0),
+            FontSize = 9.2,
             FontWeight = FontWeights.SemiBold,
             Foreground = new SolidColorBrush(MediaColor.FromRgb(142, 200, 255)),
             TextTrimming = TextTrimming.CharacterEllipsis

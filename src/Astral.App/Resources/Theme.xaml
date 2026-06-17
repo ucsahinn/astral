@@ -518,8 +518,32 @@
                                     Value="0.82" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Opacity" Value="0.50" />
+                            <Setter Property="Cursor" Value="Arrow" />
+                            <Setter TargetName="CardBorder"
+                                    Property="Opacity"
+                                    Value="0.88" />
+                            <Setter TargetName="CardBorder"
+                                    Property="BorderBrush"
+                                    Value="#7A8EC8FF" />
+                            <Setter TargetName="CardBorder"
+                                    Property="Background"
+                                    Value="#7B101D31" />
                         </Trigger>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsEnabled" Value="False" />
+                                <Condition Property="IsChecked" Value="True" />
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="CheckMark"
+                                    Property="Opacity"
+                                    Value="0.76" />
+                            <Setter TargetName="CheckMark"
+                                    Property="Background"
+                                    Value="#B88EC8FF" />
+                            <Setter TargetName="CheckMark"
+                                    Property="BorderBrush"
+                                    Value="#D7F2FF" />
+                        </MultiTrigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>

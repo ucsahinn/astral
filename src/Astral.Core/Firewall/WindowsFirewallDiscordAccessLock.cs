@@ -1,5 +1,6 @@
 using Astral.Core.Configuration;
 using Astral.Core.Infrastructure;
+using Astral.Core.Targets;
 
 namespace Astral.Core.Firewall;
 
@@ -22,26 +23,28 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
     private const string BrowserScopeDisplayName =
         "Astral tünel kapsamı - tarayıcı Discord engeli";
     private static readonly TimeSpan ScriptTimeout = TimeSpan.FromSeconds(60);
-    private const string DiscordDomains =
-        "'discord.com'," +
-        "'ptb.discord.com'," +
-        "'canary.discord.com'," +
-        "'status.discord.com'," +
-        "'support.discord.com'," +
-        "'discordapp.com'," +
-        "'discordapp.net'," +
-        "'discord.gg'," +
-        "'discord.gift'," +
-        "'discord.media'," +
-        "'discordstatus.com'," +
-        "'discordcdn.com'," +
-        "'cdn.discordapp.com'," +
-        "'dl.discordapp.net'," +
-        "'updates.discord.com'," +
-        "'gateway.discord.gg'," +
-        "'media.discordapp.net'," +
-        "'images-ext-1.discordapp.net'," +
-        "'images-ext-2.discordapp.net'";
+    private static readonly string[] DefaultLockDomains =
+    [
+        "discord.com",
+        "ptb.discord.com",
+        "canary.discord.com",
+        "status.discord.com",
+        "support.discord.com",
+        "discordapp.com",
+        "discordapp.net",
+        "discord.gg",
+        "discord.gift",
+        "discord.media",
+        "discordstatus.com",
+        "discordcdn.com",
+        "cdn.discordapp.com",
+        "dl.discordapp.net",
+        "updates.discord.com",
+        "gateway.discord.gg",
+        "media.discordapp.net",
+        "images-ext-1.discordapp.net",
+        "images-ext-2.discordapp.net"
+    ];
 
     private readonly AppPaths _paths;
     private readonly ICommandRunner _commandRunner;
@@ -62,7 +65,21 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
 
     public Task EnableAsync(CancellationToken cancellationToken)
     {
-        return RunScriptAsync("Enable", BuildEnableScript(), cancellationToken);
+        return RunScriptAsync(
+            "Enable",
+            BuildEnableScript(DefaultLockDomains),
+            cancellationToken);
+    }
+
+    public Task EnableAsync(
+        RoutingPlan routingPlan,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(routingPlan);
+        return RunScriptAsync(
+            "Enable",
+            BuildEnableScript(CreateLockDomains(routingPlan)),
+            cancellationToken);
     }
 
     public Task DisableAsync(CancellationToken cancellationToken)
@@ -117,24 +134,75 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
             return;
         }
 
-        var diagnostic = string.IsNullOrWhiteSpace(result.StandardError)
-            ? result.StandardOutput
-            : result.StandardError;
-        if (string.IsNullOrWhiteSpace(diagnostic))
-        {
-            diagnostic = $"PowerShell exit code {result.ExitCode}.";
-        }
+        var diagnostic = FormatScriptDiagnostic(result);
 
         throw new InvalidOperationException(
             $"Hedef VPN kilidi güncellenemedi ({operation}): " +
-            diagnostic.Trim().ReplaceLineEndings(" "));
+            diagnostic);
     }
 
-    private static string BuildEnableScript()
+    private static string FormatScriptDiagnostic(CommandResult result)
+    {
+        var parts = new List<string>
+        {
+            $"PowerShell exit code {result.ExitCode}."
+        };
+        AddDiagnosticPart(parts, "stderr", result.StandardError);
+        AddDiagnosticPart(parts, "stdout", result.StandardOutput);
+        return string.Join(" ", parts);
+    }
+
+    private static void AddDiagnosticPart(
+        List<string> parts,
+        string name,
+        string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        var normalized = value.Trim().ReplaceLineEndings(" ");
+        const int maxLength = 900;
+        if (normalized.Length > maxLength)
+        {
+            normalized = normalized[^maxLength..];
+        }
+
+        parts.Add($"{name}: {normalized}");
+    }
+
+    private static string[] CreateLockDomains(RoutingPlan routingPlan)
+    {
+        var domains = routingPlan.ProxyRules
+            .Where(domain => !domain.IsWildcard)
+            .Select(domain => domain.Value)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(domain => domain, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        return domains.Length == 0 ? DefaultLockDomains : domains;
+    }
+
+    private static string FormatPowerShellStringArray(IEnumerable<string> values)
+    {
+        return string.Join(
+            ",",
+            values
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                .Select(value => "'" + value.Replace("'", "''") + "'"));
+    }
+
+    private static string BuildEnableScript(IEnumerable<string> domains)
     {
         return string.Join(Environment.NewLine, [
             "$ErrorActionPreference = 'Stop'",
-            $"$domains = @({DiscordDomains})",
+            "$script:astralPhase = 'Enable:init'",
+            "trap { Write-Error ('Astral access-lock failed; phase=' + $script:astralPhase + '; error=' + $_.Exception.Message); exit 1 }",
+            "function Set-AstralPhase([string]$phase) { $script:astralPhase = $phase; Write-Output ('astral-phase=' + $phase) }",
+            $"$domains = @({FormatPowerShellStringArray(domains)})",
             $"$ruleName = '{RuleName}'",
             $"$legacyRuleName = '{LegacyRuleName}'",
             $"$displayName = '{DisplayName}'",
@@ -148,11 +216,15 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
             .. BuildHostsFileFunctions(),
             .. BuildFirewallGroupFunctions(),
             "$script:astralHostsChanged = $false",
+            "Set-AstralPhase 'Enable:clear-tunnel-scope'",
             "foreach ($group in @($browserScopeGroup, $legacyBrowserScopeGroup)) {",
             "    Clear-AstralFirewallGroup $group",
             "}",
+            "Set-AstralPhase 'Enable:remove-hosts-lock'",
             "Remove-AstralHostsLock",
+            "Set-AstralPhase 'Enable:flush-dns-before-resolve'",
             "Invoke-AstralFlushDns",
+            "Set-AstralPhase 'Enable:resolve-domains'",
             "$resolvedAddresses = foreach ($domain in $domains) {",
             "    try {",
             "        Resolve-DnsName -Name $domain -ErrorAction Stop |",
@@ -163,14 +235,16 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
             "}",
             "$addressList = @($resolvedAddresses | Sort-Object -Unique)",
             "if ($addressList.Count -gt 0) {",
+            "    Set-AstralPhase 'Enable:replace-firewall-rule'",
             "    foreach ($name in @($ruleName, $legacyRuleName)) {",
             "        $rule = Get-NetFirewallRule -Name $name -ErrorAction SilentlyContinue",
             "        if ($null -ne $rule) {",
-            "            Remove-NetFirewallRule -Name $name | Out-Null",
+            "            Remove-NetFirewallRule -Name $name -ErrorAction Stop | Out-Null",
             "        }",
             "    }",
             "    New-NetFirewallRule -Name $ruleName -DisplayName $displayName -Direction Outbound -Action Block -RemoteAddress $addressList -Enabled True | Out-Null",
             "}",
+            "Set-AstralPhase 'Enable:write-hosts-lock'",
             "Enable-AstralHostsLock"
         ]);
     }
@@ -179,6 +253,9 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
     {
         return string.Join(Environment.NewLine, [
             "$ErrorActionPreference = 'Stop'",
+            "$script:astralPhase = 'Disable:init'",
+            "trap { Write-Error ('Astral access-lock failed; phase=' + $script:astralPhase + '; error=' + $_.Exception.Message); exit 1 }",
+            "function Set-AstralPhase([string]$phase) { $script:astralPhase = $phase; Write-Output ('astral-phase=' + $phase) }",
             $"$ruleName = '{RuleName}'",
             $"$legacyRuleName = '{LegacyRuleName}'",
             "$hostsPath = Join-Path $env:SystemRoot 'System32\\drivers\\etc\\hosts'",
@@ -187,16 +264,16 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
             $"$legacyBeginMarker = '{LegacyBeginMarker}'",
             $"$legacyEndMarker = '{LegacyEndMarker}'",
             .. BuildHostsFileFunctions(),
+            .. BuildFirewallGroupFunctions(),
             "$script:astralHostsChanged = $false",
+            "Set-AstralPhase 'Disable:remove-hosts-lock'",
             "Remove-AstralHostsLock",
             "if ($script:astralHostsChanged) {",
+            "    Set-AstralPhase 'Disable:flush-dns'",
             "    Invoke-AstralFlushDns",
             "}",
             "foreach ($name in @($ruleName, $legacyRuleName)) {",
-            "    $rule = Get-NetFirewallRule -Name $name -ErrorAction SilentlyContinue",
-            "    if ($null -ne $rule) {",
-            "        Set-NetFirewallRule -Name $name -Enabled False | Out-Null",
-            "    }",
+            "    Disable-AstralFirewallRule $name",
             "}"
         ]);
     }
@@ -207,7 +284,7 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
         return string.Join(Environment.NewLine, [
             "$ErrorActionPreference = 'Stop'",
             $"$includeBrowserAccess = {includeBrowserAccessLiteral}",
-            $"$domains = @({DiscordDomains})",
+            $"$domains = @({FormatPowerShellStringArray(DefaultLockDomains)})",
             $"$browserScopeGroup = '{BrowserScopeGroup}'",
             $"$legacyBrowserScopeGroup = '{LegacyBrowserScopeGroup}'",
             $"$browserScopeDisplayName = '{BrowserScopeDisplayName}'",
@@ -358,6 +435,7 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
     {
         return [
             "function Clear-AstralFirewallGroup([string]$group) {",
+            "    if (Get-Command Set-AstralPhase -ErrorAction SilentlyContinue) { Set-AstralPhase ('FirewallGroup:' + $group) }",
             "    $rules = @(Get-NetFirewallRule -Group $group -ErrorAction SilentlyContinue)",
             "    foreach ($rule in $rules) {",
             "        try {",
@@ -366,6 +444,31 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
             "            $remaining = Get-NetFirewallRule -Name $($rule.Name) -ErrorAction SilentlyContinue",
             "            if ($null -ne $remaining) { throw }",
             "        }",
+            "    }",
+            "}",
+            "function Disable-AstralFirewallRule([string]$name) {",
+            "    if (Get-Command Set-AstralPhase -ErrorAction SilentlyContinue) { Set-AstralPhase ('FirewallRule:' + $name) }",
+            "    $rule = Get-NetFirewallRule -Name $name -ErrorAction SilentlyContinue",
+            "    if ($null -eq $rule) { return }",
+            "    try {",
+            "        Set-NetFirewallRule -Name $name -Enabled False -ErrorAction Stop | Out-Null",
+            "    } catch {",
+            "        $setError = $_.Exception.Message",
+            "        try {",
+            "            Remove-NetFirewallRule -Name $name -ErrorAction Stop | Out-Null",
+            "        } catch {",
+            "            $remaining = Get-NetFirewallRule -Name $name -ErrorAction SilentlyContinue",
+            "            if ($null -eq $remaining) { return }",
+            "            $disabled = @($remaining | Where-Object { $_.Enabled -ne 'True' })",
+            "            if ($disabled.Count -eq @($remaining).Count) { return }",
+            "            throw ('Firewall rule could not be disabled or removed: ' + $name + '; ' + $setError)",
+            "        }",
+            "    }",
+            "    $remainingAfter = Get-NetFirewallRule -Name $name -ErrorAction SilentlyContinue",
+            "    if ($null -eq $remainingAfter) { return }",
+            "    $enabledAfter = @($remainingAfter | Where-Object { $_.Enabled -eq 'True' })",
+            "    if ($enabledAfter.Count -gt 0) {",
+            "        throw ('Firewall rule still enabled after disable: ' + $name)",
             "    }",
             "}"
         ];
@@ -398,6 +501,12 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
             "    return [IO.File]::ReadAllText($path, [Text.Encoding]::ASCII)",
             "}",
             "function Write-AstralText([string]$path, [string]$value) {",
+            "    if ([IO.File]::Exists($path)) {",
+            "        $item = Get-Item -LiteralPath $path -ErrorAction Stop",
+            "        if ($item.IsReadOnly) {",
+            "            $item.IsReadOnly = $false",
+            "        }",
+            "    }",
             "    Invoke-AstralRetry { [IO.File]::WriteAllText($path, $value, [Text.Encoding]::ASCII) }",
             "}",
             "function Remove-AstralHostsBlock([string]$begin, [string]$end) {",
@@ -406,6 +515,7 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
             "    $pattern = '(?ms)^' + [regex]::Escape($begin) + '\\r?\\n.*?^' + [regex]::Escape($end) + '\\r?\\n?'",
             "    $updated = [regex]::Replace($content, $pattern, '')",
             "    if ($updated -ne $content) {",
+            "        if (Get-Command Set-AstralPhase -ErrorAction SilentlyContinue) { Set-AstralPhase ('HostsWrite:' + $begin) }",
             "        Write-AstralText $hostsPath $updated",
             "        $script:astralHostsChanged = $true",
             "    }",
@@ -426,6 +536,7 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
             "        $content += [Environment]::NewLine",
             "    }",
             "    $content += ($block -join [Environment]::NewLine) + [Environment]::NewLine",
+            "    if (Get-Command Set-AstralPhase -ErrorAction SilentlyContinue) { Set-AstralPhase 'HostsWrite:enable-lock' }",
             "    Write-AstralText $hostsPath $content",
             "    $script:astralHostsChanged = $true",
             "    Invoke-AstralFlushDns",

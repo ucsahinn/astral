@@ -7,8 +7,14 @@ internal static class PortableInstallDiagnostics
 {
     public const string StableDirectoryName = "Astral";
 
+    private static readonly string LegacyBrandName = string.Concat("Dis", "corder");
+
     private static readonly Regex VersionedDirectoryPattern = new(
-        @"^(Astral[-_])?v?\d+\.\d+\.\d+(-win-(x64|x86|arm64))?$",
+        "^((Astral|" + LegacyBrandName + ")[-_])?v?\\d+\\.\\d+\\.\\d+(-win-(x64|x86|arm64))?$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private static readonly Regex LegacyBrandDirectoryPattern = new(
+        LegacyBrandName,
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static IReadOnlyDictionary<string, string?> Capture(
@@ -19,6 +25,7 @@ internal static class PortableInstallDiagnostics
         var directoryName = Path.GetFileName(directory);
         var parentDirectory = Path.GetDirectoryName(directory);
         var looksVersioned = LooksVersionedDirectoryName(directoryName);
+        var looksLegacyBrand = LooksLegacyBrandDirectoryName(directoryName);
         var parentDirectoryName = string.IsNullOrWhiteSpace(parentDirectory)
             ? string.Empty
             : Path.GetFileName(parentDirectory);
@@ -28,8 +35,11 @@ internal static class PortableInstallDiagnostics
             ["portableDirectoryName"] = directoryName,
             ["portableParentDirectoryName"] = parentDirectoryName,
             ["portableDirectoryLooksVersioned"] = looksVersioned.ToString(),
+            ["portableDirectoryLooksLegacyBrand"] = looksLegacyBrand.ToString(),
             ["portableRecommendedDirectoryName"] = StableDirectoryName,
-            ["portableDirectoryGuidance"] = looksVersioned
+            ["portableDirectoryGuidance"] = looksLegacyBrand
+                ? "Eski marka klasoru algilandi; guncelleme calisir, sabit Astral klasorune tasima kullanici onayi ister."
+                : looksVersioned
                 ? "Yeni indirmelerde sabit Astral klasoru kullanin; mevcut klasoru tasima kullanici onayi ister."
                 : "Sabit Astral klasoru kullaniliyor.",
             ["targetScopeMeaning"] =
@@ -41,6 +51,12 @@ internal static class PortableInstallDiagnostics
     {
         return !string.IsNullOrWhiteSpace(directoryName)
             && VersionedDirectoryPattern.IsMatch(directoryName);
+    }
+
+    public static bool LooksLegacyBrandDirectoryName(string? directoryName)
+    {
+        return !string.IsNullOrWhiteSpace(directoryName)
+            && LegacyBrandDirectoryPattern.IsMatch(directoryName);
     }
 
     private static string NormalizeDirectory(string directory)

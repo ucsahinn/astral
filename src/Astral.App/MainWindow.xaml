@@ -403,7 +403,7 @@
                                     HorizontalAlignment="Center">
                             <TextBlock x:Name="StatusMessage"
                                        MaxWidth="520"
-                                       MaxHeight="58"
+                                       MaxHeight="76"
                                        HorizontalAlignment="Center"
                                        TextAlignment="Center"
                                        TextWrapping="Wrap"
@@ -413,7 +413,7 @@
                                        Text="Bağlantı kapalı" />
                             <TextBlock x:Name="StatusDetail"
                                        MaxWidth="520"
-                                       MaxHeight="42"
+                                       MaxHeight="62"
                                        Margin="0,8,0,0"
                                        HorizontalAlignment="Center"
                                        TextAlignment="Center"
@@ -543,13 +543,13 @@
                                        Text=""
                                        TextWrapping="Wrap" />
                             <ScrollViewer Margin="0,10,0,0"
-                                          MaxHeight="150"
+                                          MaxHeight="162"
                                           VerticalScrollBarVisibility="Auto"
                                           HorizontalScrollBarVisibility="Disabled"
                                           CanContentScroll="False">
                                 <WrapPanel x:Name="TargetCardsPanel"
                                            ItemWidth="194"
-                                           ItemHeight="50" />
+                                           ItemHeight="54" />
                             </ScrollViewer>
                         </StackPanel>
                     </Border>
@@ -952,7 +952,7 @@
                                VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource SecondaryTextBrush}"
-                               Text="v2.2.4" />
+                               Text="v2.2.5" />
 
                     <Button Grid.Column="5"
                             x:Name="AutoUpdateButton"

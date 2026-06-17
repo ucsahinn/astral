@@ -6,6 +6,14 @@ public interface IDiscordAccessLock
 {
     Task EnableAsync(CancellationToken cancellationToken);
 
+    Task EnableAsync(
+        RoutingPlan routingPlan,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(routingPlan);
+        return EnableAsync(cancellationToken);
+    }
+
     Task DisableAsync(CancellationToken cancellationToken);
 
     Task ApplyTunnelScopeAsync(

@@ -186,7 +186,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             _diagnostics.Info("controller.lock", "Hedef bağlantı koruması etkinleştiriliyor.");
             await StopOwnedOrphanWireSockProcessAsync(cancellationToken);
             await _webProxyService.ClearAsync(cancellationToken);
-            await _accessLock.EnableAsync(cancellationToken);
+            await _accessLock.EnableAsync(CurrentRoutingPlan, cancellationToken);
             _accessLockConfirmed = true;
             SetStatus(TunnelState.Disconnected, "Astral Bağlı Değil");
         }
@@ -1268,7 +1268,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 _diagnostics.Info("controller.disconnect", "Aktif WireSock süreci yok; bağlantı koruması etkinleştiriliyor.");
                 await TryClearWebProxyScopeAsync("DisconnectWithoutProcess");
                 await TryClearTunnelScopeAsync("DisconnectWithoutProcess");
-                await _accessLock.EnableAsync(cancellationToken);
+                await _accessLock.EnableAsync(CurrentRoutingPlan, cancellationToken);
                 _accessLockConfirmed = true;
                 await CloseManagedTargetProcessesAfterDisconnectAsync(cancellationToken);
                 SetStatus(TunnelState.Disconnected, "Astral Bağlı Değil");
@@ -1289,7 +1289,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             await DisposeProcessAsync();
             await TryClearWebProxyScopeAsync("Disconnect");
             await TryClearTunnelScopeAsync("Disconnect");
-            await _accessLock.EnableAsync(cancellationToken);
+            await _accessLock.EnableAsync(CurrentRoutingPlan, cancellationToken);
             _accessLockConfirmed = true;
             await CloseManagedTargetProcessesAfterDisconnectAsync(cancellationToken);
 
@@ -1496,7 +1496,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
     {
         try
         {
-            await _accessLock.EnableAsync(CancellationToken.None);
+            await _accessLock.EnableAsync(CurrentRoutingPlan, CancellationToken.None);
             _accessLockConfirmed = true;
         }
         catch (Exception exception)

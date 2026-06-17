@@ -16,23 +16,24 @@ Bu doküman, GitHub Releases yüzeyindeki sürüm kararlarını ve yayın kapıs
 
 ## Güncel Sürüm Kararı
 
-Güncel patch hedef `v2.2.4` olarak belirlendi.
+Güncel patch hedef `v2.2.5` olarak belirlendi.
 
-Neden `v2.2.4`?
+Neden `v2.2.5`?
 
-- Hedef seçimi ana ekrana taşındı; ayrı seçim penceresi ve özel hedef yüzeyi kaldırıldı.
-- Hazır hedef listesi Discord, Roblox, Wattpad, Bigo Live, Azar, Tango, LiVU, IMVU ve Blogspot ile sınırlandı.
-- Eski özel hedef ayarları migration sırasında güvenli biçimde yok sayılıyor.
-- Web hedefleri için genel tarayıcı süreçleri WireSock `AllowedApps` kapsamına eklenmiyor; seçili domainler `Astral.WebProxy` ve PAC allowlist üzerinden taşınıyor.
-- Güncelleme düğmesi kullanıcı isteğine göre yalnız gerçek yeni sürüm bulunduğunda görünür modele geri döndü.
-- Access-lock hata metni hangi aşamada hata alındığını gösterecek şekilde güçlendirildi.
+- v2.2.4 tanılama paketlerinde bağlantı başlamadan önce `Disable` access-lock adımında düşen stale lock hatası görüldü.
+- Firewall rule disable işlemi idempotent hale getirildi; kural yoksa başarı sayılır, bozuk app kuralı kaldırılarak temizlenebilir.
+- Bağlantı kapalıyken hedef koruması seçili hedef planındaki exact domainlerden üretilir; Discord-only varsayıma dönmez.
+- Access-lock hata metni stdout/stderr kuyruğu ve script fazını da içerir.
+- Ana ekran hedef kartları ve uzun hata kopyası okunurluğu iyileştirildi.
+- Eski marka klasöründen çalışan Astral artık tanılamada yanlış “sabit Astral klasörü” raporu üretmez.
 - Astral ana release hattı yalnız Astral assetlerini üretir; eski istemci geçişi ayrı köprü repo yüzeyinin sorumluluğudur.
 
 ## Public Release Yüzeyi
 
 | Release | Canlı durum | Asset durumu | Karar | Gerekçe |
 | --- | --- | --- | --- | --- |
-| `v2.2.4` | Yayın adayı | Bekliyor | Yayınla | Inline hedef kartları, Astral-only release assetleri, update görünürlüğü ve access-lock tanılama hotfixleri. |
+| `v2.2.5` | Yayın adayı | Bekliyor | Yayınla | Access-lock disable dayanıklılığı, seçili hedef koruması ve hedef kartı okunurluğu hotfixleri. |
+| `v2.2.4` | Yayında | 4 asset | Koru | Inline hedef kartları, Astral-only release assetleri ve update görünürlüğü hotfixleri. |
 | `v2.2.3` | Yayında | 8 asset | Koru | Önceki hedef seçim yüzeyi polish, WireSock readiness ve DNS flush hotfix. |
 | `v2.2.2` | Yayında | 8 asset | Koru | Geçiş dönemi köprü assetleri ve premium ikon seti. |
 | `v2.2.1` | Yayında | 4 asset | Koru | Web-only hedef süreci, ürün dili ve release workflow idempotency düzeltmesi. |
@@ -41,12 +42,12 @@ Neden `v2.2.4`?
 
 ## Yayın Kapısı
 
-`v2.2.4` yayınından önce tamamlanması gereken koşullar:
+`v2.2.5` yayınından önce tamamlanması gereken koşullar:
 
-- Proje, updater ve web proxy sürümü `2.2.4` ile aynı.
-- `Astral-2.2.4-win-x64.zip` ve sabit `Astral-win-x64.zip` aynı içeriği gösterir.
+- Proje, updater ve web proxy sürümü `2.2.5` ile aynı.
+- `Astral-2.2.5-win-x64.zip` ve sabit `Astral-win-x64.zip` aynı içeriği gösterir.
 - ZIP içinde `Astral.exe`, `Astral.Updater.exe`, `Astral.WebProxy.exe`, update manifest'i ve gerekli runtime dosyaları bulunur.
-- ZIP içindeki update manifest sürümü `2.2.4`.
+- ZIP içindeki update manifest sürümü `2.2.5`.
 - Astral release içinde eski isimli uyumluluk ZIP'i yayınlanmaz.
 - Kod imzalama sertifikası yapılandırılmadıysa paket imzasız olduğu açıkça not edilir.
 - `dotnet build`, Core tests, Windows tests, `scripts/verify.ps1`, `scripts/build-release.ps1`, `git diff --check` ve Gitleaks geçer.
