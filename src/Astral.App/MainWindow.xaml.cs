@@ -6,6 +6,7 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
 using Astral.App.Installation;
@@ -31,7 +32,7 @@ public partial class MainWindow : Window, IDisposable
     private static readonly Uri RepositoryUri = new(
         "https://github.com/ucsahinn/astral");
     private static readonly Uri ReleaseNotesUri = new(
-        "https://github.com/ucsahinn/astral/releases/tag/v2.2.1");
+        "https://github.com/ucsahinn/astral/releases/tag/v2.2.2");
     private static readonly Uri BackgroundVideoUri = new(
         "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260606_154941_df1a96e1-a06f-450c-bd02-d863414cc1a0.mp4");
     private static readonly string LocalBackgroundVideoPath = Path.Combine(
@@ -54,6 +55,8 @@ public partial class MainWindow : Window, IDisposable
     private bool _isUpdateCheckRunning;
     private bool _isUpdateOperationRunning;
     private bool _isUpdateProgressPinned;
+    private bool _hasCompletedUpdateCheck;
+    private bool _lastUpdateCheckFailed;
     private string? _lastLoggedUpdateProgressKey;
     private int _lastLoggedUpdateProgressPercent = -1;
     private AppUpdateCheckResult? _pendingUpdate;
@@ -1464,6 +1467,7 @@ public partial class MainWindow : Window, IDisposable
         }
 
         _isUpdateCheckRunning = true;
+        _lastUpdateCheckFailed = false;
         ApplyUpdateControls(_controller.Snapshot.IsBusy);
 
         try
@@ -1488,6 +1492,8 @@ public partial class MainWindow : Window, IDisposable
             if (update.Status == AppUpdateCheckStatus.UpToDate)
             {
                 _pendingUpdate = null;
+                _hasCompletedUpdateCheck = true;
+                _lastUpdateCheckFailed = false;
                 _diagnostics.Info(
                     "ui.update.current",
                     "Astral güncel.",
@@ -1505,6 +1511,8 @@ public partial class MainWindow : Window, IDisposable
             }
 
             _pendingUpdate = update;
+            _hasCompletedUpdateCheck = true;
+            _lastUpdateCheckFailed = false;
             DiagnosticsStatus.Text =
                 $"v{AppUpdateService.FormatVersion(update.LatestVersion)} hazır. Güncelle, bu Astral klasörünü yeniler.";
             _diagnostics.Info(
@@ -1526,6 +1534,8 @@ public partial class MainWindow : Window, IDisposable
         catch (Exception exception)
         {
             _pendingUpdate = null;
+            _hasCompletedUpdateCheck = true;
+            _lastUpdateCheckFailed = true;
             _diagnostics.Failure(
                 showStatus ? "ui.update" : "ui.update.backgroundCheck",
                 "Güncelleme denetimi tamamlanamadı.",
@@ -1538,6 +1548,10 @@ public partial class MainWindow : Window, IDisposable
                     "Astral güncelleme",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
+            }
+            else
+            {
+                DiagnosticsStatus.Text = "Güncelleme denetlenemedi. Tekrar dene.";
             }
         }
         finally
@@ -1552,7 +1566,15 @@ public partial class MainWindow : Window, IDisposable
 
     private async void AutoUpdate_Click(object sender, RoutedEventArgs e)
     {
-        await InstallPendingUpdateAsync();
+        if (_pendingUpdate?.Status == AppUpdateCheckStatus.UpdateAvailable)
+        {
+            await InstallPendingUpdateAsync();
+            return;
+        }
+
+        await CheckForUpdatesAsync(
+            showStatus: true,
+            _windowLifetimeCancellation.Token);
     }
 
     private async Task InstallPendingUpdateAsync()
@@ -1804,18 +1826,79 @@ public partial class MainWindow : Window, IDisposable
 
     private static string GetExecutableName()
     {
-        var executableName = Path.GetFileName(Environment.ProcessPath);
-        return string.IsNullOrWhiteSpace(executableName)
-            ? "Astral.exe"
-            : executableName;
+        return ResolveUpdateExecutableName(
+            Environment.ProcessPath,
+            AppContext.BaseDirectory);
+    }
+
+    internal static string ResolveUpdateExecutableName(
+        string? processPath,
+        string applicationDirectory)
+    {
+        var executableName = Path.GetFileName(processPath);
+        if (string.IsNullOrWhiteSpace(executableName))
+        {
+            return "Astral.exe";
+        }
+
+        if (string.Equals(
+                executableName,
+                "Discorder.exe",
+                StringComparison.OrdinalIgnoreCase)
+            && File.Exists(Path.Combine(applicationDirectory, "Astral.exe")))
+        {
+            return "Astral.exe";
+        }
+
+        return executableName;
     }
 
     private void ApplyUpdateControls(bool isBusy)
     {
         var hasUpdate = _pendingUpdate?.Status == AppUpdateCheckStatus.UpdateAvailable;
-        AutoUpdateButton.Visibility = hasUpdate
-            ? Visibility.Visible
-            : Visibility.Collapsed;
+        AutoUpdateButton.Visibility = Visibility.Visible;
+        if (_isUpdateCheckRunning)
+        {
+            AutoUpdateButton.Content = "… Denetleniyor";
+            AutoUpdateButton.ToolTip = "Güncelleme denetleniyor.";
+            AutomationProperties.SetName(
+                AutoUpdateButton,
+                "Güncelleme denetleniyor");
+        }
+        else if (hasUpdate)
+        {
+            var versionText = AppUpdateService.FormatVersion(_pendingUpdate!.LatestVersion);
+            AutoUpdateButton.Content = "↻ Güncelle";
+            AutoUpdateButton.ToolTip = $"v{versionText} hazır. Güncellemeyi yükle.";
+            AutomationProperties.SetName(
+                AutoUpdateButton,
+                $"v{versionText} güncellemesini yükle");
+        }
+        else if (_lastUpdateCheckFailed)
+        {
+            AutoUpdateButton.Content = "↻ Tekrar dene";
+            AutoUpdateButton.ToolTip = "Güncelleme denetlenemedi. Yeniden dene.";
+            AutomationProperties.SetName(
+                AutoUpdateButton,
+                "Güncellemeyi yeniden denetle");
+        }
+        else if (_hasCompletedUpdateCheck)
+        {
+            AutoUpdateButton.Content = "✓ Güncel";
+            AutoUpdateButton.ToolTip = "Astral güncel. Yeniden denetlemek için tıkla.";
+            AutomationProperties.SetName(
+                AutoUpdateButton,
+                "Astral güncel");
+        }
+        else
+        {
+            AutoUpdateButton.Content = "↻ Denetle";
+            AutoUpdateButton.ToolTip = "Güncellemeyi denetle.";
+            AutomationProperties.SetName(
+                AutoUpdateButton,
+                "Güncelleme durumunu denetle");
+        }
+
         SetUpdateControlsEnabled(!_isUpdateOperationRunning
             && !_isUpdateCheckRunning
             && !isBusy);
@@ -1823,8 +1906,7 @@ public partial class MainWindow : Window, IDisposable
 
     private void SetUpdateControlsEnabled(bool enabled)
     {
-        AutoUpdateButton.IsEnabled = enabled
-            && _pendingUpdate?.Status == AppUpdateCheckStatus.UpdateAvailable;
+        AutoUpdateButton.IsEnabled = enabled;
     }
 
     private static void OpenUri(Uri uri)

@@ -123,6 +123,30 @@ jobs:
             -Value "$hash  Astral-win-x64.zip" `
             -Encoding ASCII
 
+          $compatArchive = Get-ChildItem -LiteralPath artifacts -Filter "Discorder-$version-win-x64.zip" |
+            Select-Object -First 1
+          if ($null -eq $compatArchive) {
+            throw "Eski Discorder uyumluluk arşivi bulunamadı: Discorder-$version-win-x64.zip"
+          }
+
+          $compatShaPath = Join-Path 'artifacts' "Discorder-$version-win-x64.sha256.txt"
+          $compatHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $compatArchive.FullName).Hash
+          Set-Content `
+            -LiteralPath $compatShaPath `
+            -Value "$compatHash  $($compatArchive.Name)" `
+            -Encoding ASCII
+          $compatStableArchivePath = Join-Path 'artifacts' 'Discorder-win-x64.zip'
+          $compatStableShaPath = Join-Path 'artifacts' 'Discorder-win-x64.sha256.txt'
+          Copy-Item -LiteralPath $compatArchive.FullName -Destination $compatStableArchivePath -Force
+          $compatStableHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $compatStableArchivePath).Hash
+          if ($compatStableHash -ne $compatHash) {
+            throw "Sabit isimli Discorder ZIP kopyasi versioned ZIP ile eslesmiyor."
+          }
+          Set-Content `
+            -LiteralPath $compatStableShaPath `
+            -Value "$compatHash  Discorder-win-x64.zip" `
+            -Encoding ASCII
+
           $signingStatusPath = Join-Path 'artifacts' 'signing-status.txt'
           $signingStatus = 'unsigned'
           if (Test-Path -LiteralPath $signingStatusPath) {
@@ -160,7 +184,12 @@ jobs:
           - $(Split-Path -Leaf $shaPath)
           - $(Split-Path -Leaf $stableArchivePath)
           - $(Split-Path -Leaf $stableShaPath)
+          - $($compatArchive.Name)
+          - $(Split-Path -Leaf $compatShaPath)
+          - $(Split-Path -Leaf $compatStableArchivePath)
+          - $(Split-Path -Leaf $compatStableShaPath)
           - SHA-256: $hash
+          - Discorder köprü SHA-256: $compatHash
           - $signingText
           "@
 
@@ -171,6 +200,10 @@ jobs:
           "sha=$shaPath" >> $env:GITHUB_OUTPUT
           "stable_archive=$stableArchivePath" >> $env:GITHUB_OUTPUT
           "stable_sha=$stableShaPath" >> $env:GITHUB_OUTPUT
+          "compat_archive=$($compatArchive.FullName)" >> $env:GITHUB_OUTPUT
+          "compat_sha=$compatShaPath" >> $env:GITHUB_OUTPUT
+          "compat_stable_archive=$compatStableArchivePath" >> $env:GITHUB_OUTPUT
+          "compat_stable_sha=$compatStableShaPath" >> $env:GITHUB_OUTPUT
           "notes=$notesPath" >> $env:GITHUB_OUTPUT
           "signed=$signingStatus" >> $env:GITHUB_OUTPUT
 
@@ -184,6 +217,10 @@ jobs:
           RELEASE_SHA: ${{ steps.package.outputs.sha }}
           RELEASE_STABLE_ARCHIVE: ${{ steps.package.outputs.stable_archive }}
           RELEASE_STABLE_SHA: ${{ steps.package.outputs.stable_sha }}
+          RELEASE_COMPAT_ARCHIVE: ${{ steps.package.outputs.compat_archive }}
+          RELEASE_COMPAT_SHA: ${{ steps.package.outputs.compat_sha }}
+          RELEASE_COMPAT_STABLE_ARCHIVE: ${{ steps.package.outputs.compat_stable_archive }}
+          RELEASE_COMPAT_STABLE_SHA: ${{ steps.package.outputs.compat_stable_sha }}
           RELEASE_NOTES: ${{ steps.package.outputs.notes }}
         run: |
           $tag = $env:RELEASE_TAG
@@ -329,6 +366,27 @@ jobs:
           $shaName = [IO.Path]::GetFileName($env:RELEASE_SHA)
           $stableArchiveName = [IO.Path]::GetFileName($env:RELEASE_STABLE_ARCHIVE)
           $stableShaName = [IO.Path]::GetFileName($env:RELEASE_STABLE_SHA)
+          $compatArchiveName = [IO.Path]::GetFileName($env:RELEASE_COMPAT_ARCHIVE)
+          $compatShaName = [IO.Path]::GetFileName($env:RELEASE_COMPAT_SHA)
+          $compatStableArchiveName = [IO.Path]::GetFileName($env:RELEASE_COMPAT_STABLE_ARCHIVE)
+          $compatStableShaName = [IO.Path]::GetFileName($env:RELEASE_COMPAT_STABLE_SHA)
+          $managedAssetNames = @(
+            $archiveName,
+            $shaName,
+            $stableArchiveName,
+            $stableShaName,
+            $compatArchiveName,
+            $compatShaName,
+            $compatStableArchiveName,
+            $compatStableShaName
+          )
+
+          function Assert-ManagedAssetSetComplete($release, [string[]] $assetNames) {
+            foreach ($name in $assetNames) {
+              $asset = Get-AssetByName $release.assets $name
+              Assert-UploadedAsset $asset $name
+            }
+          }
 
           gh release view $tag --repo $repo *> $null
           if ($LASTEXITCODE -eq 0) {
@@ -338,6 +396,10 @@ jobs:
             $shaAsset = Get-AssetByName $release.assets $shaName
             $stableArchiveAsset = Get-AssetByName $release.assets $stableArchiveName
             $stableShaAsset = Get-AssetByName $release.assets $stableShaName
+            $compatArchiveAsset = Get-AssetByName $release.assets $compatArchiveName
+            $compatShaAsset = Get-AssetByName $release.assets $compatShaName
+            $compatStableArchiveAsset = Get-AssetByName $release.assets $compatStableArchiveName
+            $compatStableShaAsset = Get-AssetByName $release.assets $compatStableShaName
 
             if ($release.isDraft -or $release.isPrerelease) {
               throw "Release $tag draft veya prerelease durumda; otomatik latest yayına çevrilmiyor."
@@ -345,7 +407,10 @@ jobs:
 
             Assert-ReleaseTargetIfPinned $release
 
-            if ($archiveAsset -or $shaAsset -or $stableArchiveAsset -or $stableShaAsset) {
+            if ($archiveAsset -or $shaAsset -or $stableArchiveAsset -or $stableShaAsset -or
+                $compatArchiveAsset -or $compatShaAsset -or
+                $compatStableArchiveAsset -or $compatStableShaAsset) {
+              Assert-ManagedAssetSetComplete $release $managedAssetNames
               if (-not ($archiveAsset -and $shaAsset)) {
                 throw "Release $tag eksik asset içeriyor. Güvenli yayın için manuel kontrol gerekiyor."
               }
@@ -430,6 +495,14 @@ jobs:
                 $env:RELEASE_ARCHIVE `
                 $env:RELEASE_STABLE_ARCHIVE `
                 $false
+              Assert-ReleaseAssetsReady `
+                $compatArchiveName `
+                $compatShaName `
+                $compatStableArchiveName `
+                $compatStableShaName `
+                $env:RELEASE_COMPAT_ARCHIVE `
+                $env:RELEASE_COMPAT_STABLE_ARCHIVE `
+                $false
 
               Invoke-Gh release edit $tag `
                 --repo $repo `
@@ -445,6 +518,10 @@ jobs:
               $env:RELEASE_SHA `
               $env:RELEASE_STABLE_ARCHIVE `
               $env:RELEASE_STABLE_SHA `
+              $env:RELEASE_COMPAT_ARCHIVE `
+              $env:RELEASE_COMPAT_SHA `
+              $env:RELEASE_COMPAT_STABLE_ARCHIVE `
+              $env:RELEASE_COMPAT_STABLE_SHA `
               --repo $repo
             if ($LASTEXITCODE -ne 0) {
               throw "Release $tag asset yukleme islemi basarisiz oldu."
@@ -456,6 +533,14 @@ jobs:
               $stableShaName `
               $env:RELEASE_ARCHIVE `
               $env:RELEASE_STABLE_ARCHIVE `
+              $true
+            Assert-ReleaseAssetsReady `
+              $compatArchiveName `
+              $compatShaName `
+              $compatStableArchiveName `
+              $compatStableShaName `
+              $env:RELEASE_COMPAT_ARCHIVE `
+              $env:RELEASE_COMPAT_STABLE_ARCHIVE `
               $true
             Invoke-Gh release edit $tag `
               --repo $repo `
@@ -469,6 +554,10 @@ jobs:
               $env:RELEASE_SHA `
               $env:RELEASE_STABLE_ARCHIVE `
               $env:RELEASE_STABLE_SHA `
+              $env:RELEASE_COMPAT_ARCHIVE `
+              $env:RELEASE_COMPAT_SHA `
+              $env:RELEASE_COMPAT_STABLE_ARCHIVE `
+              $env:RELEASE_COMPAT_STABLE_SHA `
               --repo $repo `
               --title $releaseTitle `
               --notes-file $env:RELEASE_NOTES
@@ -482,6 +571,14 @@ jobs:
               $stableShaName `
               $env:RELEASE_ARCHIVE `
               $env:RELEASE_STABLE_ARCHIVE `
+              $true
+            Assert-ReleaseAssetsReady `
+              $compatArchiveName `
+              $compatShaName `
+              $compatStableArchiveName `
+              $compatStableShaName `
+              $env:RELEASE_COMPAT_ARCHIVE `
+              $env:RELEASE_COMPAT_STABLE_ARCHIVE `
               $true
             Invoke-Gh release edit $tag `
               --repo $repo `

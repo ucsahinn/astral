@@ -43,8 +43,8 @@ uygulamasıdır.
 - GitHub Releases üzerinden en güncel ZIP arşivini indirin ve yayınlanan SHA-256
   dosyasıyla kontrol edin.
 - ZIP'i kalıcı bir klasöre çıkarıp `Astral.exe` dosyasını çalıştırın.
-- Astral açılışta güncellemeyi sessizce denetler; yeni sürüm varsa tek
-  `Güncelle` düğmesiyle yüklenir.
+- Astral açılışta güncellemeyi sessizce denetler; aynı düğme `Denetle`,
+  `Güncel`, `Tekrar dene` veya yeni sürüm varsa `Güncelle` durumunu gösterir.
 
 ## Kapsanan Kullanıcı Soruları
 
@@ -55,6 +55,6 @@ yazılmıştır:
 - Hedef merkezi nasıl kullanılır?
 - Seçilmeyen uygulama veya domain trafiği neden normal bağlantıda kalır?
 - Portable ZIP nasıl indirilir, çalıştırılır ve güncellenir?
-- Uygulama içi güncelleme neden yalnızca gerçek yeni sürüm bulunduğunda düğme gösterir?
+- Uygulama içi güncelleme düğmesi hangi durumlarda Denetle, Güncel, Tekrar dene veya Güncelle yazar?
 - Astral sistem DNS'ini, tüm cihaz trafiğini veya kullanıcı hesaplarını değiştirir mi?
 - Tanılama paketi hangi durumlarda hazırlanır?

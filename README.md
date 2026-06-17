@@ -67,7 +67,7 @@ Başlangıç presetleri:
 | 📊 Canlı durum kartları | DNS, bağlantı durumu ve hedef kapsamını sade biçimde gösterir. |
 | 🧾 Tanılama paketi | Bağlantı sorunlarını incelemek için paylaşılabilir rapor hazırlar. |
 | 📦 Portable kullanım | Kurulum sihirbazı olmadan ZIP içinden çalışır. |
-| 🔄 Güncelleme akışı | Yeni sürümü arka planda denetler; yalnızca gerçek güncelleme varsa tek **Güncelle** düğmesini gösterir. |
+| 🔄 Güncelleme akışı | Yeni sürümü arka planda denetler; **Denetle**, **Güncel**, **Tekrar dene** ve hazırsa **Güncelle** durumlarını tek düğmede gösterir. |
 
 ## 🛡️ Neden Güvenli?
 
@@ -102,7 +102,7 @@ Release sayfasındaki ZIP paketini manuel indirdiğinizde yanında verilen SHA-2
 | Sorun giderme | [docs/sorun-giderme.md](docs/sorun-giderme.md) |
 | Mimari | [docs/mimari.md](docs/mimari.md) |
 | Kaynak sorun denetimi | [docs/kaynak-sorun-denetimi.md](docs/kaynak-sorun-denetimi.md) |
-| v2.2.1 release notu | [docs/releases/v2.2.1.md](docs/releases/v2.2.1.md) |
+| v2.2.2 release notu | [docs/releases/v2.2.2.md](docs/releases/v2.2.2.md) |
 
 ## 🧪 Geliştirme
 

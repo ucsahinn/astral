@@ -18,8 +18,8 @@
     <AssemblyCompany>ucsahinn</AssemblyCompany>
     <AssemblyProduct>Astral</AssemblyProduct>
     <Copyright>Copyright (c) 2026 ucsahinn</Copyright>
-    <Version>2.2.1</Version>
-    <FileVersion>2.2.1.0</FileVersion>
+    <Version>2.2.2</Version>
+    <FileVersion>2.2.2.0</FileVersion>
     <RepositoryUrl>https://github.com/ucsahinn/astral</RepositoryUrl>
     <PublishTrimmed>false</PublishTrimmed>
     <PublishSingleFile>false</PublishSingleFile>
@@ -34,6 +34,11 @@
   <ItemGroup>
     <Resource Include="Assets\astral-mark.png" />
     <Resource Include="Assets\astral-v2.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>Astral.Windows.Tests</_Parameter1>
+    </AssemblyAttribute>
   </ItemGroup>
   <Target Name="CopyUpdaterOnBuild" AfterTargets="Build">
     <ItemGroup>

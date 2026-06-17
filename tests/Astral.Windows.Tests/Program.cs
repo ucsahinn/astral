@@ -89,6 +89,7 @@ static void RenderWindows()
                 try
                 {
                     RenderMainWindow();
+                    VerifyLegacyDiscorderBridgeBehavior();
                     RenderTargetSelectionWindow();
                     VerifyWindowLifetimeBehavior();
                     RenderConsentWindow();
@@ -169,16 +170,28 @@ static void RenderMainWindow()
             StringComparison.Ordinal));
         var buttons = FindVisualChildren<Button>(window)
             .Select(button => button.Content?.ToString())
+            .OfType<string>()
             .Where(content => !string.IsNullOrWhiteSpace(content))
             .ToArray();
         Assert(buttons.Contains("🛠 Onar"));
         Assert(buttons.Contains("⛔ Profil Temizle"));
         Assert(buttons.Contains("🧾 Tanılama"));
-        Assert(buttons.Contains("↻ Güncelle"));
+        Assert(buttons.Any(button =>
+            button.Contains("Denetle", StringComparison.Ordinal)
+            || button.Contains("Güncelle", StringComparison.Ordinal)
+            || button.Contains("Tekrar dene", StringComparison.Ordinal)
+            || button.Contains("Güncel", StringComparison.Ordinal)));
         Assert(!buttons.Contains("Yükle"));
         var updateButton = FindVisualChildren<Button>(window)
             .Single(button => button.Name == "AutoUpdateButton");
-        Assert(updateButton.Visibility == Visibility.Collapsed);
+        Assert(updateButton.Visibility == Visibility.Visible);
+        var updateButtonText = updateButton.Content?.ToString() ?? string.Empty;
+        Assert(
+            updateButtonText.Contains("Denetle", StringComparison.Ordinal)
+            || updateButtonText.Contains("Denetleniyor", StringComparison.Ordinal)
+            || updateButtonText.Contains("Güncel", StringComparison.Ordinal)
+            || updateButtonText.Contains("Güncelle", StringComparison.Ordinal)
+            || updateButtonText.Contains("Tekrar dene", StringComparison.Ordinal));
         var switches = FindVisualChildren<CheckBox>(window).ToArray();
         var runInBackgroundSwitch = switches.Single(toggle =>
             toggle.Name == "RunInBackgroundToggle");
@@ -242,6 +255,52 @@ static void RenderMainWindow()
     }
 
     Console.WriteLine("GEÇTİ Ana pencere çizildi");
+}
+
+static void VerifyLegacyDiscorderBridgeBehavior()
+{
+    var root = Path.Combine(
+        Path.GetTempPath(),
+        "AstralBridgeTests",
+        Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(root);
+    try
+    {
+        var astralPath = Path.Combine(root, "Astral.exe");
+        File.WriteAllText(astralPath, "astral");
+
+        var resolved = MainWindow.ResolveUpdateExecutableName(
+            Path.Combine(root, "Discorder.exe"),
+            root);
+        Assert(resolved == "Astral.exe");
+
+        resolved = MainWindow.ResolveUpdateExecutableName(
+            Path.Combine(root, "Astral.exe"),
+            root);
+        Assert(resolved == "Astral.exe");
+
+        var startInfo = App.CreateLegacyDiscorderRedirectStartInfo(
+            Path.Combine(root, "Discorder.exe"),
+            root,
+            ["--background-start"]);
+        Assert(startInfo is not null);
+        var redirectStartInfo = startInfo
+            ?? throw new InvalidOperationException("Legacy redirect start info was null.");
+        Assert(redirectStartInfo.FileName == astralPath);
+        Assert(redirectStartInfo.WorkingDirectory == root);
+        Assert(redirectStartInfo.ArgumentList.Count == 1);
+        Assert(redirectStartInfo.ArgumentList[0] == "--background-start");
+
+        var noRedirect = App.CreateLegacyDiscorderRedirectStartInfo(
+            Path.Combine(root, "Astral.exe"),
+            root,
+            []);
+        Assert(noRedirect is null);
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
 }
 
 static void RenderTargetSelectionWindow()

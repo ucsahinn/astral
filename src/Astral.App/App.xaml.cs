@@ -38,6 +38,12 @@ public partial class App : System.Windows.Application, IDisposable
         WindowsPresentationEnvironment.EnsureProcessEnvironment();
         base.OnStartup(e);
 
+        if (TryRedirectLegacyDiscorderExecutable(e.Args))
+        {
+            Shutdown();
+            return;
+        }
+
         _singleInstanceMutex = new Mutex(
             initiallyOwned: true,
             MutexName,
@@ -114,7 +120,7 @@ public partial class App : System.Windows.Application, IDisposable
             Timeout = TimeSpan.FromMinutes(10)
         };
         _httpClient.DefaultRequestHeaders.UserAgent.Add(
-            new ProductInfoHeaderValue("Astral", "2.2.1"));
+            new ProductInfoHeaderValue("Astral", "2.2.2"));
 
         var downloader = new VerifiedDownloader(_httpClient, maxAttempts: 5);
         var wireSockLocator = new WireSockLocator();
@@ -181,6 +187,60 @@ public partial class App : System.Windows.Application, IDisposable
     {
         Dispose();
         base.OnExit(e);
+    }
+
+    internal static ProcessStartInfo? CreateLegacyDiscorderRedirectStartInfo(
+        string? processPath,
+        string applicationDirectory,
+        IEnumerable<string> args)
+    {
+        var executableName = Path.GetFileName(processPath);
+        if (!string.Equals(
+                executableName,
+                "Discorder.exe",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var astralPath = Path.Combine(applicationDirectory, "Astral.exe");
+        if (!File.Exists(astralPath)
+            || string.Equals(
+                Path.GetFullPath(processPath ?? string.Empty),
+                Path.GetFullPath(astralPath),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = astralPath,
+            WorkingDirectory = applicationDirectory,
+            UseShellExecute = false
+        };
+        foreach (var arg in args)
+        {
+            startInfo.ArgumentList.Add(arg);
+        }
+
+        return startInfo;
+    }
+
+    private static bool TryRedirectLegacyDiscorderExecutable(
+        IReadOnlyList<string> args)
+    {
+        var startInfo = CreateLegacyDiscorderRedirectStartInfo(
+            Environment.ProcessPath,
+            AppContext.BaseDirectory,
+            args);
+        if (startInfo is null)
+        {
+            return false;
+        }
+
+        Process.Start(startInfo);
+        return true;
     }
 
     public void Dispose()

@@ -4,14 +4,14 @@ Astral portable ZIP olarak çalışır. Bu yüzden güncelleme akışı, klasik 
 
 GitHub Releases üzerinden indirilen ZIP paketi manuel kullanım içindir. Uygulama içi otomatik güncelleme, aynı paketi GitHub release yolu, asset digest, SHA-256 dosyası ve manifest eşleşmesiyle doğrular.
 
-Manuel indirme için sabit dosya adı `Astral-win-x64.zip` kullanılır. Otomatik güncelleme ise denetlenen sürümü kilitlemek için `Astral-<version>-win-x64.zip` asset'ini ve aynı sürüme ait SHA-256 dosyasını doğrular.
+Manuel indirme için sabit dosya adı `Astral-win-x64.zip` kullanılır. Otomatik güncelleme ise denetlenen sürümü kilitlemek için `Astral-<version>-win-x64.zip` asset'ini ve aynı sürüme ait SHA-256 dosyasını doğrular. Eski Discorder istemcilerinden geçiş için release içinde ayrıca `Discorder-<version>-win-x64.zip` köprü asset'i üretilir; bu paket eski manifest/exe doğrulamasını karşılar ve yeni Astral payload'ına geçiş yapar.
 
 ## Kullanıcının Gördüğü Akış
 
 1. Astral açılışta GitHub Releases üzerinden yeni sürüm olup olmadığını arka planda denetler.
-2. Yeni sürüm yoksa ana ekranda gürültülü bir güncelleme düğmesi gösterilmez.
-3. Yeni sürüm varsa tek **Güncelle** düğmesi görünür.
-4. **Güncelle** düğmesi, arka planda denetlenip bulunan aynı sürümü indirir; tıklama sırasında farklı bir sürüm yeniden seçilmez.
+2. Ana ekrandaki tek güncelleme düğmesi ilk durumda **Denetle**, denetim sürerken **Denetleniyor**, güncelse **Güncel**, hata varsa **Tekrar dene** metnini gösterir.
+3. Yeni sürüm varsa aynı düğme **Güncelle** durumuna geçer.
+4. **Güncelle**, arka planda denetlenip bulunan aynı sürümü indirir; tıklama sırasında farklı bir sürüm yeniden seçilmez.
 5. Paket doğrulanır.
 6. Astral güncelleme için hazırlanır.
 7. Uygulama kapanır, dosyalar güvenli şekilde değiştirilir ve `Astral.exe` yeniden başlatılır.

@@ -80,7 +80,7 @@
                                 VerticalAlignment="Center">
                         <TextBlock FontSize="22"
                                    FontWeight="SemiBold"
-                                   Text="Astral v2.2.1" />
+                                   Text="Astral v2.2.2" />
                         <TextBlock Margin="0,5,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
@@ -107,7 +107,7 @@
                                            FontSize="14"
                                            LineHeight="21"
                                            TextWrapping="Wrap"
-                                           Text="v2.2.1, seçili hedef/preset modelini tamamlar: web-only hedeflerde Discord sürecine dokunulmaz, genel tarayıcı süreçleri profile eklenmez ve web hedefleri yalnız Astral.WebProxy allowlist'iyle kapsama girer." />
+                                           Text="v2.2.2, güncelleme görünürlüğünü düzeltir, eski Discorder köprü paketini üretir ve premium Astral ikon setini yeniler." />
                             </StackPanel>
                         </Border>
 
