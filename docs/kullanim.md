@@ -1,70 +1,78 @@
-# Discorder Kullanım Rehberi
+# Astral Kullanım Rehberi
 
-Discorder, Windows için portable bir Discord bağlantı yöneticisidir. ZIP içinden çalışır; klasik bir kurulum sihirbazı gerektirmez.
-
-## Discorder Kimler İçin?
-
-- Windows'ta Discord bağlantı sorunu yaşayan kullanıcılar.
-- Discord uygulamasının bağlantısını sade bir arayüzle yönetmek isteyenler.
-- Sistem genelinde VPN açmadan, dar kapsamlı bir bağlantı aracı kullanmak isteyenler.
-- Tanılama paketiyle bağlantı sorununu daha anlaşılır raporlamak isteyenler.
-
-Discorder resmi Discord ürünü değildir ve Discord hesabınızı yönetmez.
+Astral ZIP içinden çalışan portable bir Windows uygulamasıdır. Seçili uygulama veya web hedefleri için dar kapsamlı bağlantı planı oluşturur; tüm bilgisayarı veya tüm tarayıcıyı tünellemez.
 
 ## İlk Çalıştırma
 
-1. [GitHub Releases](https://github.com/ucsahinn/discorder/releases) sayfasından en güncel `Discorder-win-x64.zip` dosyasını indirin.
-2. ZIP içeriğini örneğin `C:\Tools\Discorder` gibi kalıcı bir klasöre çıkarın.
-3. `Discorder.exe` dosyasını çalıştırın.
-4. İlk kurulum ekranında WireSock VPN Client ve Cloudflare WARP koşullarını okuyun.
-5. **Kabul et ve kur** düğmesiyle devam edin.
-6. Windows yönetici onayı gelirse resmi WireSock kurulumuna izin verin.
+1. `Astral-win-x64.zip` arşivini release sayfasından indirin.
+2. ZIP içeriğini sabit bir klasöre çıkarın.
+3. `Astral.exe` dosyasını yönetici yetkisiyle çalıştırın.
+4. İlk kurulum ekranında WireSock ve Cloudflare WARP koşullarını okuyup onaylayın.
+5. Ana ekranda **Hedefleri Seç** düğmesini açın.
+6. Hedef Merkezi'nde presetleri veya özel hedefleri seçip **Kaydet** deyin.
 7. Ana ekranda **Bağlan** düğmesine basın.
 
-Portable klasörü geçici indirme klasöründe bırakmamak daha sağlıklıdır. Güncelleme ve yeniden başlatma akışı mevcut çıkarılmış klasörü hedef alır.
+## Hedef Merkezi
 
-## Ana Ekran
+Hedef Merkezi ana ekrana gömülü değildir; ayrı modal olarak açılır. Arama alanı ve kategorilerle şu hedefleri seçebilirsiniz:
 
-- **Bağlan**: Discord bağlantısını başlatır.
-- **Tarayıcı modu**: Varsayılan kapalı gelir; Discord web gerekiyorsa kullanıcı açar ve bulunan desteklenen tarayıcı executable path'leri kapsama alınır.
-- **Arka planda çalıştır**: Pencere kapanınca uygulamanın bildirim alanında açık kalmasını sağlar.
-- **Windows açılışında çalıştır**: Windows oturumu açıldığında Discorder'ı başlatır.
-- **Tanılama**: Bağlantı sorunlarını incelemek için rapor hazırlar.
-- **Onar**: Profil, araç ve kurulum önbelleğini yeniden hazırlanacak hale getirir.
-- **Uygulamayı kaldır**: Discorder'ın yönettiği yerel ayarları ve kendi kurduğu bileşenleri geri alır.
+- Discord
+- Roblox
+- Wattpad
+- Bigo Live
+- Azar
+- Tango
+- LiVU
+- IMVU
+- Blogspot
+- Özel EXE
+- Özel Domain
 
-## Tarayıcı Modu
+Kartlardaki “Uygulama + Web”, “Web”, “Uygulama” ve “Özel” etiketleri yalnız kapsam türünü anlatır. Erişim durumunu, çalışma garantisini veya servislerin güncel durumunu iddia etmez.
 
-Tarayıcı modu yeni kurulumda kapalı gelir. Böylece ilk bağlantıda yalnızca Discord masaüstü uygulaması kapsama alınır.
+## Bağlanma Davranışı
 
-Tarayıcı modu açılırsa Discorder, Discord Web için bulunan desteklenen tarayıcı executable path'lerini de WireSock kapsamına alır. WireSock süreç bazlı çalıştığı için açık modda aynı tarayıcı sürecindeki diğer sekmeler de bu süreç kapsamından etkilenebilir.
+Bağlantı kapalıyken:
 
-## Tanılama Paketi
+- Ana durum **Astral Bağlı Değil** görünür.
+- Seçili hedefler düz bağlantıya çıkmaz.
+- Diğer trafik normal bağlantıda kalır.
 
-Tanılama paketi kullanıcıya görünen bağlantı durumunu ve teknik olayları tek arşivde toplar. Paylaşmadan önce kişisel veri içermediğini kontrol edin.
+Bağlantı açıkken:
 
-Paket genellikle şunları içerir:
+- Ana durum **Astral Bağlı** görünür.
+- Sadece seçili hedefler tünelden çıkar.
+- Hedef seçimi bu oturumda kilitlenir; değiştirmek için önce bağlantıyı kesin.
 
-- `events.jsonl`
-- `errors.log`
-- `health.json`
-- `diagnostics.md`
-- `runtime.json`
-- `tunnel.log`
-- `update.log`
-- varsa `bundle-warnings.txt`
+## Web Hedefleri
 
-`runtime.json`; RAM, GC heap, handle, thread ve calisma suresi gibi sayisal performans metriklerini icerir. Token, sertifika, gizli anahtar veya ozel hesap bilgisi yazmaz. Yine de paketi paylasmadan once dosyalari gozden gecirin.
+Web hedeflerinde genel tarayıcı süreçleri WireSock profiline eklenmez. Astral bunun yerine:
 
-**Debug tanilama** secenegi kapali gelir. Acildiginda bir sonraki tanilama paketine `debug.json` eklenir. Bu dosya CPU orneklemesi, ag adaptor ozeti, TCP baglanti durum sayilari ve ilgili sureclerin RAM/handle/thread bilgilerini toplar. Paket yakalama, komut satiri, cookie, token veya endpoint listesi toplamaz; private IP adresleri maskelenir.
+1. Seçili domainler için PAC kuralı üretir.
+2. `Astral.WebProxy.exe` sürecini allowlist ile başlatır.
+3. WireSock `AllowedApps` satırına tarayıcıyı değil yalnız `Astral.WebProxy.exe` sürecini ekler.
+4. PAC içinde seçili domainlere PROXY, diğer tüm domainlere DIRECT döndürür.
 
-## Kapsam Dışı
+HTTPS içeriği çözülmez. Astral sertifika kurmaz, TLS MITM yapmaz ve sayfa içeriğini okumaz.
 
-Discorder şunları yapmaz:
+## Özel Hedefler
 
-- Discord hesabı açma, kapatma veya yönetme.
-- Discord'u kurma ya da güncelleme.
-- Sistem DNS'ini kalıcı değiştirme.
-- Tüm cihaz trafiğini genel VPN gibi yönlendirme.
-- Oyun, IPTV, yayın uygulaması veya özel uygulama tünelleme.
-- WireSock lisans koşullarını atlatma.
+Özel EXE:
+
+- Mutlak `.exe` yolu olmalıdır.
+- Dosya gerçekten var olmalıdır.
+- Reparse point veya genel tarayıcı exe'si olamaz.
+
+Özel Domain:
+
+- `example.com` veya `*.example.com` biçiminde olmalıdır.
+- URL, port, IP adresi, `*`, `*.com` gibi geniş patternler reddedilir.
+- IDN domainler punycode'a normalize edilir.
+
+## Profil Temizle
+
+**Profil Temizle** portable ZIP klasörünü veya seçtiğiniz uygulamaları silmez. Astral'ın ürettiği profil, WireSock/WARP çalışma state'i, bağlantı kilidi ve yönetilen proxy/PAC state'i temizlenir. WireSock Astral tarafından kurulmuşsa kaldırma akışı Windows onayı isteyebilir.
+
+## Tanılama
+
+**Tanılama** düğmesi redakte edilmiş bir paket üretir. Paket paylaşılırken özel anahtar, token, cookie, tam WireGuard profili veya kişisel veri eklemeyin.

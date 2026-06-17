@@ -20,9 +20,14 @@ function Copy-VerifiedBackgroundVideo {
     )
 
     $candidatePaths = @()
-    $sourceAsset = Join-Path $root 'src\Discorder.App\Assets\background.mp4'
+    $sourceAsset = Join-Path $root 'src\Astral.App\Assets\background.mp4'
     if (Test-Path -LiteralPath $sourceAsset) {
         $candidatePaths += $sourceAsset
+    }
+
+    $neutralArtifactSource = Join-Path $root 'artifacts\background-source.mp4'
+    if (Test-Path -LiteralPath $neutralArtifactSource) {
+        $candidatePaths += $neutralArtifactSource
     }
 
     $artifactsRoot = Join-Path $root 'artifacts'

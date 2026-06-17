@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <AssemblyName>Astral.WebProxy</AssemblyName>
+    <RootNamespace>Astral.WebProxy</RootNamespace>
+    <AssemblyTitle>Astral.WebProxy</AssemblyTitle>
+    <AssemblyDescription>Astral scoped target web proxy</AssemblyDescription>
+    <AssemblyCompany>ucsahinn</AssemblyCompany>
+    <AssemblyProduct>Astral</AssemblyProduct>
+    <Copyright>Copyright (c) 2026 ucsahinn</Copyright>
+    <Version>2.2.0</Version>
+    <FileVersion>2.2.0.0</FileVersion>
+    <RepositoryUrl>https://github.com/ucsahinn/astral</RepositoryUrl>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Astral.Core\Astral.Core.csproj" />
+  </ItemGroup>
+</Project>

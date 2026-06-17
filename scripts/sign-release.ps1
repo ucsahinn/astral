@@ -128,7 +128,7 @@ try {
             '/sha1',
             $certificateThumbprint,
             '/d',
-            'Discorder',
+            'Astral',
             $file.FullName
         )
 
@@ -139,11 +139,11 @@ try {
         }
     }
 
-    $mainExecutable = Join-Path $PublishDirectory 'Discorder.exe'
+    $mainExecutable = Join-Path $PublishDirectory 'Astral.exe'
     if (Test-Path -LiteralPath $mainExecutable) {
         $signature = Get-AuthenticodeSignature -LiteralPath $mainExecutable
         if ($signature.Status -ne 'Valid') {
-            throw "Discorder.exe imza dogrulamasi basarisiz: $($signature.Status)"
+            throw "Astral.exe imza dogrulamasi basarisiz: $($signature.Status)"
         }
     }
 }

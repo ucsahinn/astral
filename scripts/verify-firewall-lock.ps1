@@ -18,11 +18,11 @@ $Domains = @(
     'images-ext-1.discordapp.net',
     'images-ext-2.discordapp.net'
 )
-$RuleName = 'Discorder.BlockDiscordDomains'
-$DisplayName = 'Discorder VPN kilidi - Discord alan adlari'
+$RuleName = 'Astral.BlockDiscordDomains'
+$DisplayName = 'Astral VPN kilidi - Discord alan adlari'
 $HostsPath = Join-Path $env:SystemRoot 'System32\drivers\etc\hosts'
-$BeginMarker = '# BEGIN Discorder Discord kilidi'
-$EndMarker = '# END Discorder Discord kilidi'
+$BeginMarker = '# BEGIN Astral Discord kilidi'
+$EndMarker = '# END Astral Discord kilidi'
 
 function Test-IsAdministrator {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -61,7 +61,7 @@ function Assert-RuleState {
     return $rule
 }
 
-function Invoke-DiscorderRetry {
+function Invoke-AstralRetry {
     param([scriptblock]$Action)
 
     for ($attempt = 1; $attempt -le 8; $attempt++) {
@@ -79,7 +79,7 @@ function Invoke-DiscorderRetry {
     }
 }
 
-function Remove-DiscorderHostsLock {
+function Remove-AstralHostsLock {
     if (-not (Test-Path -LiteralPath $HostsPath)) {
         return
     }
@@ -92,7 +92,7 @@ function Remove-DiscorderHostsLock {
         '\r?\n?'
     $updated = [regex]::Replace($content, $pattern, '')
     if ($updated -ne $content) {
-        Invoke-DiscorderRetry {
+        Invoke-AstralRetry {
             Set-Content `
                 -LiteralPath $HostsPath `
                 -Value $updated `
@@ -102,7 +102,7 @@ function Remove-DiscorderHostsLock {
     }
 }
 
-function Test-DiscorderHostsLock {
+function Test-AstralHostsLock {
     if (-not (Test-Path -LiteralPath $HostsPath)) {
         return $false
     }
@@ -114,15 +114,15 @@ function Test-DiscorderHostsLock {
         $content.Contains('::1 discord.com')
 }
 
-function Enable-DiscorderHostsLock {
-    Remove-DiscorderHostsLock
+function Enable-AstralHostsLock {
+    Remove-AstralHostsLock
 
     $entries = foreach ($domain in $Domains) {
         '0.0.0.0 ' + $domain
         '::1 ' + $domain
     }
     $block = @($BeginMarker) + $entries + @($EndMarker)
-    Invoke-DiscorderRetry {
+    Invoke-AstralRetry {
         Add-Content `
             -LiteralPath $HostsPath `
             -Value ($block -join [Environment]::NewLine) `
@@ -150,8 +150,8 @@ function Resolve-DiscordAddresses {
     return @($resolvedAddresses | Sort-Object -Unique)
 }
 
-function Enable-DiscorderFirewallLock {
-    Remove-DiscorderHostsLock
+function Enable-AstralFirewallLock {
+    Remove-AstralHostsLock
     ipconfig /flushdns | Out-Null
 
     $addressList = Resolve-DiscordAddresses
@@ -178,17 +178,17 @@ function Enable-DiscorderFirewallLock {
         }
     }
 
-    Enable-DiscorderHostsLock
+    Enable-AstralHostsLock
     $ruleState = Assert-RuleState -ExpectedEnabled 'True' -Phase 'Kilidi acma'
-    if (-not (Test-DiscorderHostsLock)) {
+    if (-not (Test-AstralHostsLock)) {
         throw 'Hosts kilidi yazilamadi.'
     }
 
     return $ruleState
 }
 
-function Disable-DiscorderFirewallLock {
-    Remove-DiscorderHostsLock
+function Disable-AstralFirewallLock {
+    Remove-AstralHostsLock
     ipconfig /flushdns | Out-Null
 
     $rule = Get-NetFirewallRule -Name $RuleName -ErrorAction SilentlyContinue
@@ -229,13 +229,13 @@ Assert-NetSecurityCmdlet 'New-NetFirewallRule'
 Assert-NetSecurityCmdlet 'Set-NetFirewallRule'
 Assert-NetSecurityCmdlet 'Resolve-DnsName'
 
-$enabledState = Enable-DiscorderFirewallLock
-$disabledState = Disable-DiscorderFirewallLock
+$enabledState = Enable-AstralFirewallLock
+$disabledState = Disable-AstralFirewallLock
 $networkProbe = 'atlanildi'
 
 if ($ProbeNetwork) {
     $openWithoutLock = Test-Tcp443 'discord.com'
-    $enabledState = Enable-DiscorderFirewallLock
+    $enabledState = Enable-AstralFirewallLock
     Start-Sleep -Seconds 2
     $openWithLock = Test-Tcp443 'discord.com'
 
@@ -251,7 +251,7 @@ if ($ProbeNetwork) {
     }
 }
 
-$finalState = Enable-DiscorderFirewallLock
+$finalState = Enable-AstralFirewallLock
 
 [pscustomobject]@{
     RuleName = $finalState.Name
@@ -260,6 +260,6 @@ $finalState = Enable-DiscorderFirewallLock
     FinalCheck = [string]$finalState.Enabled
     Direction = [string]$finalState.Direction
     Action = [string]$finalState.Action
-    HostsLock = [string](Test-DiscorderHostsLock)
+    HostsLock = [string](Test-AstralHostsLock)
     NetworkProbe = $networkProbe
 }

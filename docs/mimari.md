@@ -1,134 +1,103 @@
-# Discorder Mimarisi
+# Astral Mimarisi
 
-Discorder tek amaçlı bir Windows uygulamasıdır: Discord uygulamasını Cloudflare WARP tabanlı WireGuard profili üzerinden WireSock ile tünellemek. Discord web erişimi için desteklenen tarayıcı modu kullanıcı tarafından ayrıca açılır.
+Astral, seçili uygulama veya web hedefleri için dar kapsamlı bağlantı planı üreten Windows uygulamasıdır. Genel cihaz VPN'i, tüm tarayıcı tüneli veya sistem geneli proxy aracı değildir.
 
 ## Ana Kararlar
 
-- Uygulama taşınabilir çalışır; kendi kurucusu, servis kaydı veya görev zamanlayıcısı yoktur. WireSock sürücüsüne erişmek için yönetici yetkisiyle açılır.
+- Uygulama portable çalışır; kendi servis kaydı veya görev zamanlayıcısı yoktur.
 - WireSock ve wgcf repoya gömülmez.
-- Sistem DNS'i değiştirilmez.
-- Kalıcı paket filtre sürücüsü veya DPI aşma motoru çalıştırılmaz.
-- Tünel kapsamı `AllowedApps` ile varsayılan olarak Discord uygulamalarına daraltılır.
-- Desteklenen tarayıcı süreçleri yalnızca tarayıcı modu açıldığında kapsama eklenir.
-- Bağlantı açıkken tarayıcı modu kapalıysa desteklenen tarayıcıların Discord alan adlarına düz internetten çıkmasını azaltmak için geçici tarayıcı firewall kapsamı uygulanır; tarayıcı modu açıksa ek tarayıcı engeli kaldırılır.
-- Kapalı durumda Discorder'a ait yönetilen bağlantı koruması Discord alan adlarına giden trafiği kapatır. Ana koruma hosts marker bloğudur; Windows Firewall policy izin verirse çözülen IP listesi de bloklanır.
-- Profil, ayar ve log dosyaları `%LOCALAPPDATA%\Discorder` altında tutulur.
+- Sistem DNS'i kalıcı değiştirilmez.
+- Kalıcı DPI motoru veya paket filtre sürücüsü kurulmaz.
+- Kullanıcı hedef seçer; `TargetRegistry` presetleri ve özel hedefleri tek kaynakta tutar.
+- `TargetScopeResolver`, seçili hedeflerden `RoutingPlan` üretir.
+- Uygulama hedefleri WireSock `AllowedApps` satırına yazılır.
+- Web hedefleri için genel tarayıcı exe'leri `AllowedApps` içine yazılmaz; yalnızca `Astral.WebProxy.exe` girer.
+- Astral.WebProxy loopback üzerinde çalışır, sadece seçili domain/pattern hedeflerini kabul eder.
+- HTTPS için TLS çözme, sertifika kurma veya içerik okuma yoktur; proxy CONNECT host/Host allowlist kontrolü yapar.
+- PAC çıktısı seçili domainlerde PROXY, diğer tüm domainlerde DIRECT döndürür.
+- PAC/proxy state'i bağlantı kapanınca, hata alınca, WireSock beklenmedik kapanınca ve uygulama kapanınca temizlenir.
 
 ## Bileşenler
 
-### `Discorder.App`
+### `Astral.App`
 
-WPF arayüzünü, WireSock kurulum onay ekranını, Authenticode doğrulamasını ve Windows UAC ile kurucu başlatmayı içerir.
+WPF arayüzünü, Hedef Merkezi modalını, WireSock kurulum onay ekranını, Authenticode doğrulamasını ve Windows UAC ile kurucu başlatmayı içerir.
 
-### `Discorder.Core`
+### `Astral.Core`
 
-Tünel yaşam döngüsü, Discord kapsamı, profil üretimi, indirme doğrulaması, WireSock hazırlığı ve süreç yönetimi burada yer alır.
+Tünel yaşam döngüsü, hedef registry/selection/resolver, profil üretimi, web proxy policy/PAC üretimi, indirme doğrulaması, WireSock hazırlığı, tanılama ve süreç yönetimi burada yer alır.
+
+### `Astral.WebProxy`
+
+Seçili web domainlerini taşıyan küçük loopback proxy exe'sidir. `--allow <domain>` girdileriyle başlar, allowlist dışı hostlara `403` döndürür ve HTTPS bağlantılarında yalnızca CONNECT tüneli kurar.
 
 ### Testler
 
-- `Discorder.Core.Tests`: Discord kapsamı, profil sertleştirme, WireSock hazırlığı, wgcf profil üretimi ve denetleyici yaşam döngüsünü doğrular.
-- `Discorder.Windows.Tests`: WireSock imza doğrulaması ve kurulum onay penceresinin gerçek WPF görsel kontrolünü yapar.
+- `Astral.Core.Tests`: hedef presetleri, migration, domain/custom validation, PAC policy, profil sertleştirme, WireSock hazırlığı ve denetleyici yaşam döngüsünü doğrular.
+- `Astral.Windows.Tests`: WireSock imza doğrulaması, ana pencere, Hedef Merkezi ve kurulum onay penceresinin gerçek WPF görsel kontrolünü yapar.
 
 ## Bağlantı Akışı
 
-1. Uygulama kapalı/boş durumdayken `Discorder.BlockDiscordDomains` kuralı etkin tutulur.
-2. Kullanıcı **Bağlan** düğmesine basar.
-3. Discorder kendi Discord firewall kilidini devre dışı bırakır.
-4. WireSock kurulumu için kullanıcı onayı yoksa onay penceresi açılır.
-5. WireSock kurulu değilse resmi kurucu indirilir.
-6. Kurucu SHA-256, Authenticode, yayıncı ve sürüm kontrolünden geçer.
-7. Kurucu Windows UAC ile sessiz modda çalıştırılır.
-8. Kurulu WireSock komut satırı aracı bulunur ve imzası doğrulanır.
-9. `wgcf` indirilir, doğrulanır ve Cloudflare WARP profili üretilir.
-10. Profildeki eski veya geniş `AllowedApps` satırları kaldırılır.
-11. Discord uygulamaları yeni `AllowedApps` satırına yazılır; tarayıcı modu açıksa desteklenen tarayıcılar da eklenir.
-12. Tarayıcı modu kapalıysa desteklenen tarayıcılar için geçici `Discorder.TunnelScope.Browsers` Windows Firewall kuralları uygulanır; tarayıcı modu açıksa bu geçici kurallar temiz kalır.
-13. WireSock VPN Client `run -config <discord.conf> -log-level error` komutuyla kullanıcı süreci olarak başlar.
-14. Bağlantı kesilirken çalışan WireSock süreci sonlandırılır, geçici tarayıcı kapsamı temizlenir ve Discord firewall kilidi tekrar etkinleştirilir.
+1. Uygulama açılışta eski ayarları yeni hedef seçimine taşır; varsayılan hedef Discord'dur.
+2. Kullanıcı **Hedefleri Seç** ile preset veya özel hedefleri kaydeder.
+3. Kullanıcı **Bağlan** düğmesine basar.
+4. Astral bağlantı korumasını geçici olarak kaldırır.
+5. WireSock kurulumu için kullanıcı onayı yoksa onay penceresi açılır.
+6. WireSock kurulu değilse resmi kurucu indirilir ve doğrulanır.
+7. `wgcf` indirilir, doğrulanır ve Cloudflare WARP profili üretilir.
+8. `TargetScopeResolver` seçili hedeflerden `RoutingPlan` üretir.
+9. Profildeki eski veya geniş `AllowedApps` satırları kaldırılır.
+10. Seçili uygulama exe'leri ve gerekiyorsa `Astral.WebProxy.exe` yeni `AllowedApps` satırına yazılır.
+11. Web hedefleri varsa PAC dosyası oluşturulur ve Astral.WebProxy allowlist ile başlatılır.
+12. WireSock VPN Client `run -config <discord.conf> -log-level info` komutuyla kullanıcı süreci olarak başlar.
+13. Bağlantı kesilirken WireSock süreci sonlandırılır, PAC/proxy state'i geri alınır ve bağlantı koruması tekrar etkinleştirilir.
 
-## WireSock Komut Satırı Uyumluluğu
+## Hedef Modeli
 
-WireSock VPN Client `1.4.7.1` kurulumunda güncel komut satırı yolu:
+- `TargetDefinition`: id, ad, kategori, kapsam türü, domainler, executable ipuçları ve ikon anahtarını taşır.
+- `TargetRegistry`: Discord, Roblox, Wattpad, Bigo Live, Azar, Tango, LiVU, IMVU, Blogspot, Özel EXE ve Özel Domain presetlerini sağlar.
+- `TargetSelectionStore`: seçimi `settings.json` içinde saklar.
+- `TargetScopeResolver`: seçimi `RoutingPlan` haline getirir.
+- `RoutingPlan`: `AllowedApplications`, proxy domain kuralları ve kullanıcıya gösterilecek kapsam özetini içerir.
 
-```text
-C:\Program Files\WireSock VPN Client\bin\wiresock-client.exe
+## Custom Validation
+
+- Özel EXE mutlak canonical path olmak zorundadır.
+- `.exe` uzantısı dışındaki dosyalar reddedilir.
+- Dosya mevcut olmalı ve reparse point olmamalıdır.
+- Genel tarayıcı exe'leri özel EXE hedefi olarak reddedilir.
+- Özel domain IDN/punycode normalize edilir.
+- URL, port, IP literal, tek label, `*`, `*.com` gibi geniş wildcard patternleri reddedilir.
+
+## Web Proxy ve PAC
+
+PAC örüntüsü:
+
+```javascript
+function FindProxyForURL(url, host) {
+  if (host == "wattpad.com" || dnsDomainIs(host, "wattpad.com")) return "PROXY 127.0.0.1:18088";
+  return "DIRECT";
+}
 ```
 
-Discorder yalnızca resmi WireSock VPN Client komut satırı aracını kullanır. WireSock'un ayrı grafik arayüz/tray profili ana akışa dahil edilmez.
-
-Güncel akış:
-
-```text
-wiresock-client.exe run -config <discord.conf> -log-level error
-```
+Bu tasarımda tarayıcı süreci WireSock kapsamına girmez. Tarayıcı normal kalır; yalnız seçili domain istekleri PAC üzerinden Astral.WebProxy'ye yönlenir. Proxy süreci WireSock `AllowedApps` içinde olduğu için yalnız bu seçili web hedefleri tünel yoluna girer.
 
 ## Güvenlik Sınırları
 
 - TLS doğrulaması devre dışı bırakılamaz.
 - İndirilen her ikili dosya sabit hash ile doğrulanır.
 - Kurulu WireSock komut satırı dosyası imza ve yayıncı kontrolünden geçmeden çalıştırılmaz.
-- Discord uygulaması ve isteğe bağlı tarayıcı kapsamı dışındaki özel uygulama adları `AllowedApps` içine testlerle alınmaz.
-- Virgül, satır sonu ve boş değer enjeksiyonu reddedilir.
-- Discorder kendi hosts marker bloğunu, `Discorder.BlockDiscordDomains` Windows Firewall kuralını ve bağlantı süresine bağlı geçici `Discorder.TunnelScope.Browsers` kural grubunu yönetir; servis veya görev zamanlayıcı kuralı eklemez.
-- Kapalı durum kilidi Discord alan adlarını hedefler; Chrome veya Edge gibi tarayıcı süreçlerinin tamamını bloklamaz.
+- Virgül, satır sonu ve boş `AllowedApps` enjeksiyonu reddedilir.
+- Loglarda özel anahtar, token, cookie veya tam hassas WireGuard profili yazılmaz.
+- PAC/proxy rollback state'i Astral sahiplik marker'ı ile tutulur ve yalnız Astral'ın uyguladığı PAC değeri aktifse restore edilir.
 
-## Kapalı Durum VPN Kilidi
+## Bilinen Sınırlar
 
-Discorder kapalıyken Discord'a doğrudan erişimi azaltmak için iki yönetilen katman kullanır:
-
-```text
-# BEGIN Discorder Discord kilidi
-0.0.0.0 discord.com
-::1 discord.com
-...
-# END Discorder Discord kilidi
-```
-
-Windows Firewall yerel kuralları policy tarafından uygulanıyorsa ek IP kuralı da kullanılır:
-
-```text
-Discorder.BlockDiscordDomains
-```
-
-Hosts koruması Discord alan adlarını yerel döngü adresine yönlendirir. Firewall katmanı dışa giden trafiği, Discorder'ın başlangıçta çözdüğü Discord alan adı IP'leri üzerinden bloklar. Bağlantı açılırken hosts marker bloğu kaldırılır ve Firewall kuralı devre dışı bırakılır, WireSock bağlantısı çalışır. Bağlantı kesilirken veya uygulama kapanırken koruma tekrar etkinleştirilir.
-
-Bağlı durumdayken tarayıcı modu kapalıysa Discorder desteklenen tarayıcı kurulum yollarını bulur ve bu tarayıcı programları için Discord alan adı IP'lerine geçici outbound blok kuralları ekler. Bu kural grubu tarayıcı modu açıkken, bağlantı kesilirken, uygulama kapanırken ve uygulamayı kaldırma sırasında temizlenir.
-
-Canlı doğrulama için `scripts/verify-firewall-lock.ps1` yönetici PowerShell oturumunda çalıştırılır. Script kilidi etkinleştirir, devre dışı bırakır ve finalde tekrar etkin bırakarak hosts marker durumunu ve Firewall kural durumunu raporlar. `-ProbeNetwork` seçeneği Discord'a TCP 443 bağlantısını da dener; ağ veya ISS tarafı Discord'a zaten ulaşamıyorsa bu prob kanıt olarak zorlanmaz.
-
-## Tarayıcı Kapsamı
-
-Desteklenen tarayıcı süreçleri:
-
-- Chrome: `chrome.exe`
-- Chromium: `chromium.exe`
-- Edge: `msedge.exe`
-- Firefox: `firefox.exe`
-- Brave: `brave.exe`
-- Opera: `opera.exe`
-- Vivaldi: `vivaldi.exe`
-
-Tarayıcı modu yeni kurulumda varsayılan kapalı gelir. Kapalıyken Discord uygulaması tünellenir; desteklenen tarayıcılar WireSock profiline eklenmez ve Discord web'e düz internetten çıkmasını azaltan geçici firewall kapsamı uygulanır. Açıkken Discord uygulaması ve bulunan desteklenen tarayıcı executable path'leri birlikte tünellenir. WireSock süreç bazlı filtreleme kullandığı için tarayıcı içinde yalnızca tek bir sekmeyi ayırmak yerine desteklenen tarayıcı sürecini tüneller. Bu karar Discord web erişimini çalıştırmak için bilinçli olarak alınır; oyunlar, sistem DNS'i, kalıcı servisler ve eski DPI motorları yine kapsam dışındadır.
+- PAC kullanımı bazı tarayıcı veya kurumsal policy ayarlarında farklı davranabilir.
+- Firefox gibi bazı uygulamalar Windows proxy ayarını kullanmayacak şekilde yapılandırılmış olabilir.
+- QUIC/UDP/WebRTC gibi TCP CONNECT dışı yollar bu tasarımın kapsamı dışındadır.
+- Presetler erişim durumunu garanti etmez; sadece hedef kapsamını tanımlar.
 
 ## Yayın Modeli
 
-`scripts/build-release.ps1` doğrulama scriptini çalıştırır, Windows x64 bağımsız yayın çıktısı üretir ve proje sürümünden `artifacts/Discorder-<sürüm>-win-x64.zip` arşivini oluşturur. Manuel kullanım için aynı paketin sabit adlı `artifacts/Discorder-win-x64.zip` kopyası da üretilir; sürüm bilgisi dosya adı yerine manifest, uygulama versiyonu ve release notlarında tutulur.
-
-## Portable Güncelleme Modeli
-
-Discorder geleneksel installer yerine çıkarılmış portable klasörü günceller. Güncelleme kullanıcıyı yormayan tek düğmeli bir akışla çalışır:
-
-1. Ana uygulama açılışta GitHub latest release bilgisini arka planda okur.
-2. Yeni sürüm yoksa ana ekranda güncelleme düğmesi gösterilmez.
-3. Yeni sürüm varsa bulunan aday `_pendingUpdate` olarak kilitlenir ve tek `Güncelle` düğmesi görünür.
-4. Kullanıcı `Güncelle` dediğinde aynı aday sürüm indirilir; tıklama anında farklı bir release sessizce seçilmez.
-5. Beklenen `Discorder-<sürüm>-win-x64.zip` ve `.sha256.txt` asset'leri tekil olmalıdır.
-6. Asset durumu `uploaded`, indirme yolu resmi `ucsahinn/discorder` release yolu ve GitHub `sha256:` digest değeri checksum dosyasıyla eşleşmelidir.
-7. Paket `%PROGRAMDATA%\Discorder\updates` altında yöneticiye özel staging klasörüne indirilir.
-8. ZIP içindeki `discorder.update-manifest.json` release sürümüyle, dosya listesiyle, dosya boyutlarıyla ve SHA-256 özetleriyle doğrulanır.
-9. Kod imzalama etkinse `Discorder.exe`, `Discorder.Updater.exe` ve Discorder'a ait DLL dosyaları mevcut Discorder imza thumbprint'iyle eşleşmelidir; sertifika yoksa GitHub release yolu, asset digest, SHA-256 ve manifest doğrulaması güven sınırı olur.
-10. Güncelleme helper'ı mevcut süreç kapandıktan sonra aynı portable klasöre dosyaları uygular.
-11. Uygulama sırasında eski dosyalar staging altında yedeklenir; hata olursa yedekler geri taşınır.
-12. Başarılı uygulamadan sonra helper aynı klasördeki `Discorder.exe` dosyasını yeniden başlatır.
-
-Release workflow kod imzalama secret'ı varsa Authenticode imzalı paket üretir. Sertifika yoksa paket imzasız yayınlanabilir; bu durumda otomatik güncelleme GitHub release yolu, asset digest, SHA-256 dosyası ve manifest doğrulaması geçmeden uygulanmaz.
+`scripts/build-release.ps1` doğrulama scriptini çalıştırır, Windows x64 bağımsız yayın çıktısı üretir ve proje sürümünden `artifacts/Astral-<sürüm>-win-x64.zip` arşivini oluşturur. Paket içinde `Astral.exe`, `Astral.Updater.exe`, `Astral.WebProxy.exe`, manifest ve gerekli runtime dosyaları yer alır.

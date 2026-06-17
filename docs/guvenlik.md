@@ -1,64 +1,61 @@
-# Discorder Güvenlik Sınırları
+# Astral Güvenlik Sınırları
 
-Discorder'ın güvenlik modeli dar kapsam, doğrulanmış indirme ve kullanıcı onayı üzerine kuruludur.
+Astral'ın güvenlik hedefi, seçili hedefler dışında kalan trafiği kapsam dışında bırakmaktır. Bu nedenle sistem geneli VPN, tüm tarayıcı tüneli veya kalıcı proxy aracı gibi davranmaz.
 
-## Güven Sınırı
+## Trafik Kapsamı
 
-Discorder şu bileşenlere güvenir:
+- Uygulama hedefleri WireSock `AllowedApps` satırına dar kapsamla yazılır.
+- Web hedefleri için `chrome.exe`, `msedge.exe`, `firefox.exe`, `brave.exe`, `opera.exe`, `vivaldi.exe` gibi genel tarayıcı süreçleri `AllowedApps` içine eklenmez.
+- Web hedeflerinde yalnız `Astral.WebProxy.exe` WireSock kapsamına girer.
+- PAC kuralı seçili domainlerde PROXY, diğer tüm domainlerde DIRECT döndürür.
 
-- Windows işletim sistemi, GitHub Releases ve varsa Authenticode doğrulaması.
-- GitHub Releases üzerinden yayınlanan Discorder paketleri.
-- Resmi WireSock VPN Client kurucusu.
-- Cloudflare WARP profil üretimi için kullanılan wgcf akışı.
+## TLS ve İçerik
 
-Bu bileşenlerden gelen içerik doğrulanmadan uygulanmaz.
+- TLS MITM yoktur.
+- Sertifika kurulmaz.
+- HTTPS içeriği okunmaz veya çözülmez.
+- Proxy sadece CONNECT host, HTTP Host ve domain allowlist kararını verir.
 
-## İndirilen Dosyalar
+## Custom Target Güvenliği
 
-WireSock kurucusu resmi kaynaktan alınır ve şu kontrollerden geçer:
+Özel EXE doğrulaması:
 
-- SHA-256 hash doğrulaması.
-- Authenticode imza zinciri.
-- Beklenen yayıncı adı.
-- Beklenen ürün ve sürüm bilgisi.
+- Mutlak canonical path.
+- `.exe` uzantısı.
+- Mevcut dosya.
+- Reparse point reddi.
+- Genel tarayıcı exe reddi.
 
-Discorder'ın uygulama içi otomatik güncelleme paketleri için GitHub release yolu, GitHub asset digest, SHA-256 dosyası ve manifest kontrolleri kullanılır. Kod imzalama sertifikası varsa Authenticode kontrolü ayrıca devreye alınabilir. Sertifika yoksa güven sınırı GitHub release yetkisi ve yayınlanan doğrulama verileridir; bu, imzalı yayıncı kimliğiyle aynı güven seviyesini sağlamaz. Manuel indirilen GitHub Release ZIP'lerinde kullanıcı yayınlanan SHA-256 dosyasını kontrol etmelidir.
+Özel domain doğrulaması:
 
-## Ne Yapmaz?
+- IDN/punycode normalize edilir.
+- URL, path, port ve IP literal reddedilir.
+- Tek label veya public-suffix seviyesinde wildcard reddedilir.
+- `*` ve `*.com` gibi geniş patternler reddedilir.
 
-Discorder bilinçli olarak şunları yapmaz:
+## İkili Dosyalar
 
-- TLS doğrulamasını kapatma.
-- İmza veya hash hatasını yoksayma.
-- WireSock ya da wgcf ikili dosyalarını kaynak repoya gömme.
-- Release paketinde WireSock fallback kurucusu varsa hash, Authenticode, yayıncı ve sürüm doğrulaması geçmeden çalıştırma.
-- Discord dışı uygulamaları sessizce kapsama alma.
-- Sistem DNS'ini kalıcı değiştirme.
-- Kullanıcının gizli profil veya hesap dosyalarını release paketine ekleme.
+- WireSock resmi kurucu hash, Authenticode imzası, yayıncı ve sürüm bilgisiyle doğrulanır.
+- wgcf sabit SHA-256 özetiyle doğrulanır.
+- Güncelleme paketi GitHub release yolu, asset digest, `.sha256.txt` ve manifest eşleşmesiyle doğrulanır.
 
-## Kullanıcı Verisi
+## Log ve Tanılama
 
-Yerel ayar, log, profil ve tanılama dosyaları kullanıcının makinesinde kalır:
+Loglarda şunlar yazılmamalıdır:
 
-```text
-%LOCALAPPDATA%\Discorder
-```
+- WireGuard private key.
+- Token, cookie veya credential.
+- Tam hassas WireGuard profili.
+- Kullanıcının gereksiz kişisel verisi.
 
-Tanılama paketi paylaşmadan önce özel anahtar, token, cookie, tam profil dosyası veya kişisel veri içermediğini kontrol edin.
+Debug tanılama isteğe bağlıdır. Normal tanılama paketi hafif tutulur ve redaksiyon uygular.
 
-## Public Screenshot ve Doküman Kuralı
+## Rollback
 
-Repo görselleri ve dokümanları şu verileri içermemelidir:
+PAC/proxy state'i uygulanmadan önce Astral sahiplik marker'ı ile state dosyasına alınır. Bağlantı kesilince, hata alınca, WireSock beklenmedik kapanınca veya uygulama kapanınca restore akışı çalışır. Kullanıcı veya policy bu sırada proxy ayarını değiştirmişse Astral yalnız kendi uyguladığı PAC değerini geri alır.
 
-- Yerel kullanıcı adı veya tam yerel yol.
-- Token, cookie, private key veya bağlantı dizesi.
-- Redakte edilmemiş log.
-- Gizli IP, müşteri verisi veya hesap bilgisi.
+## Sınırlar
 
-Bu nedenle README görsellerinde yalnızca ürün arayüzü ve genel DNS sağlayıcı örnekleri gösterilir; yerel yol, hesap, token, log veya kişisel veri yer almaz.
-
-## Güvenlik Açığı Bildirme
-
-Güvenlik açığını public issue olarak paylaşmayın. GitHub Security Advisory kullanın:
-
-<https://github.com/ucsahinn/discorder/security/advisories/new>
+- Presetler erişim durumunu garanti etmez.
+- Browser policy, DoH, QUIC, UDP/WebRTC veya manuel proxy ayarları davranışı etkileyebilir.
+- Kurumsal proxy/PAC ortamlarında kullanıcı ek doğrulama yapmalıdır.

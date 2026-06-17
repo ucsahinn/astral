@@ -1,6 +1,6 @@
 # Güvenlik Politikası
 
-Discorder dar kapsamlı bir Windows aracıdır: yalnızca Discord trafiğini tüneller ve sistem ağ ayarlarını kalıcı olarak değiştirmez.
+Astral dar kapsamlı bir Windows aracıdır: yalnızca Discord trafiğini tüneller ve sistem ağ ayarlarını kalıcı olarak değiştirmez.
 
 ## Desteklenen Sürüm
 
@@ -10,7 +10,7 @@ Yalnızca `main` dalı ve en son yayınlanan sürüm güvenlik düzeltmesi alır
 
 Güvenlik açıklarını herkese açık bildirim olarak paylaşmayın. Şu durumlarda GitHub özel güvenlik bildirimi kullanın:
 
-<https://github.com/ucsahinn/discorder/security/advisories/new>
+<https://github.com/ucsahinn/astral/security/advisories/new>
 
 Özellikle şunları gizli bildirin:
 
@@ -37,8 +37,8 @@ Bildirimlere şunları eklemeyin:
 - Authenticode imzası, yayıncı, MSI ürün adı ve sürüm bilgisi kontrol edilir.
 - WireSock ve Cloudflare WARP koşulları kullanıcı onayı olmadan kabul edilmiş sayılmaz.
 - Repoda ve yayın arşivinde WireSock veya wgcf ikili dosyası bulunmaz.
-- Üretilen hesap ve profil dosyaları `%LOCALAPPDATA%\Discorder` altında kalır.
+- Üretilen hesap ve profil dosyaları `%LOCALAPPDATA%\Astral` altında kalır.
 
 ## Yerel Veri Temizliği
 
-Discorder ayarlarını, loglarını ve oluşturulan profilleri silmek için `%LOCALAPPDATA%\Discorder` klasörünü kaldırabilirsiniz. WireSock ayrı bir Windows uygulamasıdır; kaldırmak için Windows Ayarları üzerinden işlem yapın.
+Astral ayarlarını, loglarını ve oluşturulan profilleri silmek için `%LOCALAPPDATA%\Astral` klasörünü kaldırabilirsiniz. WireSock ayrı bir Windows uygulamasıdır; kaldırmak için Windows Ayarları üzerinden işlem yapın.

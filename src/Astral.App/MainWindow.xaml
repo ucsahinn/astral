@@ -1,0 +1,1037 @@
+<Window x:Class="Astral.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Astral"
+        Width="1320"
+        Height="780"
+        MinWidth="1320"
+        MinHeight="780"
+        ResizeMode="CanMinimize"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource WindowBrush}"
+        Foreground="{StaticResource PrimaryTextBrush}"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        Loaded="Window_Loaded"
+        Closing="Window_Closing"
+        StateChanged="Window_StateChanged">
+    <Grid ClipToBounds="True">
+        <MediaElement x:Name="BackgroundVideo"
+                      LoadedBehavior="Manual"
+                      UnloadedBehavior="Close"
+                      Stretch="UniformToFill"
+                      Volume="0"
+                      Opacity="0.80"
+                      IsHitTestVisible="False"
+                      Loaded="BackgroundVideo_Loaded"
+                      MediaEnded="BackgroundVideo_MediaEnded"
+                      MediaFailed="BackgroundVideo_MediaFailed" />
+
+        <Rectangle IsHitTestVisible="False">
+            <Rectangle.Fill>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                    <GradientStop Color="#D0040710" Offset="0" />
+                    <GradientStop Color="#98091322" Offset="0.34" />
+                    <GradientStop Color="#5A071120" Offset="0.72" />
+                    <GradientStop Color="#64040710" Offset="1" />
+                </LinearGradientBrush>
+            </Rectangle.Fill>
+        </Rectangle>
+
+        <Rectangle IsHitTestVisible="False" Opacity="0.24">
+            <Rectangle.Fill>
+                <RadialGradientBrush Center="0.72,0.42"
+                                     GradientOrigin="0.72,0.38"
+                                     RadiusX="0.70"
+                                     RadiusY="0.78">
+                    <GradientStop Color="#00121A30" Offset="0" />
+                    <GradientStop Color="#1EFF3F75" Offset="0.38" />
+                    <GradientStop Color="#225EEBFF" Offset="0.66" />
+                    <GradientStop Color="#00050712" Offset="1" />
+                </RadialGradientBrush>
+            </Rectangle.Fill>
+        </Rectangle>
+
+        <Rectangle IsHitTestVisible="False" Opacity="0.86">
+            <Rectangle.Fill>
+                <LinearGradientBrush StartPoint="0,1" EndPoint="0,0">
+                    <GradientStop Color="#A7040710" Offset="0" />
+                    <GradientStop Color="#3C040710" Offset="0.42" />
+                    <GradientStop Color="#00040710" Offset="1" />
+                </LinearGradientBrush>
+            </Rectangle.Fill>
+        </Rectangle>
+
+        <Rectangle IsHitTestVisible="False" Opacity="0.18">
+            <Rectangle.Fill>
+                <RadialGradientBrush Center="0.26,0.44"
+                                     GradientOrigin="0.22,0.36"
+                                     RadiusX="0.52"
+                                     RadiusY="0.72">
+                    <GradientStop Color="#7E61F6FF" Offset="0" />
+                    <GradientStop Color="#2639E8FF" Offset="0.58" />
+                    <GradientStop Color="#00050712" Offset="1" />
+                </RadialGradientBrush>
+            </Rectangle.Fill>
+        </Rectangle>
+
+        <Rectangle IsHitTestVisible="False" Opacity="0.16">
+            <Rectangle.Fill>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                    <GradientStop Color="#307DEBFF" Offset="0" />
+                    <GradientStop Color="#00040710" Offset="0.32" />
+                    <GradientStop Color="#185DFF92" Offset="0.68" />
+                    <GradientStop Color="#00040710" Offset="1" />
+                </LinearGradientBrush>
+            </Rectangle.Fill>
+        </Rectangle>
+
+        <Grid Margin="28">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="76" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="74" />
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0"
+                    BorderBrush="{StaticResource PremiumLineBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="18,0"
+                    MaxWidth="1264">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#9B0C1728" Offset="0" />
+                        <GradientStop Color="#7817253C" Offset="0.54" />
+                        <GradientStop Color="#64101D31" Offset="1" />
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="36"
+                                      Direction="270"
+                                      Opacity="0.42"
+                                      ShadowDepth="0"
+                                      Color="#63D9FF" />
+                </Border.Effect>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0"
+                            Width="62"
+                            Height="62"
+                            Margin="0,0,18,0"
+                            CornerRadius="16"
+                            BorderBrush="#B77DEBFF"
+                            BorderThickness="1"
+                            RenderTransformOrigin="0.5,0.5"
+                            VerticalAlignment="Center">
+                        <Border.RenderTransform>
+                            <TransformGroup>
+                                <ScaleTransform x:Name="LogoScale"
+                                                ScaleX="1"
+                                                ScaleY="1" />
+                                <RotateTransform x:Name="LogoTilt"
+                                                 Angle="0" />
+                            </TransformGroup>
+                        </Border.RenderTransform>
+                        <Border.Triggers>
+                            <EventTrigger RoutedEvent="Loaded">
+                                <BeginStoryboard>
+                                    <Storyboard RepeatBehavior="Forever">
+                                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="LogoTilt"
+                                                                       Storyboard.TargetProperty="Angle">
+                                            <SplineDoubleKeyFrame KeyTime="0:0:0" Value="0" />
+                                            <SplineDoubleKeyFrame KeyTime="0:0:1.2" Value="0" />
+                                            <SplineDoubleKeyFrame KeyTime="0:0:1.45" Value="-3" />
+                                            <SplineDoubleKeyFrame KeyTime="0:0:1.7" Value="3" />
+                                            <SplineDoubleKeyFrame KeyTime="0:0:1.95" Value="-1.5" />
+                                            <SplineDoubleKeyFrame KeyTime="0:0:2.2" Value="0" />
+                                            <SplineDoubleKeyFrame KeyTime="0:0:4.6" Value="0" />
+                                        </DoubleAnimationUsingKeyFrames>
+                                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="LogoScale"
+                                                                       Storyboard.TargetProperty="ScaleX">
+                                            <SplineDoubleKeyFrame KeyTime="0:0:0" Value="1" />
+                                            <SplineDoubleKeyFrame KeyTime="0:0:1.2" Value="1" />
+                                            <SplineDoubleKeyFrame KeyTime="0:0:1.45" Value="1.035" />
+                                            <SplineDoubleKeyFrame KeyTime="0:0:1.7" Value="1.015" />
+                                            <SplineDoubleKeyFrame KeyTime="0:0:2.2" Value="1" />
+                                            <SplineDoubleKeyFrame KeyTime="0:0:4.6" Value="1" />
+                                        </DoubleAnimationUsingKeyFrames>
+                                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="LogoScale"
+                                                                       Storyboard.TargetProperty="ScaleY">
+                                            <SplineDoubleKeyFrame KeyTime="0:0:0" Value="1" />
+                                            <SplineDoubleKeyFrame KeyTime="0:0:1.2" Value="1" />
+                                            <SplineDoubleKeyFrame KeyTime="0:0:1.45" Value="1.035" />
+                                            <SplineDoubleKeyFrame KeyTime="0:0:1.7" Value="1.015" />
+                                            <SplineDoubleKeyFrame KeyTime="0:0:2.2" Value="1" />
+                                            <SplineDoubleKeyFrame KeyTime="0:0:4.6" Value="1" />
+                                        </DoubleAnimationUsingKeyFrames>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </EventTrigger>
+                        </Border.Triggers>
+                        <Border.Background>
+                            <RadialGradientBrush Center="0.45,0.38"
+                                                 GradientOrigin="0.32,0.24"
+                                                 RadiusX="0.85"
+                                                 RadiusY="0.85">
+                                <GradientStop Color="#767DEBFF" Offset="0" />
+                                <GradientStop Color="#3D5DFF92" Offset="0.44" />
+                                <GradientStop Color="#A0101D31" Offset="1" />
+                            </RadialGradientBrush>
+                        </Border.Background>
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="26"
+                                              Direction="270"
+                                              Opacity="0.72"
+                                              ShadowDepth="0"
+                                              Color="#7DEBFF" />
+                        </Border.Effect>
+                        <Image Width="56"
+                               Height="56"
+                               Source="Assets/astral-mark.png"
+                               Stretch="Uniform"
+                               RenderOptions.BitmapScalingMode="HighQuality" />
+                    </Border>
+
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock FontSize="20"
+                                   LineHeight="24"
+                                   FontWeight="SemiBold"
+                                   Text="Astral" />
+                        <TextBlock Margin="0,3,0,0"
+                                   FontSize="12"
+                                   Foreground="{StaticResource SecondaryTextBrush}"
+                                   Text="Seçili hedef kapsamı hazır." />
+                    </StackPanel>
+
+                    <Border Grid.Column="2"
+                            x:Name="StatusBadge"
+                            Padding="14,8"
+                            CornerRadius="7"
+                            Background="#8A101A2D"
+                            BorderBrush="#B77DEBFF"
+                            BorderThickness="1"
+                            VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse x:Name="StatusDot"
+                                     Width="8"
+                                     Height="8"
+                                     Margin="0,0,8,0"
+                                     Fill="{StaticResource SecondaryTextBrush}" />
+                            <TextBlock x:Name="StatusLabel"
+                                       FontSize="12"
+                                       FontWeight="SemiBold"
+                                       Text="KAPALI" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="1" Margin="0,24">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="560" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0"
+                        BorderBrush="#C49CD4FF"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="30,22"
+                        MaxHeight="536"
+                        VerticalAlignment="Center">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                            <GradientStop Color="#A20B1422" Offset="0" />
+                            <GradientStop Color="#7E17243B" Offset="0.52" />
+                            <GradientStop Color="#68101D31" Offset="1" />
+                        </LinearGradientBrush>
+                    </Border.Background>
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="64"
+                                          Direction="270"
+                                          Opacity="0.62"
+                                          ShadowDepth="0"
+                                          Color="#66D9FF" />
+                    </Border.Effect>
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <Button Grid.Row="0"
+                                x:Name="ToggleButton"
+                                Width="286"
+                                Height="286"
+                                Margin="0,-8,0,0"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Background="#761A2240"
+                                BorderBrush="{StaticResource AccentBrush}"
+                                BorderThickness="3"
+                                Cursor="Hand"
+                                Click="ToggleButton_Click"
+                                AutomationProperties.AutomationId="TunnelToggleButton"
+                                AutomationProperties.Name="Discord bağlantısını aç veya kapat"
+                                ToolTip="Discord bağlantısını aç veya kapat">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Grid Width="{TemplateBinding Width}"
+                                          Height="{TemplateBinding Height}">
+                                        <Ellipse x:Name="OuterRing"
+                                                 Margin="11"
+                                                 Stroke="{TemplateBinding BorderBrush}"
+                                                 StrokeThickness="{TemplateBinding BorderThickness}">
+                                            <Ellipse.Fill>
+                                                <RadialGradientBrush Center="0.42,0.34"
+                                                                     GradientOrigin="0.32,0.24"
+                                                                     RadiusX="0.86"
+                                                                     RadiusY="0.86">
+                                                    <GradientStop Color="#D633426A" Offset="0" />
+                                                    <GradientStop Color="#C329315A" Offset="0.34" />
+                                                    <GradientStop Color="#95152547" Offset="0.72" />
+                                                    <GradientStop Color="#8210182B" Offset="1" />
+                                                </RadialGradientBrush>
+                                            </Ellipse.Fill>
+                                            <Ellipse.Effect>
+                                                <DropShadowEffect BlurRadius="42"
+                                                                  Direction="270"
+                                                                  Opacity="0.95"
+                                                                  ShadowDepth="0"
+                                                                  Color="#56F07B" />
+                                            </Ellipse.Effect>
+                                        </Ellipse>
+                                        <Ellipse Width="264"
+                                                 Height="264"
+                                                 Stroke="#45FFFFFF"
+                                                 StrokeThickness="1" />
+                                        <Ellipse Margin="31"
+                                                 Stroke="#B87DEBFF"
+                                                 StrokeThickness="1.4">
+                                            <Ellipse.Fill>
+                                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                    <GradientStop Color="#C916243B" Offset="0" />
+                                                    <GradientStop Color="#A724425C" Offset="0.55" />
+                                                    <GradientStop Color="#8B3A5F65" Offset="1" />
+                                                </LinearGradientBrush>
+                                            </Ellipse.Fill>
+                                        </Ellipse>
+                                        <Ellipse x:Name="StateRing"
+                                                 Width="218"
+                                                 Height="218"
+                                                 Fill="Transparent"
+                                                 Stroke="#8F7DEBFF"
+                                                 StrokeThickness="1"
+                                                 StrokeDashArray="3 7" />
+                                        <Ellipse Width="162"
+                                                 Height="162"
+                                                 Fill="Transparent"
+                                                 Stroke="#4CF5F7FB"
+                                                 StrokeThickness="1" />
+                                        <Ellipse x:Name="CoreGlow"
+                                                 Width="134"
+                                                 Height="134"
+                                                 Stroke="#785DFF92"
+                                                 StrokeThickness="1.2">
+                                            <Ellipse.Fill>
+                                                <RadialGradientBrush Center="0.46,0.38"
+                                                                     GradientOrigin="0.34,0.25"
+                                                                     RadiusX="0.82"
+                                                                     RadiusY="0.82">
+                                                    <GradientStop Color="#3E7DEBFF" Offset="0" />
+                                                    <GradientStop Color="#275DFF92" Offset="0.48" />
+                                                    <GradientStop Color="#14040710" Offset="1" />
+                                                </RadialGradientBrush>
+                                            </Ellipse.Fill>
+                                        </Ellipse>
+                                        <StackPanel Width="170"
+                                                    HorizontalAlignment="Center"
+                                                    VerticalAlignment="Center">
+                                            <TextBlock x:Name="PowerIcon"
+                                                       HorizontalAlignment="Center"
+                                                       FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                                       FontSize="66"
+                                                       Foreground="{StaticResource AccentCyanBrush}"
+                                                       Text="&#xE7E8;">
+                                                <TextBlock.Effect>
+                                                    <DropShadowEffect BlurRadius="18"
+                                                                      Direction="270"
+                                                                      Opacity="0.86"
+                                                                      ShadowDepth="0"
+                                                                      Color="#5DFF92" />
+                                                </TextBlock.Effect>
+                                            </TextBlock>
+                                            <TextBlock x:Name="ToggleButtonLabel"
+                                                       Margin="0,10,0,0"
+                                                       HorizontalAlignment="Center"
+                                                       MaxWidth="164"
+                                                       TextAlignment="Center"
+                                                       TextWrapping="NoWrap"
+                                                       FontSize="14"
+                                                       FontWeight="Bold"
+                                                       Text="BAĞLAN" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="OuterRing"
+                                                    Property="Fill"
+                                                    Value="#9C253E54" />
+                                        </Trigger>
+                                        <Trigger Property="IsKeyboardFocused" Value="True">
+                                            <Setter TargetName="OuterRing"
+                                                    Property="StrokeThickness"
+                                                    Value="5" />
+                                        </Trigger>
+                                        <Trigger Property="IsEnabled" Value="False">
+                                            <Setter Property="Opacity" Value="0.58" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <StackPanel Grid.Row="1"
+                                    Margin="0,2,0,0"
+                                    HorizontalAlignment="Center">
+                            <TextBlock x:Name="StatusMessage"
+                                       MaxWidth="520"
+                                       MaxHeight="58"
+                                       HorizontalAlignment="Center"
+                                       TextAlignment="Center"
+                                       TextWrapping="Wrap"
+                                       TextTrimming="CharacterEllipsis"
+                                       FontSize="19"
+                                       FontWeight="SemiBold"
+                                       Text="Bağlantı kapalı" />
+                            <TextBlock x:Name="StatusDetail"
+                                       MaxWidth="520"
+                                       MaxHeight="42"
+                                       Margin="0,8,0,0"
+                                       HorizontalAlignment="Center"
+                                       TextAlignment="Center"
+                                       TextWrapping="Wrap"
+                                       TextTrimming="CharacterEllipsis"
+                                       FontSize="13"
+                                       Foreground="{StaticResource SecondaryTextBrush}"
+                                       Text="Hazır" />
+                        </StackPanel>
+
+                        <Border Grid.Row="2"
+                                Margin="0,12,0,0"
+                                Padding="16,12"
+                                BorderBrush="#5F8EA7FF"
+                                BorderThickness="1"
+                                CornerRadius="8">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                    <GradientStop Color="#56101D31" Offset="0" />
+                                    <GradientStop Color="#3E19314A" Offset="0.55" />
+                                    <GradientStop Color="#31101D31" Offset="1" />
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBlock x:Name="StageProgressLabel"
+                                               FontSize="12"
+                                               FontWeight="SemiBold"
+                                               Text="Hazır" />
+                                    <TextBlock Grid.Column="1"
+                                               x:Name="StageProgressPercent"
+                                               FontSize="12"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource SecondaryTextBrush}"
+                                               Text="0%" />
+                                </Grid>
+
+                                <ProgressBar x:Name="StageProgressBar"
+                                             Margin="0,10,0,0"
+                                             Style="{StaticResource StageProgressStyle}"
+                                             Value="0" />
+
+                                <UniformGrid Margin="0,10,0,0"
+                                             Columns="4">
+                                    <TextBlock x:Name="StageStepLock"
+                                               FontSize="11"
+                                               Foreground="{StaticResource SecondaryTextBrush}"
+                                               Text="Hazırlık" />
+                                    <TextBlock x:Name="StageStepSetup"
+                                               FontSize="11"
+                                               Foreground="{StaticResource SecondaryTextBrush}"
+                                               Text="Kurulum" />
+                                    <TextBlock x:Name="StageStepProfile"
+                                               FontSize="11"
+                                               Foreground="{StaticResource SecondaryTextBrush}"
+                                               Text="Profil" />
+                                    <TextBlock x:Name="StageStepTunnel"
+                                               FontSize="11"
+                                               Foreground="{StaticResource SecondaryTextBrush}"
+                                               Text="Bağlantı" />
+                                </UniformGrid>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <Grid Grid.Column="1" Margin="28,0,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0"
+                            HorizontalAlignment="Right"
+                            Width="650"
+                            BorderBrush="#B58EC8FF"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="22,20">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                <GradientStop Color="#8E0B1422" Offset="0" />
+                                <GradientStop Color="#70213A53" Offset="0.58" />
+                                <GradientStop Color="#55101D31" Offset="1" />
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="34"
+                                              Direction="270"
+                                              Opacity="0.40"
+                                              ShadowDepth="0"
+                                              Color="#4C72FF" />
+                        </Border.Effect>
+                        <StackPanel>
+                            <TextBlock FontSize="13"
+                                       Foreground="{StaticResource MutedTextBrush}"
+                                       Text="TÜNEL KAPSAMI" />
+                            <Grid Margin="0,16,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock FontSize="18"
+                                               FontWeight="SemiBold"
+                                               Text="Seçili hedefler" />
+                                    <TextBlock x:Name="TargetSummaryChips"
+                                               Margin="0,8,18,0"
+                                               FontSize="13"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource PrimaryTextBrush}"
+                                               TextWrapping="Wrap"
+                                               Text="[Discord]" />
+                                    <TextBlock x:Name="TargetScopeStatus"
+                                               Margin="0,8,18,0"
+                                               TextWrapping="Wrap"
+                                               FontSize="12"
+                                               LineHeight="18"
+                                               Foreground="{StaticResource SecondaryTextBrush}"
+                                               Text="Seçilen uygulama ve web hedefleri tünele alınır. Diğer tüm trafik normal bağlantıda kalır." />
+                                </StackPanel>
+
+                                <Button Grid.Column="1"
+                                        x:Name="SelectTargetsButton"
+                                        Padding="18,10"
+                                        VerticalAlignment="Top"
+                                        Style="{StaticResource CommandButtonStyle}"
+                                        Click="SelectTargetsButton_Click"
+                                        ToolTip="Hedef Merkezi'ni aç"
+                                        AutomationProperties.Name="Hedefleri Seç">
+                                    <TextBlock Text="Hedefleri Seç" />
+                                </Button>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Row="1"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center"
+                            Width="650"
+                            BorderBrush="#B58EC8FF"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="20,18">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                <GradientStop Color="#920B1422" Offset="0" />
+                                <GradientStop Color="#7A17243B" Offset="0.45" />
+                                <GradientStop Color="#5F101D31" Offset="1" />
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="40"
+                                              Direction="270"
+                                              Opacity="0.38"
+                                              ShadowDepth="0"
+                                              Color="#63D9FF" />
+                        </Border.Effect>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock FontSize="13"
+                                       Foreground="{StaticResource MutedTextBrush}"
+                                       Text="İŞLETİM MERKEZİ" />
+
+                            <Grid Grid.Row="1"
+                                  Margin="0,14,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="1" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="1" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <Grid Grid.Column="0"
+                                      Margin="0,0,18,0">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Margin="0,0,7,0"
+                                                   FontFamily="Segoe UI Emoji"
+                                                   FontSize="14"
+                                                   Text="🌙" />
+                                        <TextBlock FontSize="15"
+                                                   FontWeight="SemiBold"
+                                                   Text="Arka planda çalıştır" />
+                                    </StackPanel>
+                                    <TextBlock Grid.Row="1"
+                                               x:Name="RunInBackgroundStatus"
+                                               Margin="0,5,0,10"
+                                               TextWrapping="Wrap"
+                                               FontSize="12"
+                                               LineHeight="17"
+                                               Foreground="{StaticResource SecondaryTextBrush}"
+                                               Text="Pencere kapanınca bildirim alanında kalmaz." />
+                                    <CheckBox Grid.Row="2"
+                                              x:Name="RunInBackgroundToggle"
+                                              Style="{StaticResource BrowserSwitchStyle}"
+                                              HorizontalAlignment="Left"
+                                              Checked="RunInBackgroundToggle_Changed"
+                                              Unchecked="RunInBackgroundToggle_Changed"
+                                              ToolTip="Pencere kapanınca çalışmaya devam et"
+                                              AutomationProperties.Name="Arka planda çalıştırmayı aç veya kapat" />
+                                </Grid>
+
+                                <Rectangle Grid.Column="1"
+                                           Width="1"
+                                           Fill="#35FFFFFF" />
+
+                                <Grid Grid.Column="2"
+                                      Margin="18,0">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Margin="0,0,7,0"
+                                                   FontFamily="Segoe UI Emoji"
+                                                   FontSize="14"
+                                                   Text="🚀" />
+                                        <TextBlock Grid.Column="1"
+                                                   FontSize="15"
+                                                   FontWeight="SemiBold"
+                                                   TextWrapping="Wrap"
+                                                   LineHeight="18"
+                                                   Text="Windows açılışında çalıştır" />
+                                    </Grid>
+                                    <TextBlock Grid.Row="1"
+                                               x:Name="StartupStatus"
+                                               Margin="0,5,0,10"
+                                               TextWrapping="Wrap"
+                                               FontSize="12"
+                                               LineHeight="17"
+                                               Foreground="{StaticResource SecondaryTextBrush}"
+                                               Text="Windows açılışında çalıştır" />
+                                    <CheckBox Grid.Row="2"
+                                              x:Name="StartupToggle"
+                                              Style="{StaticResource BrowserSwitchStyle}"
+                                              HorizontalAlignment="Left"
+                                              Checked="StartupToggle_Changed"
+                                              Unchecked="StartupToggle_Changed"
+                                              ToolTip="Astral'ı Windows açılışında başlat"
+                                              AutomationProperties.Name="Windows açılışında çalıştırmayı aç veya kapat" />
+                                </Grid>
+
+                                <Rectangle Grid.Column="3"
+                                           Width="1"
+                                           Fill="#35FFFFFF" />
+
+                                <Grid Grid.Column="4"
+                                      Margin="18,0,0,0">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Margin="0,0,7,0"
+                                                   FontFamily="Segoe UI Emoji"
+                                                   FontSize="14"
+                                                   Text="🧾" />
+                                        <TextBlock FontSize="15"
+                                                   FontWeight="SemiBold"
+                                                   Text="Tanılama" />
+                                    </StackPanel>
+                                    <TextBlock Grid.Row="1"
+                                               x:Name="DiagnosticsStatus"
+                                               Margin="0,5,0,10"
+                                               TextWrapping="Wrap"
+                                               FontSize="12"
+                                               LineHeight="17"
+                                               Foreground="{StaticResource SecondaryTextBrush}"
+                                               Text="Bağlantı sorunlarını incelemek için rapor hazırla" />
+                                    <Border Grid.Row="2"
+                                            HorizontalAlignment="Left"
+                                            Padding="12,6"
+                                            CornerRadius="6"
+                                            Background="#70305A65"
+                                            BorderBrush="{StaticResource PremiumLineBrush}"
+                                            BorderThickness="1">
+                                        <TextBlock FontSize="11"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{StaticResource PrimaryTextBrush}"
+                                                   Text="Hazır" />
+                                    </Border>
+                                    <Grid Grid.Row="3"
+                                          Margin="0,10,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <TextBlock FontSize="12"
+                                                       FontWeight="SemiBold"
+                                                       Text="Debug tan&#x131;lama" />
+                                            <TextBlock x:Name="DebugDiagnosticsStatus"
+                                                       Margin="0,3,10,0"
+                                                       TextWrapping="Wrap"
+                                                       FontSize="11"
+                                                       LineHeight="15"
+                                                       Foreground="{StaticResource MutedTextBrush}"
+                                                       Text="Kapal&#x131;. Normal rapor hafif kal&#x131;r." />
+                                        </StackPanel>
+                                        <CheckBox Grid.Column="1"
+                                                  x:Name="DebugDiagnosticsToggle"
+                                                  Style="{StaticResource BrowserSwitchStyle}"
+                                                  VerticalAlignment="Top"
+                                                  Checked="DebugDiagnosticsToggle_Changed"
+                                                  Unchecked="DebugDiagnosticsToggle_Changed"
+                                                  ToolTip="Ayr&#x131;nt&#x131;l&#x131; a&#x11F; ve performans verisi ekle"
+                                                  AutomationProperties.Name="Debug tan&#x131;lamay&#x131; a&#xE7; veya kapat" />
+                                    </Grid>
+                                </Grid>
+                            </Grid>
+                        </Grid>
+                    </Border>
+
+                    <Border Grid.Row="2"
+                            HorizontalAlignment="Right"
+                            Width="650"
+                            BorderBrush="#B58EC8FF"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="20,18">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                <GradientStop Color="#890B1422" Offset="0" />
+                                <GradientStop Color="#6417243B" Offset="0.55" />
+                                <GradientStop Color="#4F101D31" Offset="1" />
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="34"
+                                              Direction="270"
+                                              Opacity="0.34"
+                                              ShadowDepth="0"
+                                              Color="#66D9FF" />
+                        </Border.Effect>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="1" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="1" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0"
+                                    Padding="14,10"
+                                    CornerRadius="7"
+                                    Background="#33101D31"
+                                    BorderBrush="#369CD4FF"
+                                    BorderThickness="1">
+                                <StackPanel>
+                                <TextBlock FontSize="11"
+                                           Foreground="{StaticResource MutedTextBrush}"
+                                           Text="DNS SUNUCUSU" />
+                                <TextBlock x:Name="DnsSummary"
+                                           Margin="0,6,0,0"
+                                           FontSize="16"
+                                           FontWeight="SemiBold"
+                                           TextWrapping="NoWrap"
+                                           TextTrimming="CharacterEllipsis"
+                                           Text="Okunuyor" />
+                                <TextBlock x:Name="DnsDetail"
+                                           Margin="0,4,0,0"
+                                           FontSize="11"
+                                           Foreground="{StaticResource SecondaryTextBrush}"
+                                           TextWrapping="NoWrap"
+                                           TextTrimming="CharacterEllipsis"
+                                           Text="Makinenin aldığı DNS" />
+                                </StackPanel>
+                            </Border>
+
+                            <Rectangle Grid.Column="1"
+                                       Width="1"
+                                       Fill="#3DFFFFFF" />
+
+                            <Border Grid.Column="2"
+                                    Margin="16,0"
+                                    Padding="14,10"
+                                    CornerRadius="7"
+                                    Background="#33101D31"
+                                    BorderBrush="#369CD4FF"
+                                    BorderThickness="1">
+                                <StackPanel>
+                                <TextBlock FontSize="11"
+                                           Foreground="{StaticResource MutedTextBrush}"
+                                           Text="BAĞLANTI DURUMU" />
+                                <TextBlock x:Name="ConnectionSummary"
+                                           Margin="0,6,0,0"
+                                           FontSize="16"
+                                           FontWeight="SemiBold"
+                                           TextWrapping="NoWrap"
+                                           TextTrimming="CharacterEllipsis"
+                                           Text="Hazır" />
+                                <TextBlock x:Name="ConnectionDetail"
+                                           Margin="0,4,0,0"
+                                           FontSize="11"
+                                           Foreground="{StaticResource SecondaryTextBrush}"
+                                           TextWrapping="NoWrap"
+                                           TextTrimming="CharacterEllipsis"
+                                           Text="Henüz bağlı değil" />
+                                </StackPanel>
+                            </Border>
+
+                            <Rectangle Grid.Column="3"
+                                       Width="1"
+                                       Fill="#3DFFFFFF" />
+
+                            <Border Grid.Column="4"
+                                    Padding="14,10"
+                                    CornerRadius="7"
+                                    Background="#33101D31"
+                                    BorderBrush="#369CD4FF"
+                                    BorderThickness="1">
+                                <StackPanel>
+                                <TextBlock FontSize="11"
+                                           Foreground="{StaticResource MutedTextBrush}"
+                                           Text="KAPSAM" />
+                                <TextBlock x:Name="ScopeSummary"
+                                           Margin="0,6,0,0"
+                                           FontSize="16"
+                                           FontWeight="SemiBold"
+                                           TextWrapping="NoWrap"
+                                           TextTrimming="CharacterEllipsis"
+                                           Text="Discord" />
+                                <TextBlock x:Name="ScopeDetail"
+                                           Margin="0,4,0,0"
+                                           FontSize="11"
+                                           Foreground="{StaticResource SecondaryTextBrush}"
+                                           TextWrapping="NoWrap"
+                                           TextTrimming="CharacterEllipsis"
+                                           Text="Sadece seçili hedefler kapsamda" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Grid>
+
+            <Border Grid.Row="2"
+                    BorderBrush="{StaticResource PremiumLineBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="16,0"
+                    MaxWidth="1264">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#96101D31" Offset="0" />
+                        <GradientStop Color="#7C0B1422" Offset="0.58" />
+                        <GradientStop Color="#62162433" Offset="1" />
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="34"
+                                      Direction="270"
+                                      Opacity="0.42"
+                                      ShadowDepth="0"
+                                      Color="#63D9FF" />
+                </Border.Effect>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <Button Grid.Column="0"
+                            Margin="0,0,10,0"
+                            Height="46"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource CommandButtonStyle}"
+                            Content="🔌 WireSock"
+                            Click="OpenWireSock_Click"
+                            ToolTip="WireSock VPN Client resmi sayfası" />
+
+                    <Button Grid.Column="1"
+                            Height="46"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource CommandButtonStyle}"
+                            Content="🧾 Tanılama"
+                            Click="OpenDiagnostics_Click"
+                            ToolTip="Bağlantı raporu hazırla" />
+
+                    <Button Grid.Column="2"
+                            x:Name="RepairButton"
+                            Margin="10,0,0,0"
+                            Height="46"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource CommandButtonStyle}"
+                            Content="🛠 Onar"
+                            Click="Repair_Click"
+                            ToolTip="Bağlantı dosyalarını güvenle yenile" />
+
+                    <Button Grid.Column="3"
+                            x:Name="CleanProfileButton"
+                            Margin="10,0,0,0"
+                            Height="46"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource DangerCommandButtonStyle}"
+                            Content="⛔ Profil Temizle"
+                            Click="CleanProfile_Click"
+                            ToolTip="Portable ZIP'e dokunmadan Astral profili, ayarları, WireSock izi ve bağlantı kilidini temizle" />
+
+                    <TextBlock Grid.Column="4"
+                               Margin="18,0"
+                               VerticalAlignment="Center"
+                               FontSize="11"
+                               Foreground="{StaticResource SecondaryTextBrush}"
+                               Text="v2.2.0" />
+
+                    <Button Grid.Column="5"
+                            x:Name="AutoUpdateButton"
+                            Margin="0,0,8,0"
+                            Width="126"
+                            Height="46"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource InstallUpdateButtonStyle}"
+                            Click="AutoUpdate_Click"
+                            Content="↻ Güncelle"
+                            Visibility="Collapsed"
+                            ToolTip="Hazır güncellemeyi yükle"
+                            AutomationProperties.Name="Güncellemeyi yükle" />
+
+                    <Button Grid.Column="6"
+                            Margin="0,0,8,0"
+                            Width="68"
+                            Height="46"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource CommandButtonStyle}"
+                            Click="RestartAstral_Click"
+                            ToolTip="Astral'ı yeniden başlat"
+                            AutomationProperties.Name="Astral'ı yeniden başlat">
+                        <Viewbox Width="22"
+                                 Height="22"
+                                 Stretch="Uniform">
+                            <Canvas Width="24" Height="24">
+                                <Path Stroke="{StaticResource PrimaryTextBrush}"
+                                      StrokeThickness="1.9"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round"
+                                      Fill="Transparent"
+                                      Data="M20,11 A8,8 0 1 0 17.7,16.6 M20,11 L20,5 M20,11 L14,11" />
+                            </Canvas>
+                        </Viewbox>
+                    </Button>
+
+                    <Button Grid.Column="7"
+                            Margin="0,0,8,0"
+                            Width="68"
+                            Height="46"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource CommandButtonStyle}"
+                            Click="OpenReleaseNotes_Click"
+                            ToolTip="Sürüm notlarını aç"
+                            AutomationProperties.Name="Sürüm notlarını aç">
+                        <Viewbox Width="22"
+                                 Height="22"
+                                 Stretch="Uniform">
+                            <Canvas Width="24" Height="24">
+                                <Path Stroke="{StaticResource PrimaryTextBrush}"
+                                      StrokeThickness="1.8"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round"
+                                      Fill="Transparent"
+                                      Data="M6,3.5 L15.5,3.5 L20,8 L20,20.5 L6,20.5 Z M15.5,3.5 L15.5,8 L20,8 M9,11 L17,11 M9,14.5 L17,14.5 M9,18 L14,18" />
+                            </Canvas>
+                        </Viewbox>
+                    </Button>
+
+                    <Button Grid.Column="8"
+                            Width="68"
+                            Height="46"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource CommandButtonStyle}"
+                            Click="OpenGitHub_Click"
+                            ToolTip="GitHub deposunu aç"
+                            AutomationProperties.Name="GitHub deposunu aç">
+                        <Viewbox Width="22"
+                                 Height="22"
+                                 Stretch="Uniform">
+                            <Canvas Width="24" Height="24">
+                                <Path Fill="{StaticResource PrimaryTextBrush}"
+                                      Data="M12,0.5C5.65,0.5 0.5,5.65 0.5,12C0.5,17.1 3.79,21.42 8.36,22.95C8.94,23.06 9.15,22.7 9.15,22.4C9.15,22.13 9.14,21.42 9.14,20.47C5.95,21.16 5.28,19.12 5.28,19.12C4.76,17.8 4.01,17.45 4.01,17.45C2.97,16.74 4.09,16.75 4.09,16.75C5.24,16.83 5.84,17.93 5.84,17.93C6.86,19.68 8.52,19.18 9.17,18.88C9.27,18.14 9.57,17.64 9.9,17.36C7.35,17.07 4.67,16.08 4.67,11.68C4.67,10.42 5.12,9.39 5.85,8.59C5.73,8.3 5.34,7.13 5.96,5.55C5.96,5.55 6.92,5.24 9.11,6.73C10.02,6.48 11,6.35 11.97,6.35C12.94,6.35 13.92,6.48 14.83,6.73C17.02,5.24 17.98,5.55 17.98,5.55C18.6,7.13 18.21,8.3 18.09,8.59C18.83,9.39 19.27,10.42 19.27,11.68C19.27,16.09 16.58,17.07 14.03,17.35C14.44,17.7 14.81,18.4 14.81,19.47C14.81,21 14.79,22.23 14.79,22.4C14.79,22.71 15,23.07 15.59,22.95C20.18,21.42 23.5,17.1 23.5,12C23.5,5.65 18.35,0.5 12,0.5Z" />
+                            </Canvas>
+                        </Viewbox>
+                    </Button>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>

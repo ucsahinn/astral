@@ -1,6 +1,6 @@
 # Üçüncü Taraf Bildirimleri
 
-Discorder, Discord trafiğini tünellemek için bazı üçüncü taraf ürün ve projelerle birlikte çalışır. Bu dosya paketlenen değil, çalışma zamanında kullanılan bileşenleri açıklar.
+Astral, seçili uygulama veya web hedefleri için bazı üçüncü taraf ürün ve projelerle birlikte çalışır. Bu dosya paketlenen değil, çalışma zamanında kullanılan bileşenleri açıklar.
 
 ## WireSock VPN Client
 
@@ -20,6 +20,6 @@ WireSock ayrı bir üründür. Ticari veya kurumsal kullanım lisans gerektirebi
 
 wgcf, Cloudflare tarafından üretilen veya desteklenen resmi bir araç değildir. Cloudflare WARP koşulları kullanıcıya ilk kurulum ekranında gösterilir.
 
-## Discord ve Cloudflare
+## Marka ve Servis Adları
 
-Discord ve Cloudflare adları ilgili sahiplerine aittir. Discorder bağımsız bir uyumluluk aracıdır; Discord, Cloudflare veya WireSock tarafından onaylanmış resmi bir ürün değildir.
+Discord, Roblox, Wattpad, Bigo Live, Azar, Tango, LiVU, IMVU, Blogspot, Cloudflare ve WireSock adları ilgili sahiplerine aittir. Astral bağımsız bir bağlantı kapsamı yöneticisidir; bu servisler veya marka sahipleri tarafından onaylanmış resmi bir ürün değildir.

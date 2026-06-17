@@ -1,54 +1,52 @@
-# Discorder Sorun Giderme
+# Astral Sorun Giderme
 
-Bu sayfa, kullanıcıların en sık karşılaşabileceği Discorder durumlarını kısa ve net şekilde açıklar.
+## Astral Bağlı Değil
 
-## Discorder Bağlı Değil Ne Demek?
+Bu durum bağlantının açık olmadığını gösterir. Seçili hedeflerin tünelden çıkması için ana ekrandaki **Bağlan** düğmesini kullanın.
 
-Bu durum, Discorder bağlantısının açık olmadığını gösterir. Discord normal internet bağlantısı üzerinden çalışmayabilir. Bağlantıyı başlatmak için ana ekrandaki **Bağlan** düğmesini kullanın.
+## Hedef Seçimi Kilitli
 
-## Güncelleme Bulunmuyor
+Bağlantı açıkken hedef kapsamı değiştirilemez. Önce **Bağlantıyı Kes**, sonra **Hedefleri Seç** düğmesiyle seçimi güncelleyin.
 
-Discorder güncelleme denetiminde yeni sürüm bulamazsa mevcut sürüm güncel olabilir veya GitHub'a erişim geçici olarak başarısız olmuş olabilir.
+## Web Hedefi Açılmıyor
 
-Şunları kontrol edin:
+Kontrol edin:
 
-- İnternet bağlantısı.
-- GitHub'a erişim.
-- Sistem saati.
-- Güvenlik yazılımının GitHub indirmelerini engelleyip engellemediği.
+- Hedef Hedef Merkezi'nde seçili mi?
+- Domain özel hedefse pattern geçerli mi?
+- Tarayıcı Windows PAC/proxy ayarını kullanıyor mu?
+- Kurumsal policy veya manuel proxy ayarı PAC kullanımını engelliyor mu?
+- QUIC/DoH/WebRTC gibi TCP CONNECT dışı bir yol zorlanıyor mu?
 
-## Güncelle Düğmesi Görünmüyor
+Astral web hedeflerinde tarayıcı exe'sini WireSock kapsamına almaz. Bu bilinçli güvenlik sınırıdır.
 
-**Güncelle** düğmesi yalnızca arka planda gerçek bir yeni sürüm bulunduğunda görünür. Düğme yoksa kurulu sürüm güncel olabilir veya GitHub denetimi geçici olarak tamamlanamamış olabilir. Discorder mevcut sürümle çalışmaya devam eder.
+## Uygulama Hedefi Açılmıyor
 
-## İlk Kurulum Takılıyor
+Kontrol edin:
 
-WireSock kurulumu Windows yönetici onayı isteyebilir. UAC penceresi arkada kaldıysa görev çubuğunu kontrol edin.
+- Preset seçili mi?
+- Özel EXE ise path mutlak ve gerçek `.exe` dosyası mı?
+- Uygulama farklı bir launcher veya updater exe üzerinden mi çalışıyor?
+- Tanılama paketinde `AllowedApps` özeti seçili hedefi gösteriyor mu?
 
-Sorun devam ederse:
+## Proxy/PAC Temizlenmedi Şüphesi
 
-1. Discorder'ı kapatın.
-2. Yönetici olarak tekrar çalıştırın.
-3. **Onar** düğmesini kullanın.
-4. Tanılama paketi hazırlayın.
+Astral bağlantı kapanırken PAC/proxy state'ini geri alır. Şüphe varsa:
 
-## İnternet Yavaşsa
+1. Astral'ı kapatıp tekrar açın.
+2. **Profil Temizle** akışını çalıştırın.
+3. Tanılama paketi oluşturun.
 
-Yavaş veya kesintili bağlantıda indirme zaman aşımı yaşanabilir. Discorder mevcut sürümü bozmadan çalışmaya devam eder. Daha sonra tekrar **Güncelle** ile deneyebilirsiniz.
+Manuel registry temizliği veya sistem proxy ayarı değiştirme işlemleri kullanıcı onayı ve dikkat gerektirir.
 
-## Tanılama Paketi Nasıl Hazırlanır?
+## Tanılama İçin Gerekli Bilgiler
 
-Ana ekrandaki **Tanılama** düğmesine basın. Discorder bağlantı sorunlarını incelemek için rapor hazırlar ve paket klasörünü açar.
+Hata bildirirken şunları ekleyin:
 
-Paylaşmadan önce gizli veri içermediğini kontrol edin.
-
-## Sorun Bildirirken Ekleyin
-
-- Discorder sürümü.
+- Astral sürümü.
 - Windows sürümü.
-- Discord kullanım yolu: uygulama veya tarayıcı.
-- Tarayıcı modu açık mı kapalı mı?
-- Hata ne zaman başladı?
+- Seçili hedefler.
+- Özel hedef kullanılıyorsa domain pattern veya redakte edilmiş exe adı.
 - Redakte edilmiş tanılama paketi.
 
-Özel anahtar, token, cookie, tam WireGuard profili veya kişisel veri paylaşmayın.
+Özel anahtar, token, cookie, `wgcf-account.toml`, tam WireGuard profili veya kişisel veri paylaşmayın.

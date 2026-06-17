@@ -1,5 +1,5 @@
 name: Hata raporu
-description: Discorder bağlantı davranışındaki tekrar üretilebilir bir hatayı bildirin
+description: Astral bağlantı davranışındaki tekrar üretilebilir bir hatayı bildirin
 title: "[HATA] "
 labels: ["hata", "inceleme-gerekli"]
 body:
@@ -17,7 +17,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: Discorder sürümü
+      label: Astral sürümü
       placeholder: 2.0.0
     validations:
       required: true
@@ -47,7 +47,7 @@ body:
     attributes:
       label: Tekrar üretme adımları
       placeholder: |
-        1. Discorder uygulamasını açtım.
+        1. Astral uygulamasını açtım.
         2. Bağlan düğmesine bastım.
         3. ...
     validations:

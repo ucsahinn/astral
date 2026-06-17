@@ -10,28 +10,28 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $output = Join-Path $root "artifacts\publish\$Runtime"
-$projectPath = Join-Path $root 'src\Discorder.App\Discorder.App.csproj'
+$projectPath = Join-Path $root 'src\Astral.App\Astral.App.csproj'
 $project = [xml](Get-Content -Raw -LiteralPath $projectPath)
 $version = $project.Project.PropertyGroup.Version
 if ([string]::IsNullOrWhiteSpace($version)) {
-    throw "Discorder surumu proje dosyasindan okunamadi"
+    throw "Astral surumu proje dosyasindan okunamadi"
 }
 if ([string]::IsNullOrWhiteSpace($CodeSigningCertificatePassword) -and
-    -not [string]::IsNullOrWhiteSpace($env:DISCORDER_CODESIGN_PFX_PASSWORD)) {
-    $CodeSigningCertificatePassword = $env:DISCORDER_CODESIGN_PFX_PASSWORD
+    -not [string]::IsNullOrWhiteSpace($env:ASTRAL_CODESIGN_PFX_PASSWORD)) {
+    $CodeSigningCertificatePassword = $env:ASTRAL_CODESIGN_PFX_PASSWORD
 }
 
-$archive = Join-Path $root "artifacts\Discorder-$version-$Runtime.zip"
-$shaPath = Join-Path $root "artifacts\Discorder-$version-$Runtime.sha256.txt"
-$stableArchive = Join-Path $root "artifacts\Discorder-$Runtime.zip"
-$stableShaPath = Join-Path $root "artifacts\Discorder-$Runtime.sha256.txt"
+$archive = Join-Path $root "artifacts\Astral-$version-$Runtime.zip"
+$shaPath = Join-Path $root "artifacts\Astral-$version-$Runtime.sha256.txt"
+$stableArchive = Join-Path $root "artifacts\Astral-$Runtime.zip"
+$stableShaPath = Join-Path $root "artifacts\Astral-$Runtime.sha256.txt"
 $signingStatusPath = Join-Path $root 'artifacts\signing-status.txt'
-$updateManifestPath = Join-Path $output 'discorder.update-manifest.json'
+$updateManifestPath = Join-Path $output 'astral.update-manifest.json'
 $wireSockInstallerName = 'wiresock-vpn-client-x64-1.4.7.1.msi'
 $wireSockInstallerHash = 'FA3F483DA7EA1AE6C234F95BECB0AA6A18E7EB18B944D3FFB4518D40F4292F40'
 $wireSockInstallerSource = Join-Path $root "vendor\wiresock\$wireSockInstallerName"
 $buildArtifactsPath = Join-Path ([IO.Path]::GetTempPath()) (
-    'discorder-release-' + [guid]::NewGuid().ToString('N'))
+    'astral-release-' + [guid]::NewGuid().ToString('N'))
 
 Push-Location $root
 
@@ -43,7 +43,7 @@ try {
         Remove-Item -LiteralPath $output -Recurse -Force
     }
 
-    dotnet publish src\Discorder.App\Discorder.App.csproj `
+    dotnet publish src\Astral.App\Astral.App.csproj `
         --configuration Release `
         --runtime $Runtime `
         --self-contained true `

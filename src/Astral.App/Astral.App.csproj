@@ -1,0 +1,58 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <ApplicationIcon>Assets\astral-v2.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AssemblyName>Astral</AssemblyName>
+    <RootNamespace>Astral.App</RootNamespace>
+    <AssemblyTitle>Astral</AssemblyTitle>
+    <AssemblyDescription>Astral, Windows icin secili uygulama ve web hedeflerini dar kapsamla yoneten baglanti yoneticisi</AssemblyDescription>
+    <AssemblyCompany>ucsahinn</AssemblyCompany>
+    <AssemblyProduct>Astral</AssemblyProduct>
+    <Copyright>Copyright (c) 2026 ucsahinn</Copyright>
+    <Version>2.2.0</Version>
+    <FileVersion>2.2.0.0</FileVersion>
+    <RepositoryUrl>https://github.com/ucsahinn/astral</RepositoryUrl>
+    <PublishTrimmed>false</PublishTrimmed>
+    <PublishSingleFile>false</PublishSingleFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Astral.Core\Astral.Core.csproj" />
+    <ProjectReference Include="..\Astral.Updater\Astral.Updater.csproj"
+                      ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\Astral.WebProxy\Astral.WebProxy.csproj"
+                      ReferenceOutputAssembly="false" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Assets\astral-mark.png" />
+    <Resource Include="Assets\astral-v2.ico" />
+  </ItemGroup>
+  <Target Name="CopyUpdaterOnBuild" AfterTargets="Build">
+    <ItemGroup>
+      <UpdaterBuildOutput Include="..\Astral.Updater\bin\$(Configuration)\net8.0-windows10.0.19041.0\Astral.Updater.*" />
+      <WebProxyBuildOutput Include="..\Astral.WebProxy\bin\$(Configuration)\net8.0\Astral.WebProxy.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(UpdaterBuildOutput)"
+          DestinationFolder="$(OutputPath)"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(WebProxyBuildOutput)"
+          DestinationFolder="$(OutputPath)"
+          SkipUnchangedFiles="true" />
+  </Target>
+  <Target Name="PublishCompanionTools" AfterTargets="Publish">
+    <MSBuild Projects="..\Astral.Updater\Astral.Updater.csproj"
+             Targets="Publish"
+             Properties="Configuration=$(Configuration);RuntimeIdentifier=$(RuntimeIdentifier);SelfContained=$(SelfContained);PublishDir=$(PublishDir)" />
+    <MSBuild Projects="..\Astral.WebProxy\Astral.WebProxy.csproj"
+             Targets="Publish"
+             Properties="Configuration=$(Configuration);RuntimeIdentifier=$(RuntimeIdentifier);SelfContained=$(SelfContained);PublishDir=$(PublishDir)" />
+  </Target>
+</Project>

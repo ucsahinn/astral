@@ -1,6 +1,6 @@
 # Katkı Rehberi
 
-Discorder'ın ürün sınırı bilinçli olarak dardır: Windows üzerinde tek düğmeyle yalnızca Discord trafiğini tünellemek.
+Astral'ın ürün sınırı bilinçli olarak dardır: Windows üzerinde tek düğmeyle yalnızca Discord trafiğini tünellemek.
 
 ## Kabul Edilen Değişiklikler
 

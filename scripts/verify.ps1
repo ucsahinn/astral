@@ -8,14 +8,14 @@ $root = Split-Path -Parent $PSScriptRoot
 $createdArtifactsPath = $false
 if ([string]::IsNullOrWhiteSpace($ArtifactsPath)) {
     $ArtifactsPath = Join-Path ([IO.Path]::GetTempPath()) (
-        'discorder-verify-' + [guid]::NewGuid().ToString('N'))
+        'astral-verify-' + [guid]::NewGuid().ToString('N'))
     $createdArtifactsPath = $true
 }
 
 Push-Location $root
 
 try {
-    dotnet build Discorder.sln `
+    dotnet build Astral.sln `
         --configuration Release `
         --artifacts-path $ArtifactsPath `
         --disable-build-servers
@@ -23,7 +23,7 @@ try {
         throw "dotnet build hata kodu $LASTEXITCODE ile basarisiz oldu"
     }
 
-    $coreTests = Join-Path $ArtifactsPath 'bin\Discorder.Core.Tests\release\Discorder.Core.Tests.dll'
+    $coreTests = Join-Path $ArtifactsPath 'bin\Astral.Core.Tests\release\Astral.Core.Tests.dll'
     if (-not (Test-Path -LiteralPath $coreTests)) {
         throw "Core test cikisi bulunamadi: $coreTests"
     }
@@ -32,7 +32,7 @@ try {
         throw "cekirdek testleri hata kodu $LASTEXITCODE ile basarisiz oldu"
     }
 
-    $windowsTests = Join-Path $ArtifactsPath 'bin\Discorder.Windows.Tests\release\Discorder.Windows.Tests.dll'
+    $windowsTests = Join-Path $ArtifactsPath 'bin\Astral.Windows.Tests\release\Astral.Windows.Tests.dll'
     if (-not (Test-Path -LiteralPath $windowsTests)) {
         throw "Windows test cikisi bulunamadi: $windowsTests"
     }
@@ -54,7 +54,6 @@ try {
         'AdvancedSplitWire',
         'Advanced SplitWire',
         'SplitWireTurkey',
-        'RobloxPlayer',
         '"Update.exe"'
     )
 
@@ -100,9 +99,9 @@ try {
         }
     }
 
-    $manifest = Get-Content -Raw -LiteralPath 'src\Discorder.App\app.manifest'
+    $manifest = Get-Content -Raw -LiteralPath 'src\Astral.App\app.manifest'
     if ($manifest -notmatch 'requestedExecutionLevel level="requireAdministrator"') {
-        throw "Discorder WireSock VPN Client surecini yonetmek icin yonetici manifest'iyle derlenmelidir"
+        throw "Astral WireSock VPN Client surecini yonetmek icin yonetici manifest'iyle derlenmelidir"
     }
 
     $gitleaks = Get-Command gitleaks -ErrorAction SilentlyContinue

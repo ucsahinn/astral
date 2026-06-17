@@ -48,8 +48,8 @@ jobs:
 
           $tagVersion = $tag.TrimStart('v')
           $versionedProjects = @(
-            'src/Discorder.App/Discorder.App.csproj',
-            'src/Discorder.Updater/Discorder.Updater.csproj'
+            'src/Astral.App/Astral.App.csproj',
+            'src/Astral.Updater/Astral.Updater.csproj'
           )
           foreach ($projectPath in $versionedProjects) {
             $project = [xml](Get-Content -Raw -LiteralPath $projectPath)
@@ -67,17 +67,17 @@ jobs:
       - name: Paket üret
         shell: pwsh
         env:
-          DISCORDER_CODESIGN_PFX_B64: ${{ secrets.DISCORDER_CODESIGN_PFX_B64 }}
-          DISCORDER_CODESIGN_PFX_PASSWORD: ${{ secrets.DISCORDER_CODESIGN_PFX_PASSWORD }}
+          ASTRAL_CODESIGN_PFX_B64: ${{ secrets.ASTRAL_CODESIGN_PFX_B64 }}
+          ASTRAL_CODESIGN_PFX_PASSWORD: ${{ secrets.ASTRAL_CODESIGN_PFX_PASSWORD }}
         run: |
           $signArgs = @()
-          $certificatePath = Join-Path $env:RUNNER_TEMP 'discorder-codesign.pfx'
+          $certificatePath = Join-Path $env:RUNNER_TEMP 'astral-codesign.pfx'
 
           try {
-            if (-not [string]::IsNullOrWhiteSpace($env:DISCORDER_CODESIGN_PFX_B64)) {
+            if (-not [string]::IsNullOrWhiteSpace($env:ASTRAL_CODESIGN_PFX_B64)) {
               [IO.File]::WriteAllBytes(
                 $certificatePath,
-                [Convert]::FromBase64String($env:DISCORDER_CODESIGN_PFX_B64))
+                [Convert]::FromBase64String($env:ASTRAL_CODESIGN_PFX_B64))
               $signArgs += @(
                 '-CodeSigningCertificatePath',
                 $certificatePath
@@ -99,20 +99,20 @@ jobs:
         run: |
           $tag = $env:RELEASE_TAG
           $version = $tag.TrimStart('v')
-          $archive = Get-ChildItem -LiteralPath artifacts -Filter "Discorder-$version-win-x64.zip" |
+          $archive = Get-ChildItem -LiteralPath artifacts -Filter "Astral-$version-win-x64.zip" |
             Select-Object -First 1
           if ($null -eq $archive) {
-            throw "Yayın arşivi bulunamadı: Discorder-$version-win-x64.zip"
+            throw "Yayın arşivi bulunamadı: Astral-$version-win-x64.zip"
           }
 
-          $shaPath = Join-Path 'artifacts' "Discorder-$version-win-x64.sha256.txt"
+          $shaPath = Join-Path 'artifacts' "Astral-$version-win-x64.sha256.txt"
           $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $archive.FullName).Hash
           Set-Content `
             -LiteralPath $shaPath `
             -Value "$hash  $($archive.Name)" `
             -Encoding ASCII
-          $stableArchivePath = Join-Path 'artifacts' 'Discorder-win-x64.zip'
-          $stableShaPath = Join-Path 'artifacts' 'Discorder-win-x64.sha256.txt'
+          $stableArchivePath = Join-Path 'artifacts' 'Astral-win-x64.zip'
+          $stableShaPath = Join-Path 'artifacts' 'Astral-win-x64.sha256.txt'
           Copy-Item -LiteralPath $archive.FullName -Destination $stableArchivePath -Force
           $stableHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $stableArchivePath).Hash
           if ($stableHash -ne $hash) {
@@ -120,7 +120,7 @@ jobs:
           }
           Set-Content `
             -LiteralPath $stableShaPath `
-            -Value "$hash  Discorder-win-x64.zip" `
+            -Value "$hash  Astral-win-x64.zip" `
             -Encoding ASCII
 
           $signingStatusPath = Join-Path 'artifacts' 'signing-status.txt'
@@ -144,11 +144,11 @@ jobs:
           else {
             $releaseDate = Get-Date -Format 'yyyy-MM-dd'
             $notes = @"
-          # Discorder $tag - Portable Windows Discord bağlantı yöneticisi
+          # Astral $tag - Portable Windows Discord bağlantı yöneticisi
 
           Tarih: $releaseDate
 
-          Discorder $version, Windows'ta Discord bağlantısını sade bir arayüzle yöneten portable masaüstü uygulamasıdır.
+          Astral $version, Windows'ta Discord bağlantısını sade bir arayüzle yöneten portable masaüstü uygulamasıdır.
           "@
           }
 
@@ -188,7 +188,7 @@ jobs:
         run: |
           $tag = $env:RELEASE_TAG
           $repo = $env:RELEASE_REPOSITORY
-          $releaseTitle = "Discorder $tag - Portable Windows Discord bağlantı yöneticisi"
+          $releaseTitle = "Astral $tag - Portable Windows Discord bağlantı yöneticisi"
           if (Test-Path -LiteralPath $env:RELEASE_NOTES) {
             $firstHeading = Get-Content -LiteralPath $env:RELEASE_NOTES |
               Where-Object { $_ -match '^#\s+' } |
@@ -302,7 +302,7 @@ jobs:
               throw "Release $tag draft veya prerelease durumda; latest yapilmiyor."
             }
 
-            $assetCheckDir = Join-Path $env:RUNNER_TEMP "discorder-release-asset-check-$tag"
+            $assetCheckDir = Join-Path $env:RUNNER_TEMP "astral-release-asset-check-$tag"
             if (Test-Path -LiteralPath $assetCheckDir) {
               Remove-Item -LiteralPath $assetCheckDir -Recurse -Force
             }
@@ -352,7 +352,7 @@ jobs:
                 throw "Release $tag asset digest bilgisi içermiyor. Güvenli yayın doğrulanamadı."
               }
 
-              $assetCheckDir = Join-Path $env:RUNNER_TEMP "discorder-release-asset-check-$tag"
+              $assetCheckDir = Join-Path $env:RUNNER_TEMP "astral-release-asset-check-$tag"
               if (Test-Path -LiteralPath $assetCheckDir) {
                 Remove-Item -LiteralPath $assetCheckDir -Recurse -Force
               }

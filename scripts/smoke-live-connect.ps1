@@ -9,19 +9,19 @@ $ErrorActionPreference = 'Stop'
 
 $root = Split-Path -Parent $PSScriptRoot
 if ([string]::IsNullOrWhiteSpace($ExePath)) {
-    $ExePath = Join-Path $root 'artifacts\publish\win-x64\Discorder.exe'
+    $ExePath = Join-Path $root 'artifacts\publish\win-x64\Astral.exe'
 }
 
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {
     $OutputPath = Join-Path $root 'artifacts\app-live-connect-smoke.txt'
 }
 
-$settingsPath = Join-Path $env:LOCALAPPDATA 'Discorder\settings.json'
-$profilePath = Join-Path $env:ProgramData 'Discorder\profiles\discord.conf'
-$logPath = Join-Path $env:LOCALAPPDATA 'Discorder\logs\tunnel.log'
+$settingsPath = Join-Path $env:LOCALAPPDATA 'Astral\settings.json'
+$profilePath = Join-Path $env:ProgramData 'Astral\profiles\discord.conf'
+$logPath = Join-Path $env:LOCALAPPDATA 'Astral\logs\tunnel.log'
 $hostsPath = Join-Path $env:SystemRoot 'System32\drivers\etc\hosts'
-$beginMarker = '# BEGIN Discorder Discord kilidi'
-$ruleName = 'Discorder.BlockDiscordDomains'
+$beginMarker = '# BEGIN Astral Discord kilidi'
+$ruleName = 'Astral.BlockDiscordDomains'
 
 function Test-IsAdministrator {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -59,7 +59,7 @@ function Wait-Until {
     return $false
 }
 
-function Test-DiscorderHostsLock {
+function Test-AstralHostsLock {
     if (-not (Test-Path -LiteralPath $hostsPath)) {
         return $false
     }
@@ -75,7 +75,7 @@ function Test-DiscorderHostsLock {
         $content.Contains('::1 discord.com')
 }
 
-function Get-DiscorderRuleEnabled {
+function Get-AstralRuleEnabled {
     $rule = Get-NetFirewallRule -Name $ruleName -ErrorAction SilentlyContinue
     if ($null -eq $rule) {
         return $null
@@ -104,12 +104,10 @@ function Test-Tcp443 {
     }
 }
 
-function Set-BrowserAccessEnabled {
-    param([bool]$Enabled)
-
+function Set-AstralTargetSelection {
     Assert-Condition `
         (Test-Path -LiteralPath $settingsPath) `
-        'Discorder ayar dosyasi bulunamadi; once uygulamayi bir kez acin.'
+        'Astral ayar dosyasi bulunamadi; once uygulamayi bir kez acin.'
 
     $settings = Get-Content -Raw -LiteralPath $settingsPath |
         ConvertFrom-Json
@@ -120,17 +118,31 @@ function Set-BrowserAccessEnabled {
         ([bool]$settings.AcceptedCloudflareWarpTerms) `
         'Cloudflare WARP kosul onayi yok; canli smoke testi onay ekranini gecemez.'
 
-    if ($settings.PSObject.Properties.Name -contains 'BrowserAccessEnabled') {
-        $settings.BrowserAccessEnabled = $Enabled
-    }
-    else {
-        $settings | Add-Member `
-            -NotePropertyName BrowserAccessEnabled `
-            -NotePropertyValue $Enabled
+    $targetSelection = [pscustomobject]@{
+        SelectedTargetIds = @('discord')
+        CustomExecutables = @()
+        CustomDomains = @()
     }
 
+    $settings | Add-Member `
+        -Force `
+        -NotePropertyName BrowserAccessEnabled `
+        -NotePropertyValue $false
+    $settings | Add-Member `
+        -Force `
+        -NotePropertyName BrowserAccessPreferenceVersion `
+        -NotePropertyValue 1
+    $settings | Add-Member `
+        -Force `
+        -NotePropertyName TargetSelectionPreferenceVersion `
+        -NotePropertyValue 1
+    $settings | Add-Member `
+        -Force `
+        -NotePropertyName TargetSelection `
+        -NotePropertyValue $targetSelection
+
     $settings |
-        ConvertTo-Json -Depth 5 |
+        ConvertTo-Json -Depth 8 |
         Set-Content -LiteralPath $settingsPath -Encoding UTF8
 }
 
@@ -165,6 +177,93 @@ function Get-NewLogText {
     }
 }
 
+function Get-CurrentHealth {
+    param(
+        [int]$ProcessId,
+        [datetime]$NotBefore
+    )
+
+    $healthPath = Join-Path $env:LOCALAPPDATA 'Astral\logs\health.json'
+    if (-not (Test-Path -LiteralPath $healthPath)) {
+        return $null
+    }
+
+    try {
+        $health = Get-Content -Raw -LiteralPath $healthPath |
+            ConvertFrom-Json
+        if ([int]$health.processId -ne $ProcessId) {
+            return $null
+        }
+
+        [DateTimeOffset]$generatedAt = [DateTimeOffset]::MinValue
+        if (-not [DateTimeOffset]::TryParse(
+                [string]$health.generatedAt,
+                [ref]$generatedAt)) {
+            return $null
+        }
+
+        if ($generatedAt.LocalDateTime -lt $NotBefore.AddSeconds(-2)) {
+            return $null
+        }
+
+        return $health
+    }
+    catch {
+        return $null
+    }
+}
+
+function Copy-HealthResult {
+    param([object]$Health)
+
+    if ($null -eq $Health) {
+        return
+    }
+
+    $result.HealthGeneratedAt = [string]$Health.generatedAt
+    $result.HealthProcessId = [string]$Health.processId
+    if ($null -eq $Health.details) {
+        return
+    }
+
+    $result.HealthTunnelReadiness =
+        [string]$Health.details.tunnelReadiness
+    $result.HealthWireSockAdapterDetected =
+        [string]$Health.details.wireSockAdapterDetected
+    $result.HealthWireSockAdapterUp =
+        [string]$Health.details.wireSockAdapterUp
+    $result.HealthWireSockAdapterStatus =
+        [string]$Health.details.wireSockAdapterStatus
+    $result.HealthWireSockAdapterBytesReceived =
+        [string]$Health.details.wireSockAdapterBytesReceived
+    $result.HealthWireSockAdapterBytesSent =
+        [string]$Health.details.wireSockAdapterBytesSent
+    $result.HealthWireSockConnectionEstablished =
+        [string]$Health.details.wireSockConnectionEstablished
+    $result.HealthWireSockHandshakeDiagnostic =
+        [string]$Health.details.wireSockHandshakeDiagnostic
+    $result.HealthTunnelReady =
+        $result.HealthTunnelReadiness -eq 'ready' -and
+        $result.HealthWireSockAdapterDetected -eq 'True' -and
+        $result.HealthWireSockAdapterUp -eq 'True' -and
+        $result.HealthWireSockConnectionEstablished -eq 'True'
+}
+
+function Stop-AstralProcess {
+    param([System.Diagnostics.Process]$Process)
+
+    if ($null -eq $Process -or $Process.HasExited) {
+        return
+    }
+
+    [void]$Process.CloseMainWindow()
+    [void]$Process.WaitForExit(15000)
+    if (-not $Process.HasExited) {
+        Stop-Process -Id $Process.Id -Force
+        [void]$Process.WaitForExit(15000)
+    }
+}
+
 function Get-WireSockProcess {
     param([datetime]$StartedAfter)
 
@@ -179,7 +278,7 @@ function Get-WireSockProcess {
         })
 }
 
-function Find-DiscorderWindow {
+function Find-AstralWindow {
     param([int]$ProcessId)
 
     $condition = [System.Windows.Automation.PropertyCondition]::new(
@@ -190,7 +289,7 @@ function Find-DiscorderWindow {
         $condition)
 }
 
-function Find-DiscorderToggle {
+function Find-AstralToggle {
     param([System.Windows.Automation.AutomationElement]$Window)
 
     $condition = [System.Windows.Automation.PropertyCondition]::new(
@@ -227,12 +326,12 @@ function Invoke-PrimaryWindowClick {
     [NativeWindow]::mouse_event(0x0004, 0, 0, 0, [UIntPtr]::Zero)
 }
 
-function Invoke-DiscorderToggle {
+function Invoke-AstralToggle {
     param([System.Windows.Automation.AutomationElement]$Window)
 
     $button = $null
     [void](Wait-Until {
-        $script:toggleButton = Find-DiscorderToggle -Window $Window
+        $script:toggleButton = Find-AstralToggle -Window $Window
         $null -ne $script:toggleButton
     } 20)
     $button = $script:toggleButton
@@ -290,25 +389,38 @@ $appProcess = $null
 $startedAt = Get-Date
 $result = [ordered]@{
     WindowFound = $false
-    BrowserAccessTemporarilyEnabled = $false
+    TargetSelectionPrepared = $false
     ConnectClicked = $false
     WireSockProcessSeen = $false
     WireSockStayedRunningAfterGrace = $false
     ConnectionEstablishedLog = $false
+    HealthFresh = $false
+    HealthGeneratedAt = ''
+    HealthProcessId = ''
+    HealthTunnelReadiness = ''
+    HealthWireSockAdapterDetected = ''
+    HealthWireSockAdapterUp = ''
+    HealthWireSockAdapterStatus = ''
+    HealthWireSockAdapterBytesReceived = ''
+    HealthWireSockAdapterBytesSent = ''
+    HealthWireSockConnectionEstablished = ''
+    HealthWireSockHandshakeDiagnostic = ''
+    HealthTunnelReady = $false
     HostsLockRemovedWhileConnected = $false
     FirewallRuleDisabledWhileConnected = $false
     DirectDiscordTcp443WhileConnected = $false
     ProfileHasDiscord = $false
     ProfileHasDiscordFullPath = $false
-    ProfileHasChrome = $false
-    ProfileHasEdge = $false
-    ProfileHasFirefox = $false
+    ProfileHasWebProxy = $false
+    ProfileHasBrowserProcess = $false
     ProfileHasBrowserFullPath = $false
+    ProfileExcludesBrowserProcess = $false
+    ProfileExcludesBrowserFullPath = $false
     DisconnectClicked = $false
     WireSockProcessStoppedAfterDisconnect = $false
     FinalHostsLock = $false
     FinalFirewallRuleEnabled = $false
-    BrowserAccessRestored = $false
+    SettingsRestored = $false
     ErrorMessage = ''
     ErrorStackTrace = ''
     SmokePassed = $false
@@ -318,8 +430,8 @@ $smokeError = $null
 
 try {
     try {
-        Set-BrowserAccessEnabled -Enabled $true
-        $result.BrowserAccessTemporarilyEnabled = $true
+        Set-AstralTargetSelection
+        $result.TargetSelectionPrepared = $true
 
         $appProcess = Start-Process `
             -FilePath $ExePath `
@@ -328,12 +440,12 @@ try {
 
         $window = $null
         $result.WindowFound = Wait-Until {
-            $script:window = Find-DiscorderWindow -ProcessId $appProcess.Id
+            $script:window = Find-AstralWindow -ProcessId $appProcess.Id
             $null -ne $script:window
         } 30
-        Assert-Condition $result.WindowFound 'Discorder penceresi bulunamadi.'
+        Assert-Condition $result.WindowFound 'Astral penceresi bulunamadi.'
 
-        Invoke-DiscorderToggle -Window $window
+        Invoke-AstralToggle -Window $window
         $result.ConnectClicked = $true
 
         $result.WireSockProcessSeen = Wait-Until {
@@ -344,9 +456,9 @@ try {
         $result.WireSockStayedRunningAfterGrace =
             @(Get-WireSockProcess -StartedAfter $startedAt).Count -gt 0
 
-        $result.HostsLockRemovedWhileConnected = -not (Test-DiscorderHostsLock)
+        $result.HostsLockRemovedWhileConnected = -not (Test-AstralHostsLock)
         $result.FirewallRuleDisabledWhileConnected =
-            (Get-DiscorderRuleEnabled) -eq 'False'
+            (Get-AstralRuleEnabled) -eq 'False'
         $result.DirectDiscordTcp443WhileConnected = Test-Tcp443 'discord.com'
 
         if (Test-Path -LiteralPath $profilePath) {
@@ -359,32 +471,55 @@ try {
                 $allowedAppsText -match 'Discord\.exe'
             $result.ProfileHasDiscordFullPath =
                 $allowedAppsText -match '\\Discord(?:PTB|Canary|Development)?\\app-[^,\\]+\\Discord(?:PTB|Canary|Development)?\.exe'
-            $result.ProfileHasChrome =
-                $allowedAppsText -match 'chrome\.exe'
-            $result.ProfileHasEdge =
-                $allowedAppsText -match 'msedge\.exe'
-            $result.ProfileHasFirefox =
-                $allowedAppsText -match 'firefox\.exe'
+            $result.ProfileHasWebProxy =
+                $allowedAppsText -match 'Astral\.WebProxy\.exe'
+            $result.ProfileHasBrowserProcess =
+                $allowedAppsText -match '(?:^|[,=\s"])(?:chrome|msedge|firefox|brave|opera|vivaldi)\.exe(?:[,="\s]|$)'
             $result.ProfileHasBrowserFullPath =
                 $allowedAppsText -match '\\(?:BraveSoftware\\Brave-Browser\\Application\\brave|Google\\Chrome\\Application\\chrome|Microsoft\\Edge\\Application\\msedge|Mozilla Firefox\\firefox|Opera\\opera|Programs\\Opera\\opera|Programs\\Opera GX\\opera|Vivaldi\\Application\\vivaldi)\.exe'
+            $result.ProfileExcludesBrowserProcess =
+                -not [bool]$result.ProfileHasBrowserProcess
+            $result.ProfileExcludesBrowserFullPath =
+                -not [bool]$result.ProfileHasBrowserFullPath
         }
 
         $result.ConnectionEstablishedLog =
             (Get-NewLogText -Offset $logOffset) -match 'Connection established'
 
-        Invoke-DiscorderToggle -Window $window
-        $result.DisconnectClicked = $true
-        $result.WireSockProcessStoppedAfterDisconnect = Wait-Until {
-            @(Get-WireSockProcess -StartedAfter $startedAt).Count -eq 0
-        } 45
+        $currentHealth = $null
+        $result.HealthFresh = Wait-Until {
+            $script:currentHealth = Get-CurrentHealth `
+                -ProcessId $appProcess.Id `
+                -NotBefore $startedAt
+            if ($null -eq $script:currentHealth) {
+                return $false
+            }
 
-        if (-not $appProcess.HasExited) {
-            [void]$appProcess.CloseMainWindow()
-            [void]$appProcess.WaitForExit(15000)
+            Copy-HealthResult -Health $script:currentHealth
+            return $result.HealthTunnelReady -or
+                [string]$script:currentHealth.status -eq 'hata'
+        } 75
+        $health = $script:currentHealth
+        if ($result.HealthFresh -and $null -ne $health) {
+            Copy-HealthResult -Health $health
         }
 
-        $result.FinalHostsLock = Test-DiscorderHostsLock
-        $result.FinalFirewallRuleEnabled = (Get-DiscorderRuleEnabled) -eq 'True'
+        if ($result.HealthTunnelReady) {
+            Invoke-AstralToggle -Window $window
+            $result.DisconnectClicked = $true
+            $result.WireSockProcessStoppedAfterDisconnect = Wait-Until {
+                @(Get-WireSockProcess -StartedAfter $startedAt).Count -eq 0
+            } 45
+        }
+        else {
+            $result.WireSockProcessStoppedAfterDisconnect =
+                @(Get-WireSockProcess -StartedAfter $startedAt).Count -eq 0
+        }
+
+        Stop-AstralProcess -Process $appProcess
+
+        $result.FinalHostsLock = Test-AstralHostsLock
+        $result.FinalFirewallRuleEnabled = (Get-AstralRuleEnabled) -eq 'True'
     }
     finally {
         if ($null -ne $originalSettings) {
@@ -393,16 +528,13 @@ try {
                 -Value $originalSettings `
                 -NoNewline `
                 -Encoding UTF8
-            $result.BrowserAccessRestored = $true
+            $result.SettingsRestored = $true
         }
 
-        if ($null -ne $appProcess -and -not $appProcess.HasExited) {
-            [void]$appProcess.CloseMainWindow()
-            [void]$appProcess.WaitForExit(15000)
-        }
+        Stop-AstralProcess -Process $appProcess
 
-        $result.FinalHostsLock = Test-DiscorderHostsLock
-        $result.FinalFirewallRuleEnabled = (Get-DiscorderRuleEnabled) -eq 'True'
+        $result.FinalHostsLock = Test-AstralHostsLock
+        $result.FinalFirewallRuleEnabled = (Get-AstralRuleEnabled) -eq 'True'
     }
 }
 catch {
@@ -413,24 +545,26 @@ catch {
 
 $criticalChecks = @(
     'WindowFound',
-    'BrowserAccessTemporarilyEnabled',
+    'TargetSelectionPrepared',
     'ConnectClicked',
     'WireSockProcessSeen',
     'WireSockStayedRunningAfterGrace',
+    'ConnectionEstablishedLog',
+    'HealthFresh',
+    'HealthTunnelReady',
     'HostsLockRemovedWhileConnected',
     'FirewallRuleDisabledWhileConnected',
     'DirectDiscordTcp443WhileConnected',
     'ProfileHasDiscord',
     'ProfileHasDiscordFullPath',
-    'ProfileHasChrome',
-    'ProfileHasEdge',
-    'ProfileHasFirefox',
-    'ProfileHasBrowserFullPath',
+    'ProfileHasWebProxy',
+    'ProfileExcludesBrowserProcess',
+    'ProfileExcludesBrowserFullPath',
     'DisconnectClicked',
     'WireSockProcessStoppedAfterDisconnect',
     'FinalHostsLock',
     'FinalFirewallRuleEnabled',
-    'BrowserAccessRestored'
+    'SettingsRestored'
 )
 
 $result.SmokePassed =
