@@ -16,21 +16,23 @@ Bu doküman, GitHub Releases yüzeyindeki sürüm kararlarını ve yayın kapıs
 
 ## Güncel Sürüm Kararı
 
-Güncel patch hedef `v2.2.11` olarak belirlendi.
+Güncel patch hedef `v2.2.12` olarak belirlendi.
 
-Neden `v2.2.11`?
+Neden `v2.2.12`?
 
-- v2.2.10 üstüne WireSock transparent mode readiness düzeltmesi eklendi.
+- v2.2.11 üstüne live smoke sınıflandırması düzeltildi.
 - Transparent mode'da sanal adaptör zorunlu kabul edilmiyor; WireSock süreci erken kapanırsa hata, sağlıklı kalırsa hedef kapsamı hazır sayılıyor.
 - Profil üretimi WireSock uyumlu `#@ws:AllowedApps` direktifiyle yazılıyor ve eski/geniş satırları temizliyor.
 - WebProxy başlatmadan önce aynı executable path'e ait orphan proxy süreçleri temizleniyor; port fallback ihtiyacı ve kapanma takılması azalıyor.
 - Güncel tanılama ve smoke scripti `wireSockMode`, `wireSockProcessExited` ve `transparent-process-running` alanlarıyla aynı doğrulama modelini kullanır.
+- `discord.com:443` doğrudan ağ probu ISP/servis durumuna bağlı olduğu için canlı smoke'ta bilgi amaçlı kalır; release başarısı için hedef kapsamı, profil, WebProxy, WireSock lifecycle ve cleanup kanıtı esas alınır.
 
 ## Public Release Yüzeyi
 
 | Release | Canlı durum | Asset durumu | Karar | Gerekçe |
 | --- | --- | --- | --- | --- |
-| `v2.2.11` | Yayın adayı | Bekliyor | Yayınla | WireSock transparent readiness, `#@ws:AllowedApps` ve WebProxy orphan cleanup hotfixleri. |
+| `v2.2.12` | Yayın adayı | Bekliyor | Yayınla | Live smoke sınıflandırması, WireSock transparent readiness ve `#@ws:AllowedApps` hotfixleri. |
+| `v2.2.11` | Tarihsel aday | Yerine geçti | Koru | WireSock transparent readiness, `#@ws:AllowedApps` ve WebProxy orphan cleanup hotfixleri. |
 | `v2.2.10` | Tarihsel aday | Yerine geçti | Koru | Gerçek hedef ikonları, state sistemi, lifecycle hotfixleri ve Astral-only update hattı. |
 | `v2.2.9` | Tarihsel aday | Yerine geçti | Koru | İsimli 5+4 hedef kartları ve geçiş release notu v2.2.10 tarafından genişletildi. |
 | `v2.2.8` | Yayında | 4 asset | Koru | Icon-only hedef grid, legacy tanılama temizliği ve güncelleme sürekliliği. |
@@ -46,12 +48,12 @@ Neden `v2.2.11`?
 
 ## Yayın Kapısı
 
-`v2.2.11` yayınından önce tamamlanması gereken koşullar:
+`v2.2.12` yayınından önce tamamlanması gereken koşullar:
 
-- Proje, updater ve web proxy sürümü `2.2.11` ile aynı.
-- `Astral-2.2.11-win-x64.zip` ve sabit `Astral-win-x64.zip` aynı içeriği gösterir.
+- Proje, updater ve web proxy sürümü `2.2.12` ile aynı.
+- `Astral-2.2.12-win-x64.zip` ve sabit `Astral-win-x64.zip` aynı içeriği gösterir.
 - ZIP içinde `Astral.exe`, `Astral.Updater.exe`, `Astral.WebProxy.exe`, update manifest'i ve gerekli runtime dosyaları bulunur.
-- ZIP içindeki update manifest sürümü `2.2.11`.
+- ZIP içindeki update manifest sürümü `2.2.12`.
 - Astral release içinde eski isimli uyumluluk ZIP'i yayınlanmaz.
 - Kod imzalama sertifikası yapılandırılmadıysa paket imzasız olduğu açıkça not edilir.
 - `dotnet build`, Core tests, Windows tests, `scripts/verify.ps1`, `scripts/build-release.ps1`, `git diff --check` ve Gitleaks geçer.

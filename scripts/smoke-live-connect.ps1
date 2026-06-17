@@ -565,7 +565,6 @@ $criticalChecks = @(
     'HealthTunnelReady',
     'HostsLockRemovedWhileConnected',
     'FirewallRuleDisabledWhileConnected',
-    'DirectDiscordTcp443WhileConnected',
     'ProfileHasDiscord',
     'ProfileHasDiscordFullPath',
     'ProfileHasWebProxy',
