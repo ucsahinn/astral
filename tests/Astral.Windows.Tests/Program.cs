@@ -326,19 +326,39 @@ static void RenderTargetSelectionWindow()
         Assert(text.Contains("Özel EXE", StringComparison.Ordinal));
         Assert(text.Contains("Özel Domain", StringComparison.Ordinal));
         Assert(text.Contains("Seçilenler: Discord", StringComparison.Ordinal));
+        Assert(text.Contains("Kapsam hazır", StringComparison.Ordinal));
+        Assert(text.Contains("Bilgi gerekli", StringComparison.Ordinal));
+        Assert(!text.Contains("Popüler", StringComparison.Ordinal));
+        Assert(!text.Contains("İletişim", StringComparison.Ordinal));
+        Assert(!text.Contains("Canlı/Sosyal", StringComparison.Ordinal));
 
         var textBoxes = FindVisualChildren<TextBox>(window).ToArray();
-        Assert(textBoxes.Any(box => box.Name == "SearchBox"));
+        var searchBox = textBoxes.Single(box => box.Name == "SearchBox");
         Assert(textBoxes.Any(box => box.Name == "CustomExecutableTextBox"));
         Assert(textBoxes.Any(box => box.Name == "CustomDomainTextBox"));
+
+        var targetCards = FindVisualChildren<CheckBox>(window).ToArray();
+        Assert(targetCards.Length == TargetRegistry.CreateDefault().GetBuiltInTargets().Count);
 
         var buttons = FindVisualChildren<Button>(window)
             .Select(button => button.Content?.ToString())
             .Where(content => !string.IsNullOrWhiteSpace(content))
             .ToArray();
-        Assert(buttons.Contains("Popüler"));
         Assert(buttons.Contains("Kaydet"));
         Assert(buttons.Contains("Vazgeç"));
+
+        window.Width = window.MinWidth;
+        searchBox.Text = "hedef-yok-astral-test";
+        window.UpdateLayout();
+        var emptyStateText = string.Join(
+            "\n",
+            FindVisualChildren<TextBlock>(window).Select(block => block.Text));
+        Assert(emptyStateText.Contains("Sonuç bulunamadı", StringComparison.Ordinal));
+        Assert(!FindVisualChildren<CheckBox>(window).Any());
+        searchBox.Text = string.Empty;
+        window.Width = 940;
+        window.Height = 700;
+        window.UpdateLayout();
 
         SaveWindowPng(window, Path.Combine(
             FindRepositoryRoot(),

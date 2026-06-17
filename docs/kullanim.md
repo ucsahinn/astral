@@ -14,7 +14,7 @@ Astral ZIP içinden çalışan portable bir Windows uygulamasıdır. Seçili uyg
 
 ## Hedef Merkezi
 
-Hedef Merkezi ana ekrana gömülü değildir; ayrı modal olarak açılır. Arama alanı ve kategorilerle şu hedefleri seçebilirsiniz:
+Hedef Merkezi ana ekrana gömülü değildir; ayrı modal olarak açılır. Üstteki arama alanı hedef adı, domain, exe ipucu veya kısa takma adlarla filtreler; alttaki ikonlu kartlardan şu hedefleri seçebilirsiniz:
 
 - Discord
 - Roblox

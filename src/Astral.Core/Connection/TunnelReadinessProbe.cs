@@ -176,12 +176,40 @@ public sealed class WindowsTunnelReadinessProbe : ITunnelReadinessProbe
     }
 
     private static bool IsWireSockAdapter(NetworkInterface adapter) =>
-        ContainsWireSock(adapter.Name)
-        || ContainsWireSock(adapter.Description);
+        IsWireSockCompatibleAdapter(adapter.Name, adapter.Description);
+
+    internal static bool IsWireSockCompatibleAdapter(
+        string? name,
+        string? description)
+    {
+        if (ContainsWireSock(name) || ContainsWireSock(description))
+        {
+            return true;
+        }
+
+        return IsWireSockWireGuardTunnelName(name)
+            && ContainsWireGuardTunnel(description);
+    }
 
     private static bool ContainsWireSock(string? value) =>
         !string.IsNullOrWhiteSpace(value)
         && value.Contains("WireSock", StringComparison.OrdinalIgnoreCase);
+
+    private static bool ContainsWireGuardTunnel(string? value) =>
+        !string.IsNullOrWhiteSpace(value)
+        && value.Contains("WireGuard Tunnel", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsWireSockWireGuardTunnelName(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)
+            || value.Length < 3
+            || !value.StartsWith("wt", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return value[2..].All(char.IsDigit);
+    }
 
     private static (long? BytesReceived, long? BytesSent) CaptureTrafficCounters(
         NetworkInterface adapter)

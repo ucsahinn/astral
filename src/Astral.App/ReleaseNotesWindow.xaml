@@ -80,7 +80,7 @@
                                 VerticalAlignment="Center">
                         <TextBlock FontSize="22"
                                    FontWeight="SemiBold"
-                                   Text="Astral v2.2.2" />
+                                   Text="Astral v2.2.3" />
                         <TextBlock Margin="0,5,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
@@ -107,7 +107,7 @@
                                            FontSize="14"
                                            LineHeight="21"
                                            TextWrapping="Wrap"
-                                           Text="v2.2.2, güncelleme görünürlüğünü düzeltir, eski Discorder köprü paketini üretir ve premium Astral ikon setini yeniler." />
+                                           Text="v2.2.3, Hedef Merkezi görsel kalitesini yükseltir, WireSock adaptör algısını güçlendirir ve bağlantı kilidi DNS temizliğini hata toleranslı yapar." />
                             </StackPanel>
                         </Border>
 
@@ -126,19 +126,19 @@
                                            FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="• Hedef Merkezi ile Discord, Roblox, Wattpad, Bigo Live, Azar, Tango, LiVU, IMVU, Blogspot ve özel hedefler seçilebilir." />
+                                           Text="• Hedef Merkezi kategori paneli olmadan daha geniş kart grid'i, premium servis işaretleri, net seçili durumu ve taşma kontrollü arama akışıyla yenilendi." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="• Web hedefleri için Astral.WebProxy ve PAC allowlist eklendi; diğer domainler DIRECT kalır." />
+                                           Text="• WireSock hazırlık denetimi wt + WireGuard Tunnel adaptörlerini tanır; şirket içi wg-* adları gibi ilgisiz adaptörler kapsam dışı kalır." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="• Custom EXE ve Custom Domain doğrulaması geniş wildcard, tarayıcı exe ve injection risklerini reddeder." />
+                                           Text="• Bağlantı kilidi kapanışında DNS flush komutu boş native çıkış koduyla başarısız görünürse tünel akışı artık kırılmaz." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="• UI'daki eski web kapsamı yerine TÜNEL KAPSAMI ve Hedefleri Seç akışı geldi." />
+                                           Text="• Seçili web hedeflerinde tarayıcı süreçleri WireSock AllowedApps kapsamına alınmaz; yalnızca Astral.WebProxy tünel kapsamına girer." />
                             </StackPanel>
                         </Border>
 

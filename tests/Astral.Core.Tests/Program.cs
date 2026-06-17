@@ -104,6 +104,8 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Denetleyici duran indirme zaman aşımını Türkçe açıklar", ControllerDirectDownloadTimeoutIsUserFriendlyAsync),
     ("Denetleyici bağlantı koruması hatasını Türkçe açıklar", ControllerAccessLockFailureIsUserFriendlyAsync),
     ("Windows Firewall koruması Discord alan adı kuralını yönetir", WindowsFirewallAccessLockBuildsExpectedCommandsAsync),
+    ("Windows Firewall koruması DNS temizleme hatasını kritik çıkış kodu yapmaz", WindowsFirewallAccessLockIgnoresDnsFlushExitCodeAsync),
+    ("WireSock hazırlık denetimi wt WireGuard adaptörünü tanır", TunnelReadinessRecognizesWireSockWireGuardAdapterAsync),
     ("Onarım ayarları ve logları koruyup üretilen veriyi yeniler", CleanupServiceRepairsGeneratedStateAsync),
     ("Profil temizliği Astral verisini ve korumayı siler", CleanupServiceRemovesAstralStateAsync),
     ("Profil temizliği eski marka veri köklerini de temizler", CleanupServiceRemovesLegacyBrandStateAsync),
@@ -3877,6 +3879,52 @@ static async Task WindowsFirewallAccessLockBuildsExpectedCommandsAsync()
     {
         Directory.Delete(root, recursive: true);
     }
+}
+
+static async Task WindowsFirewallAccessLockIgnoresDnsFlushExitCodeAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var runner = new RecordingCommandRunner();
+    var accessLock = new WindowsFirewallDiscordAccessLock(
+        new AppPaths(root),
+        runner,
+        "powershell.exe");
+
+    try
+    {
+        await accessLock.EnableAsync(CancellationToken.None);
+        await accessLock.DisableAsync(CancellationToken.None);
+        await accessLock.RemoveAsync(CancellationToken.None);
+
+        Assert(runner.Commands.Count == 3);
+        Assert(runner.Commands.All(command => command.Contains(
+            "Invoke-AstralFlushDns",
+            StringComparison.Ordinal)));
+        Assert(runner.Commands.All(command => !command.Contains(
+            "ipconfig /flushdns | Out-Null",
+            StringComparison.Ordinal)));
+        Assert(runner.Commands.All(command => command.Contains(
+            "$global:LASTEXITCODE = 0",
+            StringComparison.Ordinal)));
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static Task TunnelReadinessRecognizesWireSockWireGuardAdapterAsync()
+{
+    Assert(WindowsTunnelReadinessProbe.IsWireSockCompatibleAdapter(
+        "wt0",
+        "WireGuard Tunnel"));
+    Assert(WindowsTunnelReadinessProbe.IsWireSockCompatibleAdapter(
+        "WireSock Virtual Adapter",
+        "WireSock VPN Client"));
+    Assert(!WindowsTunnelReadinessProbe.IsWireSockCompatibleAdapter(
+        "wg-company",
+        "WireGuard Tunnel"));
+    return Task.CompletedTask;
 }
 
 static async Task CleanupServiceRemovesAstralStateAsync()

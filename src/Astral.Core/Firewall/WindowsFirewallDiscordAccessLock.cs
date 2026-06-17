@@ -147,7 +147,7 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
             "    Clear-AstralFirewallGroup $group",
             "}",
             "Remove-AstralHostsLock",
-            "ipconfig /flushdns | Out-Null",
+            "Invoke-AstralFlushDns",
             "$resolvedAddresses = foreach ($domain in $domains) {",
             "    try {",
             "        Resolve-DnsName -Name $domain -ErrorAction Stop |",
@@ -185,7 +185,7 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
             "$script:astralHostsChanged = $false",
             "Remove-AstralHostsLock",
             "if ($script:astralHostsChanged) {",
-            "    ipconfig /flushdns | Out-Null",
+            "    Invoke-AstralFlushDns",
             "}",
             "foreach ($name in @($ruleName, $legacyRuleName)) {",
             "    $rule = Get-NetFirewallRule -Name $name -ErrorAction SilentlyContinue",
@@ -344,7 +344,7 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
             "    Clear-AstralFirewallGroup $group",
             "}",
             "if ($script:astralHostsChanged) {",
-            "    ipconfig /flushdns | Out-Null",
+            "    Invoke-AstralFlushDns",
             "}"
         ]);
     }
@@ -378,6 +378,14 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
             "            if ($attempt -eq 8) { throw }",
             "            Start-Sleep -Milliseconds (120 * $attempt)",
             "        }",
+            "    }",
+            "}",
+            "function Invoke-AstralFlushDns {",
+            "    try {",
+            "        & ipconfig /flushdns *> $null",
+            "    } catch {",
+            "    } finally {",
+            "        $global:LASTEXITCODE = 0",
             "    }",
             "}",
             "function Read-AstralText([string]$path) {",
@@ -415,7 +423,7 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
             "    $content += ($block -join [Environment]::NewLine) + [Environment]::NewLine",
             "    Write-AstralText $hostsPath $content",
             "    $script:astralHostsChanged = $true",
-            "    ipconfig /flushdns | Out-Null",
+            "    Invoke-AstralFlushDns",
             "}"
         ];
     }
