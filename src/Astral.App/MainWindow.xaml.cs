@@ -38,7 +38,7 @@ public partial class MainWindow : Window, IDisposable
     private static readonly Uri RepositoryUri = new(
         "https://github.com/ucsahinn/astral");
     private static readonly Uri ReleaseNotesUri = new(
-        "https://github.com/ucsahinn/astral/releases/tag/v2.2.7");
+        "https://github.com/ucsahinn/astral/releases/tag/v2.2.8");
     private static readonly Uri BackgroundVideoUri = new(
         "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260606_154941_df1a96e1-a06f-450c-bd02-d863414cc1a0.mp4");
     private static readonly string LocalBackgroundVideoPath = Path.Combine(
@@ -679,10 +679,10 @@ public partial class MainWindow : Window, IDisposable
             {
                 Name = "TargetToggle_" + CreateSafeTargetName(target.Id),
                 Tag = target,
-                Width = 184,
+                Width = 60,
                 Height = 50,
                 Margin = new Thickness(4),
-                Padding = new Thickness(8, 5, 7, 5),
+                Padding = new Thickness(5),
                 Style = (Style)FindResource("TargetCardCheckBoxStyle"),
                 ToolTip = $"{target.Label} - {target.ScopeLabel}",
                 Content = CreateTargetCardContent(target)
@@ -810,20 +810,18 @@ public partial class MainWindow : Window, IDisposable
         var visual = GetTargetVisual(target.IconKey);
         var grid = new Grid
         {
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center
         };
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(14) });
 
         var iconBadge = new Border
         {
-            Width = 34,
-            Height = 34,
-            HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
+            Width = 42,
+            Height = 42,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
-            CornerRadius = new CornerRadius(9),
-            BorderBrush = new SolidColorBrush(MediaColor.FromArgb(132, 245, 247, 251)),
+            CornerRadius = new CornerRadius(11),
+            BorderBrush = new SolidColorBrush(MediaColor.FromArgb(146, 245, 247, 251)),
             BorderThickness = new Thickness(1),
             Background = new LinearGradientBrush(visual.StartColor, visual.EndColor, 42),
             Child = CreateTargetMark(visual)
@@ -837,31 +835,6 @@ public partial class MainWindow : Window, IDisposable
             Color = visual.EndColor
         };
         grid.Children.Add(iconBadge);
-
-        var textPanel = new StackPanel
-        {
-            Margin = new Thickness(8, 0, 0, 0),
-            VerticalAlignment = VerticalAlignment.Center
-        };
-        textPanel.Children.Add(new TextBlock
-        {
-            Text = target.Label,
-            FontSize = 12.5,
-            FontWeight = FontWeights.SemiBold,
-            Foreground = new SolidColorBrush(MediaColor.FromRgb(245, 247, 251)),
-            TextTrimming = TextTrimming.CharacterEllipsis
-        });
-        textPanel.Children.Add(new TextBlock
-        {
-            Text = target.ScopeLabel,
-            Margin = new Thickness(0, 2, 0, 0),
-            FontSize = 9.3,
-            FontWeight = FontWeights.SemiBold,
-            Foreground = new SolidColorBrush(MediaColor.FromRgb(142, 200, 255)),
-            TextTrimming = TextTrimming.CharacterEllipsis
-        });
-        Grid.SetColumn(textPanel, 1);
-        grid.Children.Add(textPanel);
 
         return grid;
     }
@@ -1600,11 +1573,6 @@ public partial class MainWindow : Window, IDisposable
         }
 
         return Drawing.SystemIcons.Application;
-    }
-
-    private void OpenWireSock_Click(object sender, RoutedEventArgs e)
-    {
-        OpenUri(_wireSockBootstrapper.ProductPage);
     }
 
     private void OpenDiagnostics_Click(object sender, RoutedEventArgs e)

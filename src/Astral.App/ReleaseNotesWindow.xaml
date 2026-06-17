@@ -80,11 +80,11 @@
                                 VerticalAlignment="Center">
                         <TextBlock FontSize="22"
                                    FontWeight="SemiBold"
-                                   Text="Astral v2.2.7" />
+                                   Text="Astral v2.2.8" />
                         <TextBlock Margin="0,5,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
-                                   Text="Hedef merkezi ve dar kapsamlı web proxy" />
+                                   Text="Premium hedef grid ve güncelleme sürekliliği" />
                     </StackPanel>
                 </Grid>
 
@@ -107,7 +107,7 @@
                                            FontSize="14"
                                            LineHeight="21"
                                            TextWrapping="Wrap"
-                                           Text="v2.2.7, eski oturumdan kalan yerel WebProxy port çakışmasını ve hedef kartı görsel hizasını düzelten hotfix sürümüdür." />
+                                           Text="v2.2.8, Astral ana ekranındaki desteklenen hedef panelini yazısız premium logo grid'e taşır, eski marka tanılama izlerini temizler ve güncelleme sürekliliğini korur." />
                             </StackPanel>
                         </Border>
 
@@ -126,19 +126,19 @@
                                            FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="• Varsayılan yerel proxy portu kullanımda ise Astral bu oturum için güvenli yedek port seçer ve PAC dosyasını aynı porta göre yazar." />
+                                           Text="• Desteklenen hedefler ana ekranda yalnız marka renkli temiz marklarla görünür; isimler erişilebilirlik ve ipuçlarında korunur." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="• Astral.WebProxy başlatılamazsa PAC uygulanmadan hata verilir; uygulama artık çöken proxy sürecini hazır saymaz." />
+                                           Text="• Hedef grid'i, GitHub ikonu ve seçili durum işaretleri yüksek DPI'da kırpılmayacak şekilde sıkılaştırıldı." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="• Hedef kartları isim, kapsam etiketi ve marka renkli işaretlerle daha okunur hale getirildi; seçili tik ve GitHub ikonu kırpılmayacak şekilde düzenlendi." />
+                                           Text="• Legacy portable klasörlerden çalışırken tanılama çıktısı Astral diliyle kalır; güncelleme yine aynı klasöre güvenli şekilde uygulanır." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="• Seçili web hedeflerinde tarayıcı süreçleri WireSock AllowedApps kapsamına alınmaz; yalnızca Astral.WebProxy tünel kapsamına girer." />
+                                           Text="• v2.2.7 WebProxy port fallback davranışı korunur; otomatik güncelleme beklenen Astral asset adlarıyla devam eder." />
                             </StackPanel>
                         </Border>
 

@@ -90,6 +90,7 @@ static void RenderWindows()
                 {
                     RenderMainWindow();
                     VerifyWindowLifetimeBehavior();
+                    VerifyPortableInstallDiagnosticsSanitizesLegacyBrand();
                     RenderConsentWindow();
                 }
                 catch (Exception exception)
@@ -150,29 +151,14 @@ static void RenderMainWindow()
             "\n",
             FindVisualChildren<TextBlock>(window).Select(block => block.Text));
         Assert(text.Contains("Astral", StringComparison.Ordinal));
-        Assert(text.Contains("Seçili hedef kapsamı hazır", StringComparison.Ordinal));
+        Assert(text.Contains("Desteklenen hedef kapsamı hazır", StringComparison.Ordinal));
         Assert(!text.Contains("TÜNEL KAPSAMI", StringComparison.Ordinal));
         Assert(!text.Contains("Seçili hedefler", StringComparison.Ordinal));
         Assert(!text.Contains("Hedefleri Seç", StringComparison.Ordinal));
         Assert(!text.Contains("Hedef Merkezi", StringComparison.Ordinal));
-        foreach (var expectedLabel in new[]
-                 {
-                     "Discord",
-                     "Roblox",
-                     "Wattpad",
-                     "Bigo Live",
-                     "Azar",
-                     "Tango",
-                     "LiVU",
-                     "IMVU",
-                     "Blogspot"
-                 })
-        {
-            Assert(text.Contains(expectedLabel, StringComparison.Ordinal));
-        }
-
-        Assert(text.Contains("Uygulama + Web", StringComparison.Ordinal));
-        Assert(text.Contains("Web", StringComparison.Ordinal));
+        Assert(!text.Contains("Bigo Live", StringComparison.Ordinal));
+        Assert(!text.Contains("Blogspot", StringComparison.Ordinal));
+        Assert(!text.Contains("Wattpad", StringComparison.Ordinal));
         Assert(!text.Contains("Özel EXE", StringComparison.Ordinal));
         Assert(!text.Contains("Özel Domain", StringComparison.Ordinal));
         Assert(!text.Contains("Tarayıcı modu", StringComparison.Ordinal));
@@ -230,6 +216,29 @@ static void RenderMainWindow()
                  })
         {
             Assert(targetNames.Contains(expectedTarget));
+        }
+        var visibleTargetLabels = new[]
+        {
+            "Discord",
+            "Roblox",
+            "Wattpad",
+            "Bigo Live",
+            "Azar",
+            "Tango",
+            "LiVU",
+            "IMVU",
+            "Blogspot",
+            "Uygulama + Web",
+            "Web"
+        };
+        foreach (var targetToggle in targetToggles)
+        {
+            var cardTexts = FindVisualChildren<TextBlock>(targetToggle)
+                .Select(block => block.Text)
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .ToArray();
+            Assert(!cardTexts.Any(cardText => visibleTargetLabels.Contains(cardText)));
+            Assert(targetToggle.ToolTip?.ToString()?.Length > 0);
         }
 
         Assert(targetToggles.Any(toggle =>
@@ -317,6 +326,24 @@ static void VerifyWindowLifetimeBehavior()
     VerifyTrayExitDisposesActiveConnectionWhenRunInBackgroundIsEnabled();
 
     Console.WriteLine("GEÇTİ Pencere kapanış ve arka plan davranışı doğrulandı");
+}
+
+static void VerifyPortableInstallDiagnosticsSanitizesLegacyBrand()
+{
+    var legacyProductName = string.Concat("Dis", "corder");
+    var details = PortableInstallDiagnostics.Capture(
+        Path.Combine(
+            Path.GetTempPath(),
+            legacyProductName + "-2.0.20-win-x64"));
+
+    Assert(details["portableDirectoryLooksLegacyBrand"] == "True");
+    Assert(details["portableDirectoryName"] == "Astral-legacy-portable");
+    Assert(details["portableDirectoryBrandStatus"] == "legacy-portable-folder");
+    Assert(!details.Values
+        .OfType<string>()
+        .Any(value => value.Contains(legacyProductName, StringComparison.OrdinalIgnoreCase)));
+
+    Console.WriteLine("GEÇTİ Legacy portable klasör tanılaması Astral diliyle kaldı");
 }
 
 static void VerifyCloseHidesToTrayWhenRunInBackgroundIsEnabled()

@@ -12,6 +12,8 @@
         Foreground="{StaticResource PrimaryTextBrush}"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextRenderingMode="ClearType"
         Loaded="Window_Loaded"
         Closing="Window_Closing"
         StateChanged="Window_StateChanged">
@@ -21,7 +23,7 @@
                       UnloadedBehavior="Close"
                       Stretch="UniformToFill"
                       Volume="0"
-                      Opacity="0.88"
+                      Opacity="0.68"
                       IsHitTestVisible="False"
                       Loaded="BackgroundVideo_Loaded"
                       MediaEnded="BackgroundVideo_MediaEnded"
@@ -206,7 +208,7 @@
                         <TextBlock Margin="0,3,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
-                                   Text="Seçili hedef kapsamı hazır." />
+                                   Text="Desteklenen hedef kapsamı hazır." />
                     </StackPanel>
 
                     <Border Grid.Column="2"
@@ -498,7 +500,8 @@
                             BorderBrush="#B58EC8FF"
                             BorderThickness="1"
                             CornerRadius="8"
-                            Padding="18,16">
+                            Padding="18,16"
+                            SnapsToDevicePixels="True">
                         <Border.Background>
                             <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
                                 <GradientStop Color="#8E0B1422" Offset="0" />
@@ -513,17 +516,16 @@
                                               ShadowDepth="0"
                                               Color="#4C72FF" />
                         </Border.Effect>
-                        <StackPanel>
-                            <ScrollViewer MaxHeight="182"
-                                          VerticalScrollBarVisibility="Auto"
-                                          HorizontalScrollBarVisibility="Disabled"
-                                          CanContentScroll="False">
-                                <WrapPanel x:Name="TargetCardsPanel"
-                                           HorizontalAlignment="Center"
-                                           ItemWidth="192"
-                                           ItemHeight="58" />
-                            </ScrollViewer>
-                        </StackPanel>
+                        <ScrollViewer MaxHeight="188"
+                                      VerticalScrollBarVisibility="Disabled"
+                                      HorizontalScrollBarVisibility="Disabled"
+                                      CanContentScroll="False"
+                                      Focusable="False">
+                            <WrapPanel x:Name="TargetCardsPanel"
+                                       HorizontalAlignment="Center"
+                                       ItemWidth="68"
+                                       ItemHeight="58" />
+                        </ScrollViewer>
                     </Border>
 
                     <Border Grid.Row="1"
@@ -914,7 +916,7 @@
                                VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource SecondaryTextBrush}"
-                               Text="v2.2.7" />
+                               Text="v2.2.8" />
 
                     <Button Grid.Column="4"
                             x:Name="AutoUpdateButton"
@@ -938,10 +940,12 @@
                             Click="RestartAstral_Click"
                             ToolTip="Astral'ı yeniden başlat"
                             AutomationProperties.Name="Astral'ı yeniden başlat">
-                        <Viewbox Width="22"
-                                 Height="22"
+                        <Viewbox Width="20"
+                                 Height="20"
                                  Stretch="Uniform">
-                            <Canvas Width="24" Height="24">
+                            <Canvas Width="24"
+                                    Height="24"
+                                    ClipToBounds="False">
                                 <Path Stroke="{StaticResource PrimaryTextBrush}"
                                       StrokeThickness="1.9"
                                       StrokeStartLineCap="Round"

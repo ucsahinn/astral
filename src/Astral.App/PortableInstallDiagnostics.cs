@@ -26,19 +26,25 @@ internal static class PortableInstallDiagnostics
         var parentDirectory = Path.GetDirectoryName(directory);
         var looksVersioned = LooksVersionedDirectoryName(directoryName);
         var looksLegacyBrand = LooksLegacyBrandDirectoryName(directoryName);
+        var directoryNameForDiagnostics = looksLegacyBrand
+            ? "Astral-legacy-portable"
+            : directoryName;
         var parentDirectoryName = string.IsNullOrWhiteSpace(parentDirectory)
             ? string.Empty
             : Path.GetFileName(parentDirectory);
 
         return new Dictionary<string, string?>
         {
-            ["portableDirectoryName"] = directoryName,
+            ["portableDirectoryName"] = directoryNameForDiagnostics,
             ["portableParentDirectoryName"] = parentDirectoryName,
             ["portableDirectoryLooksVersioned"] = looksVersioned.ToString(),
             ["portableDirectoryLooksLegacyBrand"] = looksLegacyBrand.ToString(),
+            ["portableDirectoryBrandStatus"] = looksLegacyBrand
+                ? "legacy-portable-folder"
+                : "astral",
             ["portableRecommendedDirectoryName"] = StableDirectoryName,
             ["portableDirectoryGuidance"] = looksLegacyBrand
-                ? "Eski marka klasoru algilandi; guncelleme calisir, sabit Astral klasorune tasima kullanici onayi ister."
+                ? "Legacy portable klasor algilandi; guncelleme calisir, sabit Astral klasorune tasima kullanici onayi ister."
                 : looksVersioned
                 ? "Yeni indirmelerde sabit Astral klasoru kullanin; mevcut klasoru tasima kullanici onayi ister."
                 : "Sabit Astral klasoru kullaniliyor.",

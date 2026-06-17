@@ -449,10 +449,10 @@
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Focusable" Value="True" />
         <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}" />
-        <Setter Property="Background" Value="#6E101D31" />
-        <Setter Property="BorderBrush" Value="#759CD4FF" />
+        <Setter Property="Background" Value="#58101D31" />
+        <Setter Property="BorderBrush" Value="#6E9CD4FF" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="Padding" Value="10" />
+        <Setter Property="Padding" Value="6" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="CheckBox">
@@ -466,7 +466,7 @@
                         <Border.Effect>
                             <DropShadowEffect BlurRadius="18"
                                               Direction="270"
-                                              Opacity="0.24"
+                                              Opacity="0.18"
                                               ShadowDepth="0"
                                               Color="#63D9FF" />
                         </Border.Effect>
@@ -474,20 +474,21 @@
                             <ContentPresenter HorizontalAlignment="Stretch"
                                               VerticalAlignment="Center" />
                             <Border x:Name="CheckMark"
-                                    Width="18"
-                                    Height="18"
+                                    Width="16"
+                                    Height="16"
                                     HorizontalAlignment="Right"
                                     VerticalAlignment="Top"
-                                    CornerRadius="9"
+                                    Margin="0,-2,-2,0"
+                                    CornerRadius="8"
                                     Background="{StaticResource AccentBrush}"
                                     BorderBrush="#F5F7FB"
                                     BorderThickness="1"
                                     Opacity="0">
                                 <Path Stroke="#07120C"
-                                      StrokeThickness="1.7"
+                                      StrokeThickness="1.65"
                                       StrokeStartLineCap="Round"
                                       StrokeEndLineCap="Round"
-                                      Data="M4,8 L7,11 L12,5" />
+                                      Data="M3.7,7.3 L6.6,10.1 L11.7,4.9" />
                             </Border>
                         </Grid>
                     </Border>
@@ -498,7 +499,7 @@
                                     Value="{StaticResource AccentCyanBrush}" />
                             <Setter TargetName="CardBorder"
                                     Property="Background"
-                                    Value="#8A17243B" />
+                                    Value="#7817243B" />
                         </Trigger>
                         <Trigger Property="IsKeyboardFocused" Value="True">
                             <Setter TargetName="CardBorder"
@@ -514,7 +515,10 @@
                                     Value="{StaticResource AccentBrush}" />
                             <Setter TargetName="CardBorder"
                                     Property="Background"
-                                    Value="#9B183A38" />
+                                    Value="#8C183A38" />
+                            <Setter TargetName="CardBorder"
+                                    Property="BorderThickness"
+                                    Value="1.4" />
                             <Setter TargetName="CheckMark"
                                     Property="Opacity"
                                     Value="1" />
