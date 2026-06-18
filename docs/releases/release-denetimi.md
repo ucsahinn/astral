@@ -16,21 +16,23 @@ Bu doküman, GitHub Releases yüzeyindeki sürüm kararlarını ve yayın kapıs
 
 ## Güncel Sürüm Kararı
 
-Güncel patch hedef `v2.2.22` olarak belirlendi.
+Güncel patch hedef `v2.2.23` olarak belirlendi.
 
-Neden `v2.2.22`?
+Neden `v2.2.23`?
 
 - v2.2.21 tanı paketleri WireSock sürecinin ve Astral.WebProxy/PAC kapsamının başladığını, ancak transparent modda sanal adapter `Down` kaldığı için pasif readiness kapısının bağlantıyı yanlış başarısız saydığını gösterdi.
 - WireSock transparent mode sanal adapter `Up` kanıtına bağlı değildir; web hedefleri için doğru aktif kanıt, yalnız `Astral.WebProxy.exe` üzerinden seçili hedef hostlarına yapılan scoped `CONNECT` denemesidir.
-- v2.2.22, PAC uygulandıktan sonra seçili hedeflere scoped WebProxy kanıtı alır ve bu kanıtı transparent readiness kararına dahil eder.
+- v2.2.23, PAC uygulandıktan sonra seçili her web hedefi için scoped WebProxy kanıtı alır ve bu kanıtı transparent readiness kararına dahil eder.
 - Tarayıcı executable'ları yine WireSock `AllowedApps` içine girmez; proof trafiği yalnız `Astral.WebProxy.exe` sürecinden çıkar.
 - v2.2.21 yayınlandığı için bu bağlantı doğrulama düzeltmesi ayrı `v2.2.22` hotfix sürümü olarak çıkarılır; böylece 2.2.21 kullanıcıları otomatik güncelleme görür.
+- v2.2.22 yayınlandıktan sonra tek başarılı hostun yeterli olması daraltıldı; `v2.2.23` tüm seçili web hedefleri için hedef bazlı kanıt ister.
 
 ## Public Release Yüzeyi
 
 | Release | Canlı durum | Asset durumu | Karar | Gerekçe |
 | --- | --- | --- | --- | --- |
-| `v2.2.22` | Yayın adayı | Bekliyor | Yayınla | Transparent mode için scoped WebProxy aktif hedef kanıtı, tanı alanları ve v2.2.21 bağlantı başarısızlığı hotfix'i. |
+| `v2.2.23` | Yayında | 4 asset | Koru | Transparent mode için seçili her web hedefinde scoped WebProxy aktif hedef kanıtı, tanı alanları ve kısmi başarıyı bağlı saymama hotfix'i. |
+| `v2.2.22` | Yayında | 4 asset | Koru | Transparent mode için scoped WebProxy aktif hedef kanıtı, tanı alanları ve v2.2.21 bağlantı başarısızlığı hotfix'i; v2.2.23 hedef bazlı kanıtla tamamlanır. |
 | `v2.2.21` | Yayında | 4 asset | Koru | Onarım timeout ayrımı, WireSock motor yenileme yolu, son süreç çıkışı tanısı ve hedef kartı rozet/layout hotfix'i; v2.2.22 tarafından scoped proof readiness ile tamamlanır. |
 | `v2.2.20` | Yayında | 4 asset | Koru | WireSock profil adı uyumluluğu, stabil probe hostları, logo ağırlıklı hedef kartları ve işletim merkezi layout hotfix'i; v2.2.21 tarafından onarım timeout'u giderilir. |
 | `v2.2.19` | Yayında | 4 asset | Koru | Sabit ana pencere boyutu, sade kapsam durumu, restart timeout toleransı, açılışta bağımsız güncelleme denetimi ve WebProxy DNS fallback hotfixleri; v2.2.20 tarafından WireSock profil regresyonu giderildi. |
@@ -57,13 +59,13 @@ Neden `v2.2.22`?
 
 ## Yayın Kapısı
 
-`v2.2.22` yayınından önce tamamlanması gereken koşullar:
+`v2.2.23` yayınından önce tamamlanması gereken koşullar:
 
-- Proje, updater ve web proxy sürümü `2.2.22` ile aynı.
+- Proje, updater ve web proxy sürümü `2.2.23` ile aynı.
 - `src/Astral.App/app.manifest` kimlik sürümü proje sürümüyle aynı.
-- `Astral-2.2.22-win-x64.zip` ve sabit `Astral-win-x64.zip` aynı içeriği gösterir.
+- `Astral-2.2.23-win-x64.zip` ve sabit `Astral-win-x64.zip` aynı içeriği gösterir.
 - ZIP içinde `Astral.exe`, `Astral.Updater.exe`, `Astral.WebProxy.exe`, update manifest'i ve gerekli runtime dosyaları bulunur.
-- ZIP içindeki update manifest sürümü `2.2.22`.
+- ZIP içindeki update manifest sürümü `2.2.23`.
 - Astral release içinde eski isimli uyumluluk ZIP'i yayınlanmaz.
 - Kod imzalama sertifikası yapılandırılmadıysa paket imzasız olduğu açıkça not edilir.
 - `dotnet build`, Core tests, Windows tests, `scripts/verify.ps1`, `scripts/build-release.ps1`, `git diff --check` ve Gitleaks geçer.

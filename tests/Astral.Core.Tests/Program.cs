@@ -35,6 +35,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Web proxy varsayılan port doluyken yedek porta geçer", ScopedWebProxyUsesFallbackPortWhenPreferredPortIsBusyAsync),
     ("Web proxy PAC sapmasında kapsamı yeniden uygular", ScopedWebProxyEnsureReappliesMissingPacScopeAsync),
     ("Web proxy erken kapanırsa PAC uygulanmaz", ScopedWebProxyRejectsExitedProcessBeforeApplyingPacAsync),
+    ("Web proxy kanıtı seçili her web hedefinden başarı ister", ScopedWebProxyProofRequiresEverySelectedWebTargetAsync),
     ("Discord kapsamı parametresiz çağrıda sadece uygulamayı içerir", DiscordScopeDefaultsToAppOnlyAsync),
     ("Eski web kapsamı çağrısı tarayıcıları profile eklemez", DiscordScopeDoesNotIncludeBrowsersWhenLegacyFlagIsEnabledAsync),
     ("Web kapsamı PATH üzerindeki sahte tarayıcıları kapsama almaz", DiscordScopeIgnoresPathSpoofedBrowsersAsync),
@@ -702,6 +703,67 @@ static async Task ScopedWebProxyRejectsExitedProcessBeforeApplyingPacAsync()
     finally
     {
         await service.ClearAsync(CancellationToken.None);
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task ScopedWebProxyProofRequiresEverySelectedWebTargetAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var paths = new AppPaths(root);
+    var expectedPacUri = new Uri(paths.WebProxyPacFile).AbsoluteUri;
+    var healthyPacStatus = JsonSerializer.Serialize(new
+    {
+        CurrentAutoConfigURL = expectedPacUri,
+        ExpectedAutoConfigURL = expectedPacUri,
+        PacFileExists = true,
+        StateFileExists = true,
+        StateOwner = "Astral",
+        StateAppliedAutoConfigURL = expectedPacUri
+    });
+    var runner = new SequencedCommandRunner(
+        new CommandResult(0, string.Empty, string.Empty),
+        new CommandResult(0, healthyPacStatus, string.Empty));
+    var launcher = new ConnectProofProcessLauncher(host =>
+        host.EndsWith("wattpad.com", StringComparison.OrdinalIgnoreCase));
+    var webProxyExecutable = Path.Combine(root, "Astral.WebProxy.exe");
+    var service = new WindowsScopedWebProxyService(
+        paths,
+        runner,
+        launcher,
+        webProxyExecutable,
+        powerShellPath: "powershell.exe",
+        preferredProxyPort: ReserveTcpPort());
+    File.WriteAllText(webProxyExecutable, "proxy");
+
+    var registry = TargetRegistry.CreateDefault();
+    var resolver = new TargetScopeResolver(
+        registry,
+        new DiscordAppScope(root, root, root),
+        webProxyExecutable);
+    var plan = resolver.Resolve(new TargetSelection(
+        [TargetIds.Wattpad, TargetIds.Blogspot]));
+
+    try
+    {
+        await service.ApplyAsync(plan, progress: null, CancellationToken.None);
+
+        var proof = await service.VerifyTargetAccessAsync(
+            plan,
+            CancellationToken.None);
+
+        Assert(proof.Required);
+        Assert(!proof.IsVerified);
+        Assert(proof.RequiredTargetCount == 2);
+        Assert(proof.VerifiedTargetCount == 1);
+        var failedTargets = proof.FailedTargets ?? string.Empty;
+        Assert(failedTargets.Contains("Blogspot", StringComparison.Ordinal));
+        Assert(!failedTargets.Contains("Wattpad", StringComparison.Ordinal));
+    }
+    finally
+    {
+        await service.ClearAsync(CancellationToken.None);
+        await launcher.DisposeAsync();
         Directory.Delete(root, recursive: true);
     }
 }
@@ -5976,10 +6038,13 @@ file sealed class FakeScopedWebProxyService : IScopedWebProxyService
     private static ScopedWebProxyProof CreateDefaultProof(RoutingPlan routingPlan)
     {
         return routingPlan.RequiresWebProxy
-            ? ScopedWebProxyProof.Verified(
-                "fake.local",
+            ? ScopedWebProxyProof.VerifiedAll(
+                routingPlan.SelectedTargets
+                    .Where(target => target.HasWebScope)
+                    .Select(target => target.Id + "=fake.local")
+                    .ToArray(),
                 18088,
-                "Fake scoped web proxy proof succeeded.")
+                routingPlan.SelectedTargets.Count(target => target.HasWebScope))
             : ScopedWebProxyProof.NotRequired();
     }
 }
@@ -6617,6 +6682,155 @@ file sealed class SequencedCommandRunner(params CommandResult[] results) : IComm
         }
 
         return Task.FromResult(results[_index++]);
+    }
+}
+
+file sealed class ConnectProofProcessLauncher(Func<string, bool> shouldSucceed)
+    : IProcessLauncher, IAsyncDisposable
+{
+    private ConnectProofManagedProcess? _process;
+
+    public IManagedProcess Start(
+        string executable,
+        IReadOnlyList<string> arguments,
+        string workingDirectory,
+        string logPath)
+    {
+        var portIndex = arguments
+            .Select((value, index) => (value, index))
+            .Single(item => item.value == "--port")
+            .index + 1;
+        var port = int.Parse(arguments[portIndex], CultureInfo.InvariantCulture);
+        _process = new ConnectProofManagedProcess(port, shouldSucceed);
+        return _process;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_process is not null)
+        {
+            await _process.DisposeAsync();
+        }
+    }
+}
+
+file sealed class ConnectProofManagedProcess : IManagedProcess
+{
+    private static int _nextProcessId = 7000;
+    private readonly Func<string, bool> _shouldSucceed;
+    private readonly CancellationTokenSource _stop = new();
+    private readonly TcpListener _listener;
+    private readonly Task _acceptLoop;
+    private bool _hasExited;
+
+    public ConnectProofManagedProcess(
+        int port,
+        Func<string, bool> shouldSucceed)
+    {
+        _shouldSucceed = shouldSucceed;
+        ProcessId = Interlocked.Increment(ref _nextProcessId);
+        StartTime = DateTimeOffset.Now;
+        _listener = new TcpListener(IPAddress.Loopback, port);
+        _listener.Start();
+        _acceptLoop = Task.Run(AcceptLoopAsync);
+    }
+
+    public event EventHandler? Exited;
+
+    public bool HasExited => _hasExited;
+
+    public bool ExitConfirmed => _hasExited;
+
+    public int? ExitCode => _hasExited ? 0 : null;
+
+    public int ProcessId { get; }
+
+    public DateTimeOffset? StartTime { get; }
+
+    public async Task StopAsync(
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        if (_hasExited)
+        {
+            return;
+        }
+
+        _hasExited = true;
+        _stop.Cancel();
+        _listener.Stop();
+        try
+        {
+            await _acceptLoop.WaitAsync(timeout, cancellationToken);
+        }
+        catch (Exception exception)
+            when (exception is OperationCanceledException
+                or ObjectDisposedException
+                or SocketException
+                or TimeoutException)
+        {
+        }
+
+        Exited?.Invoke(this, EventArgs.Empty);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await StopAsync(TimeSpan.FromSeconds(2), CancellationToken.None);
+        _stop.Dispose();
+    }
+
+    private async Task AcceptLoopAsync()
+    {
+        while (!_stop.IsCancellationRequested)
+        {
+            TcpClient client;
+            try
+            {
+                client = await _listener.AcceptTcpClientAsync(_stop.Token);
+            }
+            catch (Exception exception)
+                when (exception is OperationCanceledException
+                    or ObjectDisposedException
+                    or SocketException)
+            {
+                break;
+            }
+
+            _ = Task.Run(() => HandleClientAsync(client), _stop.Token);
+        }
+    }
+
+    private async Task HandleClientAsync(TcpClient client)
+    {
+        using var _ = client;
+        var stream = client.GetStream();
+        var buffer = new byte[1024];
+        var read = await stream.ReadAsync(buffer, _stop.Token);
+        var request = Encoding.ASCII.GetString(buffer, 0, read);
+        var host = ParseConnectHost(request);
+        var response = _shouldSucceed(host)
+            ? "HTTP/1.1 200 Connection Established\r\n\r\n"
+            : "HTTP/1.1 502 Bad Gateway\r\n\r\n";
+        await stream.WriteAsync(
+            Encoding.ASCII.GetBytes(response),
+            _stop.Token);
+    }
+
+    private static string ParseConnectHost(string request)
+    {
+        var firstLine = request.Split(
+            ["\r\n", "\n"],
+            StringSplitOptions.None).FirstOrDefault() ?? string.Empty;
+        var parts = firstLine.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 2)
+        {
+            return string.Empty;
+        }
+
+        var authority = parts[1];
+        var colon = authority.LastIndexOf(':');
+        return colon > 0 ? authority[..colon] : authority;
     }
 }
 

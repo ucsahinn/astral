@@ -83,7 +83,10 @@ public sealed record ScopedWebProxyProof(
     string Message,
     string? Host = null,
     int? ProxyPort = null,
-    int? StatusCode = null)
+    int? StatusCode = null,
+    int? RequiredTargetCount = null,
+    int? VerifiedTargetCount = null,
+    string? FailedTargets = null)
 {
     public static ScopedWebProxyProof NotRequired(
         string message = "Web proxy target proof is not required.") =>
@@ -93,14 +96,48 @@ public sealed record ScopedWebProxyProof(
         string host,
         int proxyPort,
         string message = "Scoped web proxy target proof succeeded.") =>
-        new(true, true, message, host, proxyPort, 200);
+        new(
+            true,
+            true,
+            message,
+            host,
+            proxyPort,
+            200,
+            RequiredTargetCount: 1,
+            VerifiedTargetCount: 1);
+
+    public static ScopedWebProxyProof VerifiedAll(
+        IReadOnlyList<string> hosts,
+        int proxyPort,
+        int requiredTargetCount) =>
+        new(
+            true,
+            true,
+            "Scoped web proxy target proof succeeded for all selected web targets.",
+            string.Join(", ", hosts),
+            proxyPort,
+            200,
+            requiredTargetCount,
+            hosts.Count);
 
     public static ScopedWebProxyProof Failed(
         string? host,
         int? proxyPort,
         string message,
-        int? statusCode = null) =>
-        new(true, false, message, host, proxyPort, statusCode);
+        int? statusCode = null,
+        int? requiredTargetCount = null,
+        int? verifiedTargetCount = null,
+        string? failedTargets = null) =>
+        new(
+            true,
+            false,
+            message,
+            host,
+            proxyPort,
+            statusCode,
+            requiredTargetCount,
+            verifiedTargetCount,
+            failedTargets);
 
     public IReadOnlyDictionary<string, string?> ToDiagnosticDetails(
         string prefix = "webProxyProof")
@@ -112,7 +149,12 @@ public sealed record ScopedWebProxyProof(
             [$"{prefix}.message"] = Message,
             [$"{prefix}.host"] = Host,
             [$"{prefix}.proxyPort"] = ProxyPort?.ToString(CultureInfo.InvariantCulture),
-            [$"{prefix}.statusCode"] = StatusCode?.ToString(CultureInfo.InvariantCulture)
+            [$"{prefix}.statusCode"] = StatusCode?.ToString(CultureInfo.InvariantCulture),
+            [$"{prefix}.requiredTargetCount"] =
+                RequiredTargetCount?.ToString(CultureInfo.InvariantCulture),
+            [$"{prefix}.verifiedTargetCount"] =
+                VerifiedTargetCount?.ToString(CultureInfo.InvariantCulture),
+            [$"{prefix}.failedTargets"] = FailedTargets
         };
     }
 }
@@ -167,10 +209,13 @@ public sealed class NullScopedWebProxyService : IScopedWebProxyService
     {
         cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult(routingPlan.RequiresWebProxy
-            ? ScopedWebProxyProof.Verified(
-                "noop.local",
+            ? ScopedWebProxyProof.VerifiedAll(
+                routingPlan.SelectedTargets
+                    .Where(target => target.HasWebScope)
+                    .Select(target => target.Id)
+                    .ToArray(),
                 0,
-                "No-op web proxy target proof accepted.")
+                routingPlan.SelectedTargets.Count(target => target.HasWebScope))
             : ScopedWebProxyProof.NotRequired());
     }
 
@@ -184,7 +229,7 @@ public sealed class NullScopedWebProxyService : IScopedWebProxyService
 public sealed class WindowsScopedWebProxyService : IScopedWebProxyService, IAsyncDisposable
 {
     private const int DefaultProxyPort = 18088;
-    private const int MaxProbeHosts = 4;
+    private const int MaxProbeHostsPerTarget = 2;
     private static readonly TimeSpan ScriptTimeout = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan TargetProofTimeout = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan ProcessStartupValidationDelay =
@@ -437,32 +482,71 @@ public sealed class WindowsScopedWebProxyService : IScopedWebProxyService, IAsyn
                 "Scoped web proxy port could not be determined.");
         }
 
-        var failures = new List<string>();
-        foreach (var host in EnumerateProbeHosts(routingPlan).Take(MaxProbeHosts))
+        var probeTargets = EnumerateProbeTargets(routingPlan).ToArray();
+        if (probeTargets.Length == 0)
         {
-            var proof = await TryVerifySingleHostAsync(
-                host,
+            return ScopedWebProxyProof.Failed(
+                host: null,
                 proxyPort,
-                cancellationToken);
-            if (proof.IsVerified)
-            {
-                _diagnostics.Info(
-                    "webProxy.proof",
-                    "Scoped web proxy target proof succeeded.",
-                    proof.ToDiagnosticDetails());
-                return proof;
-            }
-
-            failures.Add(CreateProbeFailureSummary(proof));
+                "No safe probe host is available for selected web targets.",
+                requiredTargetCount: 0,
+                verifiedTargetCount: 0);
         }
 
-        var message = failures.Count == 0
-            ? "No safe probe host is available for selected web targets."
-            : "Selected target proxy proof failed: " + string.Join("; ", failures);
+        var verifiedHosts = new List<string>();
+        var targetFailures = new List<string>();
+        foreach (var target in probeTargets)
+        {
+            var probeFailures = new List<string>();
+            var targetVerified = false;
+            foreach (var host in target.Hosts.Take(MaxProbeHostsPerTarget))
+            {
+                var proof = await TryVerifySingleHostAsync(
+                    host,
+                    proxyPort,
+                    cancellationToken);
+                if (proof.IsVerified)
+                {
+                    verifiedHosts.Add(target.Label + "=" + host);
+                    targetVerified = true;
+                    break;
+                }
+
+                probeFailures.Add(CreateProbeFailureSummary(proof));
+            }
+
+            if (!targetVerified)
+            {
+                targetFailures.Add(
+                    target.Label + "=" +
+                    (probeFailures.Count == 0
+                        ? "no-safe-probe-host"
+                        : string.Join(",", probeFailures)));
+            }
+        }
+
+        if (targetFailures.Count == 0)
+        {
+            var verified = ScopedWebProxyProof.VerifiedAll(
+                verifiedHosts,
+                proxyPort,
+                probeTargets.Length);
+            _diagnostics.Info(
+                "webProxy.proof",
+                "Scoped web proxy target proof succeeded for all selected web targets.",
+                verified.ToDiagnosticDetails());
+            return verified;
+        }
+
+        var message = "Selected target proxy proof failed: " +
+            string.Join("; ", targetFailures);
         var failed = ScopedWebProxyProof.Failed(
             host: null,
             proxyPort,
-            message);
+            message,
+            requiredTargetCount: probeTargets.Length,
+            verifiedTargetCount: verifiedHosts.Count,
+            failedTargets: string.Join("; ", targetFailures));
         _diagnostics.Warning(
             "webProxy.proof",
             "Scoped web proxy target proof failed.",
@@ -502,39 +586,53 @@ public sealed class WindowsScopedWebProxyService : IScopedWebProxyService, IAsyn
         await ClearAsync(CancellationToken.None);
     }
 
-    private static IEnumerable<string> EnumerateProbeHosts(RoutingPlan routingPlan)
+    private static IEnumerable<ProbeTarget> EnumerateProbeTargets(
+        RoutingPlan routingPlan)
     {
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
         foreach (var target in routingPlan.SelectedTargets)
         {
-            if (!target.Metadata.TryGetValue("probeHosts", out var rawHosts))
+            if (!target.HasWebScope)
             {
                 continue;
             }
 
+            var hosts = EnumerateTargetProbeHosts(target)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            yield return new ProbeTarget(
+                target.Id,
+                target.Label,
+                hosts);
+        }
+    }
+
+    private static IEnumerable<string> EnumerateTargetProbeHosts(
+        TargetDefinition target)
+    {
+        if (target.Metadata.TryGetValue("probeHosts", out var rawHosts))
+        {
             foreach (var rawHost in rawHosts.Split(
-                         ';',
-                         StringSplitOptions.RemoveEmptyEntries
-                            | StringSplitOptions.TrimEntries))
+                     ';',
+                     StringSplitOptions.RemoveEmptyEntries
+                        | StringSplitOptions.TrimEntries))
             {
                 var host = TryNormalizeProbeHost(rawHost);
-                if (host is not null && seen.Add(host))
+                if (host is not null)
                 {
                     yield return host;
                 }
             }
         }
 
-        foreach (var rule in routingPlan.ProxyRules)
+        foreach (var domain in target.Domains)
         {
-            if (rule.IsWildcard)
+            if (domain.IsWildcard)
             {
                 continue;
             }
 
-            var host = TryNormalizeProbeHost(rule.Value);
-            if (host is not null && seen.Add(host))
+            var host = TryNormalizeProbeHost(domain.Value);
+            if (host is not null)
             {
                 yield return host;
             }
@@ -686,6 +784,11 @@ public sealed class WindowsScopedWebProxyService : IScopedWebProxyService, IAsyn
             : proof.Host;
         return host + "=" + proof.Message;
     }
+
+    private sealed record ProbeTarget(
+        string Id,
+        string Label,
+        IReadOnlyList<string> Hosts);
 
     private async Task StopProxyProcessAsync(CancellationToken cancellationToken)
     {

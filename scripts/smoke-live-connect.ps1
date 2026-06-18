@@ -257,6 +257,12 @@ function Copy-HealthResult {
         [string]$Health.details.'webProxyProof.host'
     $result.HealthWebProxyProofMessage =
         [string]$Health.details.'webProxyProof.message'
+    $result.HealthWebProxyProofRequiredTargetCount =
+        [string]$Health.details.'webProxyProof.requiredTargetCount'
+    $result.HealthWebProxyProofVerifiedTargetCount =
+        [string]$Health.details.'webProxyProof.verifiedTargetCount'
+    $result.HealthWebProxyProofFailedTargets =
+        [string]$Health.details.'webProxyProof.failedTargets'
     $adapterReady =
         $result.HealthTunnelReadiness -eq 'ready' -and
         $result.HealthWireSockAdapterDetected -eq 'True' -and
@@ -548,6 +554,9 @@ $result = [ordered]@{
     HealthWebProxyProofVerified = ''
     HealthWebProxyProofHost = ''
     HealthWebProxyProofMessage = ''
+    HealthWebProxyProofRequiredTargetCount = ''
+    HealthWebProxyProofVerifiedTargetCount = ''
+    HealthWebProxyProofFailedTargets = ''
     HealthTunnelReady = $false
     HostsLockRemovedWhileConnected = $false
     FirewallRuleDisabledWhileConnected = $false
