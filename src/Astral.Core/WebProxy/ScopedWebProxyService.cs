@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
 using System.Text.Json;
 
 namespace Astral.Core.WebProxy;
@@ -23,6 +24,10 @@ public interface IScopedWebProxyService
         CancellationToken cancellationToken);
 
     Task<ScopedWebProxyStatus> GetStatusAsync(
+        RoutingPlan routingPlan,
+        CancellationToken cancellationToken);
+
+    Task<ScopedWebProxyProof> VerifyTargetAccessAsync(
         RoutingPlan routingPlan,
         CancellationToken cancellationToken);
 
@@ -72,6 +77,46 @@ public sealed record ScopedWebProxyStatus(
     }
 }
 
+public sealed record ScopedWebProxyProof(
+    bool Required,
+    bool IsVerified,
+    string Message,
+    string? Host = null,
+    int? ProxyPort = null,
+    int? StatusCode = null)
+{
+    public static ScopedWebProxyProof NotRequired(
+        string message = "Web proxy target proof is not required.") =>
+        new(false, true, message);
+
+    public static ScopedWebProxyProof Verified(
+        string host,
+        int proxyPort,
+        string message = "Scoped web proxy target proof succeeded.") =>
+        new(true, true, message, host, proxyPort, 200);
+
+    public static ScopedWebProxyProof Failed(
+        string? host,
+        int? proxyPort,
+        string message,
+        int? statusCode = null) =>
+        new(true, false, message, host, proxyPort, statusCode);
+
+    public IReadOnlyDictionary<string, string?> ToDiagnosticDetails(
+        string prefix = "webProxyProof")
+    {
+        return new Dictionary<string, string?>
+        {
+            [$"{prefix}.required"] = Required.ToString(),
+            [$"{prefix}.verified"] = IsVerified.ToString(),
+            [$"{prefix}.message"] = Message,
+            [$"{prefix}.host"] = Host,
+            [$"{prefix}.proxyPort"] = ProxyPort?.ToString(CultureInfo.InvariantCulture),
+            [$"{prefix}.statusCode"] = StatusCode?.ToString(CultureInfo.InvariantCulture)
+        };
+    }
+}
+
 public sealed class NullScopedWebProxyService : IScopedWebProxyService
 {
     public static NullScopedWebProxyService Instance { get; } = new();
@@ -116,6 +161,19 @@ public sealed class NullScopedWebProxyService : IScopedWebProxyService
             : ScopedWebProxyStatus.NotRequired());
     }
 
+    public Task<ScopedWebProxyProof> VerifyTargetAccessAsync(
+        RoutingPlan routingPlan,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(routingPlan.RequiresWebProxy
+            ? ScopedWebProxyProof.Verified(
+                "noop.local",
+                0,
+                "No-op web proxy target proof accepted.")
+            : ScopedWebProxyProof.NotRequired());
+    }
+
     public Task ClearAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -126,7 +184,9 @@ public sealed class NullScopedWebProxyService : IScopedWebProxyService
 public sealed class WindowsScopedWebProxyService : IScopedWebProxyService, IAsyncDisposable
 {
     private const int DefaultProxyPort = 18088;
+    private const int MaxProbeHosts = 4;
     private static readonly TimeSpan ScriptTimeout = TimeSpan.FromSeconds(20);
+    private static readonly TimeSpan TargetProofTimeout = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan ProcessStartupValidationDelay =
         TimeSpan.FromMilliseconds(450);
     private static readonly JsonSerializerOptions StatusJsonOptions = new()
@@ -348,6 +408,68 @@ public sealed class WindowsScopedWebProxyService : IScopedWebProxyService, IAsyn
             ProxyPort: proxyPort);
     }
 
+    public async Task<ScopedWebProxyProof> VerifyTargetAccessAsync(
+        RoutingPlan routingPlan,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(routingPlan);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (!routingPlan.RequiresWebProxy)
+        {
+            return ScopedWebProxyProof.NotRequired();
+        }
+
+        var status = await GetStatusAsync(routingPlan, cancellationToken);
+        if (!status.IsApplied)
+        {
+            return ScopedWebProxyProof.Failed(
+                host: null,
+                proxyPort: status.ProxyPort,
+                "Scoped web proxy is not applied: " + status.Message);
+        }
+
+        if (status.ProxyPort is not int proxyPort)
+        {
+            return ScopedWebProxyProof.Failed(
+                host: null,
+                proxyPort: null,
+                "Scoped web proxy port could not be determined.");
+        }
+
+        var failures = new List<string>();
+        foreach (var host in EnumerateProbeHosts(routingPlan).Take(MaxProbeHosts))
+        {
+            var proof = await TryVerifySingleHostAsync(
+                host,
+                proxyPort,
+                cancellationToken);
+            if (proof.IsVerified)
+            {
+                _diagnostics.Info(
+                    "webProxy.proof",
+                    "Scoped web proxy target proof succeeded.",
+                    proof.ToDiagnosticDetails());
+                return proof;
+            }
+
+            failures.Add(CreateProbeFailureSummary(proof));
+        }
+
+        var message = failures.Count == 0
+            ? "No safe probe host is available for selected web targets."
+            : "Selected target proxy proof failed: " + string.Join("; ", failures);
+        var failed = ScopedWebProxyProof.Failed(
+            host: null,
+            proxyPort,
+            message);
+        _diagnostics.Warning(
+            "webProxy.proof",
+            "Scoped web proxy target proof failed.",
+            failed.ToDiagnosticDetails());
+        return failed;
+    }
+
     public async Task ClearAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -378,6 +500,191 @@ public sealed class WindowsScopedWebProxyService : IScopedWebProxyService, IAsyn
     public async ValueTask DisposeAsync()
     {
         await ClearAsync(CancellationToken.None);
+    }
+
+    private static IEnumerable<string> EnumerateProbeHosts(RoutingPlan routingPlan)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var target in routingPlan.SelectedTargets)
+        {
+            if (!target.Metadata.TryGetValue("probeHosts", out var rawHosts))
+            {
+                continue;
+            }
+
+            foreach (var rawHost in rawHosts.Split(
+                         ';',
+                         StringSplitOptions.RemoveEmptyEntries
+                            | StringSplitOptions.TrimEntries))
+            {
+                var host = TryNormalizeProbeHost(rawHost);
+                if (host is not null && seen.Add(host))
+                {
+                    yield return host;
+                }
+            }
+        }
+
+        foreach (var rule in routingPlan.ProxyRules)
+        {
+            if (rule.IsWildcard)
+            {
+                continue;
+            }
+
+            var host = TryNormalizeProbeHost(rule.Value);
+            if (host is not null && seen.Add(host))
+            {
+                yield return host;
+            }
+        }
+    }
+
+    private static string? TryNormalizeProbeHost(string value)
+    {
+        try
+        {
+            if (value.Contains('*', StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            return DomainPattern.NormalizeHost(value);
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    private static async Task<ScopedWebProxyProof> TryVerifySingleHostAsync(
+        string host,
+        int proxyPort,
+        CancellationToken cancellationToken)
+    {
+        using var timeout = new CancellationTokenSource(TargetProofTimeout);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            timeout.Token);
+        try
+        {
+            using var client = new TcpClient();
+            client.NoDelay = true;
+            await client.ConnectAsync(
+                IPAddress.Loopback,
+                proxyPort,
+                linked.Token);
+            await using var stream = client.GetStream();
+            var request = Encoding.ASCII.GetBytes(
+                "CONNECT " + host + ":443 HTTP/1.1\r\n" +
+                "Host: " + host + ":443\r\n" +
+                "User-Agent: Astral-Probe\r\n" +
+                "Proxy-Connection: close\r\n\r\n");
+            await stream.WriteAsync(request, linked.Token);
+            var responseHeader = await ReadProxyResponseHeaderAsync(
+                stream,
+                linked.Token);
+            var statusCode = TryParseHttpStatusCode(responseHeader);
+            return statusCode == 200
+                ? ScopedWebProxyProof.Verified(host, proxyPort)
+                : ScopedWebProxyProof.Failed(
+                    host,
+                    proxyPort,
+                    "Proxy CONNECT returned HTTP " +
+                    (statusCode?.ToString(CultureInfo.InvariantCulture) ?? "unknown") +
+                    ".",
+                    statusCode);
+        }
+        catch (OperationCanceledException)
+            when (!cancellationToken.IsCancellationRequested)
+        {
+            return ScopedWebProxyProof.Failed(
+                host,
+                proxyPort,
+                "Proxy CONNECT timed out.");
+        }
+        catch (Exception exception)
+            when (exception is IOException
+                or SocketException
+                or InvalidOperationException)
+        {
+            return ScopedWebProxyProof.Failed(
+                host,
+                proxyPort,
+                AstralDiagnostics.RedactForLog(
+                    exception.Message ?? exception.GetType().Name)
+                    ?? "Proxy CONNECT failed.");
+        }
+    }
+
+    private static async Task<string> ReadProxyResponseHeaderAsync(
+        Stream stream,
+        CancellationToken cancellationToken)
+    {
+        const int maxHeaderBytes = 8 * 1024;
+        var buffer = new byte[256];
+        using var memory = new MemoryStream();
+        while (memory.Length < maxHeaderBytes)
+        {
+            var read = await stream.ReadAsync(buffer, cancellationToken);
+            if (read == 0)
+            {
+                break;
+            }
+
+            memory.Write(buffer, 0, read);
+            if (EndsWithHeaderTerminator(memory))
+            {
+                break;
+            }
+        }
+
+        return Encoding.ASCII.GetString(memory.ToArray());
+    }
+
+    private static bool EndsWithHeaderTerminator(MemoryStream memory)
+    {
+        if (memory.Length < 4)
+        {
+            return false;
+        }
+
+        var buffer = memory.GetBuffer();
+        var offset = (int)memory.Length - 4;
+        return buffer[offset] == '\r'
+            && buffer[offset + 1] == '\n'
+            && buffer[offset + 2] == '\r'
+            && buffer[offset + 3] == '\n';
+    }
+
+    private static int? TryParseHttpStatusCode(string responseHeader)
+    {
+        var firstLine = responseHeader.Split(
+            ["\r\n", "\n"],
+            StringSplitOptions.None).FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(firstLine))
+        {
+            return null;
+        }
+
+        var parts = firstLine.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 2
+            && int.TryParse(
+                parts[1],
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out var statusCode)
+            ? statusCode
+            : null;
+    }
+
+    private static string CreateProbeFailureSummary(ScopedWebProxyProof proof)
+    {
+        var host = string.IsNullOrWhiteSpace(proof.Host)
+            ? "unknown-host"
+            : proof.Host;
+        return host + "=" + proof.Message;
     }
 
     private async Task StopProxyProcessAsync(CancellationToken cancellationToken)

@@ -87,6 +87,8 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         new Dictionary<string, string?>();
     private ScopedWebProxyStatus _lastWebProxyStatus =
         ScopedWebProxyStatus.NotRequired("Web proxy kapsamı henüz denetlenmedi.");
+    private ScopedWebProxyProof _lastWebProxyProof =
+        ScopedWebProxyProof.NotRequired("Web proxy target proof has not run.");
 
     public DiscordTunnelController(
         AppPaths paths,
@@ -267,6 +269,11 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             details[webProxyDetail.Key] = webProxyDetail.Value;
         }
 
+        foreach (var webProxyProofDetail in _lastWebProxyProof.ToDiagnosticDetails())
+        {
+            details[webProxyProofDetail.Key] = webProxyProofDetail.Value;
+        }
+
         foreach (var readinessDetail in CreateTunnelReadinessDetails())
         {
             details[readinessDetail.Key] = readinessDetail.Value;
@@ -388,6 +395,8 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             _lastWireSockHandshakeDiagnostic =
                 "WireSock handshake has not been checked.";
             _lastWireSockMode = WireSockTransparentMode;
+            _lastWebProxyProof =
+                ScopedWebProxyProof.NotRequired("Web proxy target proof has not run.");
             var routingPlan = _targetScopeResolver.Resolve(_targetSelection);
             _lastRoutingPlan = routingPlan;
             _lastWebProxyStatus = routingPlan.RequiresWebProxy
@@ -462,12 +471,6 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 cancellationToken);
             LogConnectPhase("web-proxy-ready");
 
-            SetStatus(TunnelState.Verifying, "Hedef kapsamı doğrulanıyor");
-            await VerifyTunnelReadinessAsync(
-                _lastTunnelLogStartPosition,
-                cancellationToken);
-            LogConnectPhase("tunnel-ready");
-
             _lastWebProxyStatus = await _webProxyService.EnsureAppliedAsync(
                 routingPlan,
                 progress,
@@ -479,6 +482,23 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     "Seçili web hedefleri için scoped proxy kapsamı doğrulanamadı: " +
                     _lastWebProxyStatus.Message);
             }
+
+            _lastWebProxyProof = await _webProxyService.VerifyTargetAccessAsync(
+                routingPlan,
+                cancellationToken);
+            LogConnectPhase("web-proxy-proof");
+            if (_lastWebProxyProof.Required && !_lastWebProxyProof.IsVerified)
+            {
+                throw new InvalidOperationException(
+                    "Seçili web hedeflerine scoped proxy üzerinden çıkış doğrulanamadı: " +
+                    _lastWebProxyProof.Message);
+            }
+
+            SetStatus(TunnelState.Verifying, "Hedef kapsamı doğrulanıyor");
+            await VerifyTunnelReadinessAsync(
+                _lastTunnelLogStartPosition,
+                cancellationToken);
+            LogConnectPhase("tunnel-ready");
 
             var finalState = TunnelState.Connected;
             var nextAction = "Seçili hedefleri şimdi açabilirsiniz.";
@@ -507,6 +527,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                         .ToString(CultureInfo.InvariantCulture),
                     ["wireSockRunning"] = "True"
                 }.Concat(_lastWebProxyStatus.ToDiagnosticDetails())
+                    .Concat(_lastWebProxyProof.ToDiagnosticDetails())
                     .Concat(CreateTunnelReadinessDetails())
                     .ToDictionary(pair => pair.Key, pair => pair.Value));
             _diagnostics.WriteHealth(
@@ -528,6 +549,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     ["tunnelLog"] = _paths.TunnelLog,
                     ["wireSockRunning"] = "True"
                 }.Concat(_lastWebProxyStatus.ToDiagnosticDetails())
+                    .Concat(_lastWebProxyProof.ToDiagnosticDetails())
                     .Concat(CreateTunnelReadinessDetails())
                     .ToDictionary(pair => pair.Key, pair => pair.Value));
         }
@@ -557,6 +579,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     ["message"] = userFacingMessage,
                     ["diagnostic"] = exception.Message
                 }.Concat(_lastWebProxyStatus.ToDiagnosticDetails())
+                    .Concat(_lastWebProxyProof.ToDiagnosticDetails())
                     .Concat(CreateTunnelReadinessDetails())
                     .ToDictionary(pair => pair.Key, pair => pair.Value));
             SetStatus(
@@ -789,6 +812,18 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         if (attempt < MinTransparentReadinessChecks)
         {
             return false;
+        }
+
+        if (_lastWebProxyProof.Required && _lastWebProxyProof.IsVerified)
+        {
+            _lastTunnelReadiness = TunnelReadinessSnapshot.TransparentProcessRunning(
+                _lastTunnelReadiness,
+                "WireSock transparent mode is running; scoped web proxy target proof was observed.");
+
+            _lastWireSockHandshakeDiagnostic =
+                "WireSock log marker was not observed; scoped web proxy target proof confirmed readiness.";
+
+            return true;
         }
 
         if (IsWireSockHandshakeReady())

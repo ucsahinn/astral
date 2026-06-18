@@ -82,7 +82,7 @@
                                 VerticalAlignment="Center">
                         <TextBlock FontSize="22"
                                    FontWeight="SemiBold"
-                                   Text="Astral v2.2.21" />
+                                   Text="Astral v2.2.22" />
                         <TextBlock Margin="0,5,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
@@ -109,7 +109,7 @@
                                            FontSize="14"
                                            LineHeight="21"
                                            TextWrapping="Wrap"
-                                           Text="Bu sürüm v2.2.20 tanı paketlerinde görülen onarım süresi ve WireSock adaptör doğrulama sorunlarını hedefler. Astral, adaptör hazır kanıtı gelmediğinde motor durumunu daha doğru raporlar, onarım akışına yeterli süre tanır ve hedef kartlarında yalnız gerçek hedef hatalarını sorunlu gösterir." />
+                                           Text="Bu sürüm v2.2.21 tanı paketlerinde görülen transparent mod bağlantı doğrulama sorununu hedefler. Astral artık web hedeflerinde yalnız PAC durumuna bakmakla kalmaz; seçili hedefe Astral.WebProxy üzerinden aktif CONNECT kanıtı alır ve bu kanıtı transparent WireSock readiness kararında kullanır." />
                             </StackPanel>
                         </Border>
 
@@ -164,7 +164,7 @@
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Sürüm metadata'sı, updater, web proxy ve uygulama içi release bağlantısı v2.2.21 ile hizalandı." />
+                                           Text="&#x2022; Sürüm metadata'sı, updater, web proxy ve uygulama içi release bağlantısı v2.2.22 ile hizalandı." />
                             </StackPanel>
                         </Border>
 
@@ -210,7 +210,7 @@
                     <TextBlock VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource MutedTextBrush}"
-                                   Text="Bu not, v2.2.21 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
+                                   Text="Bu not, v2.2.22 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
                     <Button Grid.Column="1"
                             Margin="0,0,10,0"
                             Height="40"

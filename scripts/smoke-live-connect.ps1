@@ -133,7 +133,7 @@ function Set-AstralTargetSelection {
     $settings | Add-Member `
         -Force `
         -NotePropertyName TargetSelectionPreferenceVersion `
-        -NotePropertyValue 1
+        -NotePropertyValue 2
     $settings | Add-Member `
         -Force `
         -NotePropertyName TargetSelection `
@@ -251,6 +251,12 @@ function Copy-HealthResult {
         [string]$Health.details.wireSockTrafficDeltaObserved
     $result.HealthWireSockTrafficDiagnostic =
         [string]$Health.details.wireSockTrafficDiagnostic
+    $result.HealthWebProxyProofVerified =
+        [string]$Health.details.'webProxyProof.verified'
+    $result.HealthWebProxyProofHost =
+        [string]$Health.details.'webProxyProof.host'
+    $result.HealthWebProxyProofMessage =
+        [string]$Health.details.'webProxyProof.message'
     $adapterReady =
         $result.HealthTunnelReadiness -eq 'ready' -and
         $result.HealthWireSockAdapterDetected -eq 'True' -and
@@ -264,7 +270,8 @@ function Copy-HealthResult {
         $result.HealthWireSockMode -eq 'transparent' -and
         (
             $result.HealthWireSockConnectionEstablished -eq 'True' -or
-            $result.HealthWireSockTrafficDeltaObserved -eq 'True'
+            $result.HealthWireSockTrafficDeltaObserved -eq 'True' -or
+            $result.HealthWebProxyProofVerified -eq 'True'
         ) -and
         $result.HealthWireSockProcessExited -ne 'True'
     $result.HealthTunnelReady = $adapterReady -or $transparentReady
@@ -305,9 +312,37 @@ function Find-AstralWindow {
     $condition = [System.Windows.Automation.PropertyCondition]::new(
         [System.Windows.Automation.AutomationElement]::ProcessIdProperty,
         $ProcessId)
-    return [System.Windows.Automation.AutomationElement]::RootElement.FindFirst(
+    $windows = [System.Windows.Automation.AutomationElement]::RootElement.FindAll(
         [System.Windows.Automation.TreeScope]::Children,
         $condition)
+    if ($null -eq $windows -or $windows.Count -eq 0) {
+        return $null
+    }
+
+    $bestWindow = $null
+    $bestArea = 0.0
+    foreach ($candidate in $windows) {
+        try {
+            $rect = $candidate.Current.BoundingRectangle
+            if ($rect.Width -le 0 -or $rect.Height -le 0) {
+                continue
+            }
+
+            $area = [double]$rect.Width * [double]$rect.Height
+            if ($area -gt $bestArea) {
+                $bestWindow = $candidate
+                $bestArea = $area
+            }
+        }
+        catch {
+        }
+    }
+
+    if ($null -ne $bestWindow) {
+        return $bestWindow
+    }
+
+    return $windows[0]
 }
 
 function Find-AstralToggle {
@@ -338,6 +373,24 @@ function Find-AstralToggle {
     return $null
 }
 
+function Find-AstralToggleForProcess {
+    param([int]$ProcessId)
+
+    $processCondition = [System.Windows.Automation.PropertyCondition]::new(
+        [System.Windows.Automation.AutomationElement]::ProcessIdProperty,
+        $ProcessId)
+    $automationIdCondition = [System.Windows.Automation.PropertyCondition]::new(
+        [System.Windows.Automation.AutomationElement]::AutomationIdProperty,
+        'TunnelToggleButton')
+    $condition = [System.Windows.Automation.AndCondition]::new(
+        $processCondition,
+        $automationIdCondition)
+
+    return [System.Windows.Automation.AutomationElement]::RootElement.FindFirst(
+        [System.Windows.Automation.TreeScope]::Descendants,
+        $condition)
+}
+
 function Invoke-PrimaryWindowClick {
     param([System.Windows.Automation.AutomationElement]$Window)
 
@@ -360,6 +413,17 @@ function Invoke-PrimaryWindowClick {
 
 function Invoke-AutomationElementClick {
     param([System.Windows.Automation.AutomationElement]$Element)
+
+    try {
+        $togglePattern = $Element.GetCurrentPattern(
+            [System.Windows.Automation.TogglePattern]::Pattern)
+        if ($null -ne $togglePattern) {
+            $togglePattern.Toggle()
+            return
+        }
+    }
+    catch {
+    }
 
     try {
         $pattern = $Element.GetCurrentPattern(
@@ -398,6 +462,15 @@ function Invoke-AstralToggle {
         $null -ne $script:toggleButton
     } 20)
     $button = $script:toggleButton
+
+    if ($null -eq $button) {
+        $processId = [int]$Window.Current.ProcessId
+        [void](Wait-Until {
+            $script:toggleButton = Find-AstralToggleForProcess -ProcessId $processId
+            $null -ne $script:toggleButton
+        } 20)
+        $button = $script:toggleButton
+    }
 
     if ($null -eq $button) {
         Invoke-PrimaryWindowClick -Window $Window
@@ -472,6 +545,9 @@ $result = [ordered]@{
     HealthWireSockHandshakeDiagnostic = ''
     HealthWireSockTrafficDeltaObserved = ''
     HealthWireSockTrafficDiagnostic = ''
+    HealthWebProxyProofVerified = ''
+    HealthWebProxyProofHost = ''
+    HealthWebProxyProofMessage = ''
     HealthTunnelReady = $false
     HostsLockRemovedWhileConnected = $false
     FirewallRuleDisabledWhileConnected = $false
@@ -492,6 +568,9 @@ $result = [ordered]@{
     FinalHostsLock = $false
     FinalFirewallRuleEnabled = $false
     SettingsRestored = $false
+    WindowTitle = ''
+    WindowBounds = ''
+    WindowCount = ''
     ErrorMessage = ''
     ErrorStackTrace = ''
     SmokePassed = $false
@@ -515,6 +594,25 @@ try {
             $null -ne $script:window
         } 30
         Assert-Condition $result.WindowFound 'Astral penceresi bulunamadi.'
+        try {
+            $rect = $window.Current.BoundingRectangle
+            $result.WindowTitle = [string]$window.Current.Name
+            $result.WindowBounds = (
+                '{0},{1},{2},{3}' -f
+                [int]$rect.Left,
+                [int]$rect.Top,
+                [int]$rect.Width,
+                [int]$rect.Height)
+            $processCondition = [System.Windows.Automation.PropertyCondition]::new(
+                [System.Windows.Automation.AutomationElement]::ProcessIdProperty,
+                $appProcess.Id)
+            $result.WindowCount =
+                [string]([System.Windows.Automation.AutomationElement]::RootElement.FindAll(
+                    [System.Windows.Automation.TreeScope]::Children,
+                    $processCondition).Count)
+        }
+        catch {
+        }
 
         Invoke-AstralToggle -Window $window
         $result.ConnectClicked = $true

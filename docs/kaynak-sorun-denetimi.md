@@ -26,6 +26,29 @@ Astral, eski geniş kapsamlı bağlantı yaklaşımlarını büyütmek yerine he
 
 Bu presetler erişim durumunu kalıcı gerçek gibi ifade etmez. Yalnız hedef kapsamını tanımlar.
 
+## Hedef Aday Kuralları
+
+Yeni hedef ekleme kararı erişim durumunu kalıcı gerçek gibi kodlamaz. Bir hedef ancak şu kurallar sağlanırsa aktif preset olur:
+
+- Hedef kullanıcı açısından anlamlı ve sık kullanılan bir uygulama veya web ürünü olmalı.
+- Web hedeflerinde genel tarayıcı exe'leri `AllowedApps` içine eklenmemeli; yalnız `Astral.WebProxy.exe` kapsamlanmalı.
+- Her web hedefi için route domainleri ile kısa `probeHosts` listesi ayrı tutulmalı.
+- `probeHosts` wildcard, public suffix veya geniş domain olmamalı; gerçek host olmalı.
+- Giriş/bootstrap için gereken birinci taraf hostlar eklenmeli, fakat tüm Google, tüm Meta veya tüm CDN gibi geniş kapsamlar eklenmemeli.
+- Gerçek marka ikonu lisans açısından güvenli değilse release'e generic resmi logo gibi davranan asset eklenmemeli; kontrollü fallback veya ayrı asset görevi yazılmalı.
+- Erişim durumu zamanla değiştiği için UI veya dokümanda "kesin çalışır", "engelli", "ban riski yok" gibi kalıcı iddia kullanılmamalı.
+
+2026-06-18 araştırma notuna göre ek aday havuzu:
+
+| Aday | Kapsam | Kural notu | Durum |
+| --- | --- | --- | --- |
+| Radio Garden | Web | `radio.garden` ve servis bootstrap hostları ayrı doğrulanmalı; canlı yayın stream hostları çok genişse eklenmemeli. | Watchlist |
+| Threads | Web/App | `threads.net` tek başına yeterli olmayabilir; Türkiye'deki servis kapatma/account-region davranışı VPN ile çözülemeyebilir. | Watchlist |
+| Ekşi Sözlük | Web | `eksisozluk.com` gibi dar hostlarla sınırlanmalı; güncel erişim durumu tekrar doğrulanmadan aktif preset yapılmamalı. | Watchlist |
+| Tidal | Web/App | RTÜK/lisans kaynaklı erişim değişken olabilir; player/CDN hostları genişlemeden önce tek tek ölçülmeli. | Watchlist |
+
+Roblox şu anda aktif preset listesine geri alınmaz. Kullanıcı veya güncel ölçüm tekrar gerçek erişim ihtiyacı gösterirse ayrı hedef olarak yeniden değerlendirilir.
+
 ## Test Kapsamı
 
 - `TargetRegistry` presetleri.
@@ -34,6 +57,7 @@ Bu presetler erişim durumunu kalıcı gerçek gibi ifade etmez. Yalnız hedef k
 - Browser executable denylist.
 - Eski custom alanların yok sayılması.
 - `WebProxy` allowlist.
+- Scoped WebProxy hedef çıkış kanıtı.
 - PAC PROXY/DIRECT üretimi.
 - Controller connect/disconnect proxy apply/clear yaşam döngüsü.
 - Access-lock PowerShell hata aşaması görünürlüğü.
