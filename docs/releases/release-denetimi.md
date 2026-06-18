@@ -30,7 +30,7 @@ Neden `v2.2.17`?
 
 | Release | Canlı durum | Asset durumu | Karar | Gerekçe |
 | --- | --- | --- | --- | --- |
-| `v2.2.17` | Yayın adayı | 4 asset yerelde hazır | Yayınla | WireSock trafik kanıtı, 8 hedef kapsamı, otomatik hedef testi ve aksiyon barı netliği hotfixleri. |
+| `v2.2.17` | Yayında | 4 asset | Koru | WireSock trafik kanıtı, 8 hedef kapsamı, otomatik hedef testi ve aksiyon barı netliği hotfixleri. |
 | `v2.2.16` | Yayında | 4 asset | Koru | Kanıtlı hedef kartı durumu, otomatik hedef testi ve aksiyon barı netliği hotfixleri. |
 | `v2.2.15` | Yayında | 4 asset | Koru | WireSock tunnel-started kapısı, ortak log kilidi, hedef hızlı testi ve tanılama hotfixleri. |
 | `v2.2.14` | Yayında | 4 asset | Koru | Scoped PAC doğrulama, kullanıcı alanı PAC dosyası, hedef hızlı testi ve tanılama hotfixleri. |
