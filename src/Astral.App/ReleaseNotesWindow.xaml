@@ -82,11 +82,11 @@
                                 VerticalAlignment="Center">
                         <TextBlock FontSize="22"
                                    FontWeight="SemiBold"
-                                   Text="Astral v2.2.17" />
+                                   Text="Astral v2.2.18" />
                         <TextBlock Margin="0,5,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
-                                   Text="WireSock doğrulama, 8 hedef kapsamı ve aksiyon barı hotfix'i" />
+                                   Text="Çoklu host rota testi ve hedef kapsam hotfix'i" />
                     </StackPanel>
                 </Grid>
 
@@ -109,7 +109,7 @@
                                            FontSize="14"
                                            LineHeight="21"
                                            TextWrapping="Wrap"
-                                           Text="Bu sürüm WireSock transparent mode doğrulamasını tek bir log satırına bağlı kalmadan adapter trafik kanıtıyla güçlendirir. Hedef kapsamı 8 aktif preset'e iner, bağlantı hazır olduktan sonra hedefler otomatik ölçülür ve manuel test düğmesi gösterilmez." />
+                                           Text="Bu sürüm seçili hedeflerin rota testini tek ana hostla sınırlamaz; hedefin tanımlı hostlarını sırayla ölçer, kapsam dışı proxy isteklerini tanılamaya güvenli biçimde yazar ve alt bardaki ayrı Geçmiş aksiyonunu kaldırır." />
                             </StackPanel>
                         </Border>
 
@@ -128,43 +128,31 @@
                                            FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; WireSock hazır logu eksik olsa bile process canlı, adapter Up ve başlangıçtan sonra trafik artışı varsa transparent mode bağlantı kanıtı kabul edilir." />
+                                           Text="&#x2022; Wattpad, Bigo Live, Azar, Tango, LiVU, IMVU ve Blogspot presetleri giriş/bootstrap akışlarında kullanılan ek birinci taraf hostlarla genişletildi." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Roblox hedef preset'i aktif listeden çıkarıldı; ana hedef paneli 4+4 düzeninde 8 hedef gösterir." />
+                                           Text="&#x2022; Otomatik kontrol artık her hedefte tek host yerine tüm somut hedef hostlarını Astral.WebProxy üzerinden CONNECT 443 ile ölçer." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Hedef kartları artık global Connected durumunu tek başına başarı kanıtı saymaz; test sonucu yoksa Test bekliyor durumunda kalır." />
+                                           Text="&#x2022; Sonuç dili Hedef testi yerine Rota testi olarak netleştirildi; bu kontrol login garantisi değil, proxy/tünel yolunun çalıştığını gösterir." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Bağlantı hazır olduğunda seçili hedefler otomatik sıraya alınır; ayrı manuel test düğmesi gösterilmez." />
+                                           Text="&#x2022; Astral.WebProxy allowlist dışı gelen proxy isteklerinde yalnız güvenli host adını loglar; URL path, cookie, token veya içerik yazılmaz." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Kapsam kartı artık bağlantı sırasında hedef test sonucu yoksa bekliyor yazar; sonuç gelince OK ve sorunlu sayıları ayrı görünür." />
+                                           Text="&#x2022; Alt aksiyon barındaki ayrı Geçmiş butonu kaldırıldı; Tanı Paketi tanılama paketini oluşturup klasörü açmaya devam eder." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Seçili kart rengi sakin cyan'a alındı; yeşil başarı vurgusu yalnızca kapsam/test kanıtı geldikten sonra kullanılır." />
+                                           Text="&#x2022; Sürüm metadata'sı, updater, web proxy ve uygulama içi release bağlantısı v2.2.18 ile hizalandı." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Tanılama ve sürüm notu aksiyonları görünür etiketlerle ayrıldı: Tanı Paketi tanılama paketini üretir, Sürüm Notları bu pencereyi açar." />
-                                <TextBlock FontSize="13"
-                                           LineHeight="22"
-                                           TextWrapping="Wrap"
-                                           Text="&#x2022; Alt aksiyon barı ve hedef paneli korunarak daha okunur hale getirildi; arka plan/video görünürlüğü kontrollü artırıldı." />
-                                <TextBlock FontSize="13"
-                                           LineHeight="22"
-                                           TextWrapping="Wrap"
-                                           Text="&#x2022; Kapanış ve restart akışında otomatik hedef testi kuyruğu pencere kapanırken güvenli biçimde düşer." />
-                                <TextBlock FontSize="13"
-                                           LineHeight="22"
-                                           TextWrapping="Wrap"
-                                           Text="&#x2022; Per-target durum regresyonu Windows UI testine eklendi; bağlı kart test kanıtı olmadan Kapsamda görünmez." />
+                                           Text="&#x2022; Windows UI testi Geçmiş butonunun kaldırıldığını ve Blogspot rota testinin `blogger.com` hostunu da kapsadığını doğrular." />
                             </StackPanel>
                         </Border>
 
@@ -183,12 +171,12 @@
                                            FontSize="13"
                                            LineHeight="21"
                                            TextWrapping="Wrap"
-                                           Text="Astral bağlantı sırasında hedef kapsamını dar tutar: uygulama hedefleri AllowedApps içinde kalır, web hedeflerinde ise yalnız Astral.WebProxy tünele alınır. PAC dosyası sadece seçili domainlerde PROXY, diğer tüm domainlerde DIRECT döndürür." />
+                                           Text="Astral bağlantı sırasında hedef kapsamını dar tutar: uygulama hedefleri AllowedApps içinde kalır, web hedeflerinde ise yalnız Astral.WebProxy tünele alınır. PAC dosyası sadece seçili hedef hostlarında PROXY, diğer tüm domainlerde DIRECT döndürür." />
                                 <TextBlock Margin="0,8,0,0"
                                            FontSize="13"
                                            LineHeight="21"
                                            TextWrapping="Wrap"
-                                           Text="Windows kod imzası bu pakette sertifika olmadığı için uygulanmadı. Web hedefleri HTTPS içeriğini çözmez; CONNECT host allowlist'iyle çalışır." />
+                                           Text="Windows kod imzası bu pakette sertifika olmadığı için uygulanmadı. Web hedefleri HTTPS içeriğini çözmez; CONNECT host allowlist'iyle çalışır. Gerçek kullanıcı hesabıyla login sonucu servis tarafı, captcha, üçüncü taraf auth ve yerel tarayıcı PAC uyumuna bağlı kalabilir." />
                             </StackPanel>
                         </Border>
 
@@ -210,7 +198,7 @@
                     <TextBlock VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource MutedTextBrush}"
-                               Text="Bu not, v2.2.17 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
+                               Text="Bu not, v2.2.18 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
                     <Button Grid.Column="1"
                             Margin="0,0,10,0"
                             Height="40"

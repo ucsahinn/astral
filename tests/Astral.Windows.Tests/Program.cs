@@ -172,7 +172,7 @@ static void RenderMainWindow()
         Assert(text.Contains("Kapalı. Normal rapor hafif kalır.", StringComparison.Ordinal));
         Assert(!text.Contains("Rapor hazırla", StringComparison.Ordinal));
         Assert(!text.Contains("Bağlanınca test", StringComparison.Ordinal));
-        Assert(text.Contains("Otomatik hedef testi:", StringComparison.Ordinal));
+        Assert(text.Contains("Otomatik rota testi:", StringComparison.Ordinal));
         Assert(text.Contains("Hazır", StringComparison.Ordinal));
         Assert(text.Contains("Astral Bağlı Değil", StringComparison.Ordinal));
         Assert(text.Contains(
@@ -186,7 +186,7 @@ static void RenderMainWindow()
         Assert(buttonNames.Contains("Astral onar"));
         Assert(buttonNames.Contains("Profil temizle"));
         Assert(buttonNames.Contains("Tanı paketi oluştur"));
-        Assert(buttonNames.Contains("Tanılama geçmişini aç"));
+        Assert(!buttonNames.Contains("Tanılama geçmişini aç"));
         Assert(!buttonNames.Contains("Tanılama raporu hazırla"));
         Assert(!buttonNames.Contains("Seçili hedefleri hızlı test et"));
         Assert(buttonNames.Contains("Sürüm notlarını aç"));
@@ -211,10 +211,8 @@ static void RenderMainWindow()
         Assert(releaseNotesButton.ToolTip?.ToString() == "Sürüm notlarını aç");
         Assert(!releaseNotesButton.ToolTip!.ToString()!.Contains("klasör", StringComparison.OrdinalIgnoreCase));
         Assert(ToolTipService.GetShowsToolTipOnKeyboardFocus(releaseNotesButton) == true);
-        var diagnosticsHistoryButton = FindVisualChildren<Button>(window)
-            .Single(button => button.Name == "DiagnosticsHistoryButton");
-        Assert(diagnosticsHistoryButton.ToolTip?.ToString() == "Tanılama geçmişi klasörünü aç");
-        Assert(ToolTipService.GetShowsToolTipOnKeyboardFocus(diagnosticsHistoryButton) == true);
+        Assert(!FindVisualChildren<Button>(window)
+            .Any(button => button.Name == "DiagnosticsHistoryButton"));
         var diagnosticsBundleButton = FindVisualChildren<Button>(window)
             .Single(button => button.Name == "DiagnosticsBundleButton");
         Assert(diagnosticsBundleButton.ToolTip?.ToString() == "Tanı paketi oluştur ve klasörü aç");
@@ -294,7 +292,10 @@ static void RenderMainWindow()
             out _));
         var registry = TargetRegistry.CreateDefault();
         Assert(registry.TryGet("blogspot", out var blogspotTarget));
-        Assert(MainWindow.GetTargetTestHostForTesting(blogspotTarget) == "blogspot.com");
+        var blogspotHosts = MainWindow.GetTargetTestHostsForTesting(blogspotTarget);
+        Assert(blogspotHosts.Contains("blogspot.com", StringComparer.OrdinalIgnoreCase));
+        Assert(blogspotHosts.Contains("blogger.com", StringComparer.OrdinalIgnoreCase));
+        Assert(!blogspotHosts.Contains("*.blogspot.com", StringComparer.OrdinalIgnoreCase));
 
         var visibleTargetCardTexts = targetToggles
             .SelectMany(toggle => FindVisualChildren<TextBlock>(toggle))

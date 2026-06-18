@@ -49,7 +49,7 @@ public partial class MainWindow : Window, IDisposable
     private static readonly Uri RepositoryUri = new(
         "https://github.com/ucsahinn/astral");
     private static readonly Uri ReleaseNotesUri = new(
-        "https://github.com/ucsahinn/astral/releases/tag/v2.2.17");
+        "https://github.com/ucsahinn/astral/releases/tag/v2.2.18");
     private static readonly Uri BackgroundVideoUri = new(
         "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260606_154941_df1a96e1-a06f-450c-bd02-d863414cc1a0.mp4");
     private static readonly string LocalBackgroundVideoPath = Path.Combine(
@@ -91,7 +91,7 @@ public partial class MainWindow : Window, IDisposable
     private bool _isUpdateProgressPinned;
     private string? _lastLoggedUpdateProgressKey;
     private int _lastLoggedUpdateProgressPercent = -1;
-    private string _lastTargetTestSummary = "Hedef testi çalıştırılmadı.";
+    private string _lastTargetTestSummary = "Rota testi çalıştırılmadı.";
     private readonly Dictionary<string, TargetProbeResult> _targetProbeResults =
         new(StringComparer.OrdinalIgnoreCase);
     private AppUpdateCheckResult? _pendingUpdate;
@@ -247,11 +247,11 @@ public partial class MainWindow : Window, IDisposable
         {
             _automaticTargetTestQueued = false;
             _targetProbeResults.Clear();
-            _lastTargetTestSummary = "Otomatik hedef testi çalıştırılmadı.";
+            _lastTargetTestSummary = "Otomatik rota testi çalıştırılmadı.";
             if (!_isTargetTestRunning)
             {
                 TargetTestSummary.Text =
-                    "Otomatik hedef testi: bağlantı açılınca seçili hedefler tek tek ölçülür.";
+                    "Otomatik rota testi: bağlantı açılınca seçili hedef hostları ölçülür.";
             }
         }
 
@@ -357,7 +357,7 @@ public partial class MainWindow : Window, IDisposable
         }
         ScopeSummary.ToolTip = routingPlan.Summary;
         ScopeDetail.Text = snapshot.IsConnected && _targetProbeResults.Count == 0
-            ? "Hedef testi çalışınca sonuçlar burada görünür"
+            ? "Rota testi çalışınca sonuçlar burada görünür"
             : routingPlan.RequiresWebProxy
                 ? "Uygulama + web hedefleri kapsamda"
                 : "Yalnızca uygulama hedefleri kapsamda";
@@ -829,8 +829,8 @@ public partial class MainWindow : Window, IDisposable
         _settingsStore.SetTargetSelection(selection);
         _targetProbeResults.Clear();
         _automaticTargetTestQueued = false;
-        _lastTargetTestSummary = "Otomatik hedef testi çalıştırılmadı.";
-        TargetTestSummary.Text = "Otomatik hedef testi: bağlantı açılınca seçili hedefler tek tek ölçülür.";
+        _lastTargetTestSummary = "Otomatik rota testi çalıştırılmadı.";
+        TargetTestSummary.Text = "Otomatik rota testi: bağlantı açılınca seçili hedef hostları ölçülür.";
         _diagnostics.Info(
             "ui.targetSelection",
             "Hedef seçimi güncellendi.",
@@ -1140,10 +1140,10 @@ public partial class MainWindow : Window, IDisposable
 
         _automaticTargetTestQueued = true;
         TargetTestSummary.Text =
-            "Hedef testi: bağlantı hazır, seçili hedefler sırayla ölçülecek.";
+            "Rota testi: bağlantı hazır, seçili hedef hostları sırayla ölçülecek.";
         _diagnostics.Info(
             "ui.targetTest.queued",
-            "Bağlantı sonrası otomatik hedef testi kuyruğa alındı.",
+            "Bağlantı sonrası otomatik rota testi kuyruğa alındı.",
             new Dictionary<string, string?>
             {
                 ["selectedTargets"] = _controller.CurrentRoutingPlan.Summary
@@ -1189,7 +1189,7 @@ public partial class MainWindow : Window, IDisposable
         if (_isTargetTestRunning)
         {
             TargetTestSummary.Text =
-                "Otomatik hedef testi başladı; seçili hedefler sırayla ölçülüyor.";
+                "Otomatik rota testi başladı; seçili hedef hostları sırayla ölçülüyor.";
             return;
         }
 
@@ -1199,20 +1199,20 @@ public partial class MainWindow : Window, IDisposable
                 || target.HasApplicationScope);
         if (!hasSelectedTarget)
         {
-            TargetTestSummary.Text = "Otomatik hedef testi: seçili hedef yok.";
+            TargetTestSummary.Text = "Otomatik rota testi: seçili hedef yok.";
             return;
         }
 
         if (!snapshot.IsConnected)
         {
             TargetTestSummary.Text =
-                "Otomatik hedef testi: bağlantı açılınca seçili hedefler tek tek ölçülür.";
+                "Otomatik rota testi: bağlantı açılınca seçili hedef hostları ölçülür.";
             return;
         }
 
         if (!string.IsNullOrWhiteSpace(_lastTargetTestSummary))
         {
-            TargetTestSummary.Text = "Hedef testi: " + _lastTargetTestSummary;
+            TargetTestSummary.Text = "Rota testi: " + _lastTargetTestSummary;
         }
     }
 
@@ -1226,7 +1226,7 @@ public partial class MainWindow : Window, IDisposable
         var snapshot = _controller.Snapshot;
         if (!snapshot.IsConnected || snapshot.IsBusy)
         {
-            TargetTestSummary.Text = "Otomatik hedef testi için önce Astral bağlantısını açın.";
+            TargetTestSummary.Text = "Otomatik rota testi için önce Astral bağlantısını açın.";
             ApplyTargetTestSummaryState(snapshot);
             return;
         }
@@ -1238,14 +1238,14 @@ public partial class MainWindow : Window, IDisposable
             .ToArray();
         if (selectedTargets.Length == 0)
         {
-            TargetTestSummary.Text = "Test edilecek seçili hedef yok.";
+            TargetTestSummary.Text = "Rota testi yapılacak seçili hedef yok.";
             return;
         }
 
         _isTargetTestRunning = true;
         TargetTestSummary.Text =
-            "Otomatik hedef testi başladı; seçili hedefler sırayla ölçülüyor.";
-        _lastTargetTestSummary = "Otomatik hedef testi çalışıyor.";
+            "Otomatik rota testi başladı; seçili hedef hostları sırayla ölçülüyor.";
+        _lastTargetTestSummary = "Otomatik rota testi çalışıyor.";
         _diagnostics.Info(
             "ui.targetTest.autoStart",
             "Seçili hedefler için otomatik test başlatıldı.",
@@ -1254,7 +1254,7 @@ public partial class MainWindow : Window, IDisposable
                 ["selectedTargets"] = string.Join(", ", selectedTargets.Select(target => target.Label))
             });
 
-        using var timeoutSource = new CancellationTokenSource(TimeSpan.FromSeconds(40));
+        using var timeoutSource = new CancellationTokenSource(TimeSpan.FromSeconds(75));
         using var linkedSource = CancellationTokenSource.CreateLinkedTokenSource(
             timeoutSource.Token,
             _windowLifetimeCancellation.Token);
@@ -1269,8 +1269,8 @@ public partial class MainWindow : Window, IDisposable
             {
                 foreach (var target in selectedTargets)
                 {
-                    var host = GetTargetTestHost(target);
-                    if (host is null)
+                    var hosts = GetTargetTestHosts(target);
+                    if (hosts.Length == 0)
                     {
                         var scoped = new TargetProbeResult(
                             TargetProbeStatus.ProfileScope,
@@ -1284,7 +1284,7 @@ public partial class MainWindow : Window, IDisposable
 
                     var failed = new TargetProbeResult(
                         TargetProbeStatus.Failed,
-                        host,
+                        string.Join(", ", hosts),
                         scopeStatus.Message,
                         DateTimeOffset.Now);
                     _targetProbeResults[target.Id] = failed;
@@ -1295,7 +1295,7 @@ public partial class MainWindow : Window, IDisposable
                     "Scoped web kapsamı doğrulanamadı: " + scopeStatus.Message;
                 TargetTestSummary.Text = _lastTargetTestSummary;
                 _diagnostics.WriteHealth(
-                    "hedef testi scoped proxy doğrulamasında durdu",
+                    "rota testi scoped proxy doğrulamasında durdu",
                     CreateTargetTestDiagnosticDetails(results)
                         .Concat(scopeStatus.ToDiagnosticDetails())
                         .ToDictionary(pair => pair.Key, pair => pair.Value));
@@ -1306,8 +1306,8 @@ public partial class MainWindow : Window, IDisposable
             foreach (var target in selectedTargets)
             {
                 linkedSource.Token.ThrowIfCancellationRequested();
-                var host = GetTargetTestHost(target);
-                if (host is null)
+                var hosts = GetTargetTestHosts(target);
+                if (hosts.Length == 0)
                 {
                     var scoped = new TargetProbeResult(
                         TargetProbeStatus.ProfileScope,
@@ -1323,15 +1323,15 @@ public partial class MainWindow : Window, IDisposable
 
                 var running = new TargetProbeResult(
                     TargetProbeStatus.Running,
-                    host,
-                    "Test ediliyor",
+                    string.Join(", ", hosts),
+                    "Rota testi çalışıyor",
                     DateTimeOffset.Now);
                 _targetProbeResults[target.Id] = running;
                 RefreshTargetScopeView(locked: true);
 
-                var result = await ProbeTargetViaScopedProxyAsync(
+                var result = await ProbeTargetHostsViaScopedProxyAsync(
                     target,
-                    host,
+                    hosts,
                     linkedSource.Token);
                 _targetProbeResults[target.Id] = result;
                 results.Add(result);
@@ -1346,23 +1346,23 @@ public partial class MainWindow : Window, IDisposable
             var skippedCount = results.Count(result =>
                 result.Status is TargetProbeStatus.Skipped);
             _lastTargetTestSummary =
-                $"{successCount} başarılı, {failedCount} sorunlu, {skippedCount} atlandı.";
-            TargetTestSummary.Text = "Hedef testi: " + _lastTargetTestSummary;
+                $"{successCount} rota OK, {failedCount} sorunlu, {skippedCount} atlandı.";
+            TargetTestSummary.Text = "Rota testi: " + _lastTargetTestSummary;
             _diagnostics.Info(
                 "ui.targetTest.complete",
-                "Otomatik hedef testi tamamlandı.",
+                "Otomatik rota testi tamamlandı.",
                 CreateTargetTestDiagnosticDetails(results));
             _diagnostics.WriteHealth(
-                "hedef testi tamamlandı",
+                "rota testi tamamlandı",
                 CreateTargetTestDiagnosticDetails(results));
         }
         catch (OperationCanceledException)
         {
-            _lastTargetTestSummary = "Otomatik hedef testi iptal edildi veya zaman aşımına uğradı.";
+            _lastTargetTestSummary = "Otomatik rota testi iptal edildi veya zaman aşımına uğradı.";
             TargetTestSummary.Text = _lastTargetTestSummary;
             _diagnostics.Warning(
                 "ui.targetTest.cancelled",
-                "Otomatik hedef testi iptal edildi veya zaman aşımına uğradı.");
+                "Otomatik rota testi iptal edildi veya zaman aşımına uğradı.");
         }
         finally
         {
@@ -1374,30 +1374,68 @@ public partial class MainWindow : Window, IDisposable
         }
     }
 
-    private async Task<TargetProbeResult> ProbeTargetViaScopedProxyAsync(
+    private async Task<TargetProbeResult> ProbeTargetHostsViaScopedProxyAsync(
         TargetDefinition target,
-        string host,
+        string[] hosts,
         CancellationToken cancellationToken)
     {
         var startedAt = DateTimeOffset.Now;
+        var tested = 0;
         try
         {
             if (!TryReadProxyPortFromPacFile(out var proxyPort))
             {
                 return new TargetProbeResult(
                     TargetProbeStatus.Failed,
-                    host,
+                    string.Join(", ", hosts),
                     "Aktif proxy portu bulunamadı.",
                     startedAt);
             }
 
-            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+            foreach (var host in hosts)
+            {
+                tested++;
+                var hostResult = await ProbeSingleTargetHostViaScopedProxyAsync(
+                    host,
+                    proxyPort,
+                    cancellationToken);
+                if (hostResult is not null)
+                {
+                    return hostResult;
+                }
+            }
+
+            return new TargetProbeResult(
+                TargetProbeStatus.Success,
+                string.Join(", ", hosts),
+                $"CONNECT 443 rota OK: {tested.ToString(CultureInfo.InvariantCulture)}/{hosts.Length.ToString(CultureInfo.InvariantCulture)} host.",
+                startedAt);
+        }
+        catch (OperationCanceledException)
+        {
+            return new TargetProbeResult(
+                TargetProbeStatus.Failed,
+                string.Join(", ", hosts),
+                $"Rota testi zaman aşımına uğradı: {tested.ToString(CultureInfo.InvariantCulture)}/{hosts.Length.ToString(CultureInfo.InvariantCulture)} host denendi.",
+                startedAt);
+        }
+    }
+
+    private static async Task<TargetProbeResult?> ProbeSingleTargetHostViaScopedProxyAsync(
+        string host,
+        int proxyPort,
+        CancellationToken cancellationToken)
+    {
+        var startedAt = DateTimeOffset.Now;
+        try
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(6));
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(
                 cancellationToken,
                 timeout.Token);
             using var client = new TcpClient();
             await client.ConnectAsync(IPAddress.Loopback, proxyPort)
-                .WaitAsync(TimeSpan.FromSeconds(4), linked.Token);
+                .WaitAsync(TimeSpan.FromSeconds(3), linked.Token);
             await using var stream = client.GetStream();
             var request = Encoding.ASCII.GetBytes(
                 $"CONNECT {host}:443 HTTP/1.1\r\nHost: {host}:443\r\nProxy-Connection: close\r\n\r\n");
@@ -1415,11 +1453,7 @@ public partial class MainWindow : Window, IDisposable
                     "HTTP/1.0 200",
                     StringComparison.OrdinalIgnoreCase))
             {
-                return new TargetProbeResult(
-                    TargetProbeStatus.Success,
-                    host,
-                    "CONNECT 443 başarılı.",
-                    startedAt);
+                return null;
             }
 
             var status = response.Split(
@@ -1475,7 +1509,7 @@ public partial class MainWindow : Window, IDisposable
         {
             _diagnostics.Warning(
                 "ui.targetTest",
-                "PAC dosyası otomatik hedef testi için okunamadı.",
+                "PAC dosyası otomatik rota testi için okunamadı.",
                 new Dictionary<string, string?>
                 {
                     ["diagnostic"] = exception.Message
@@ -1519,17 +1553,20 @@ public partial class MainWindow : Window, IDisposable
             && proxyPort is > 0 and <= 65535;
     }
 
-    internal static string? GetTargetTestHostForTesting(TargetDefinition target)
+    internal static string[] GetTargetTestHostsForTesting(TargetDefinition target)
     {
-        return GetTargetTestHost(target);
+        return GetTargetTestHosts(target);
     }
 
-    private static string? GetTargetTestHost(TargetDefinition target)
+    private static string[] GetTargetTestHosts(TargetDefinition target)
     {
         return target.Domains
-            .OrderBy(pattern => pattern.IsWildcard)
+            .Where(pattern => !pattern.IsWildcard)
             .Select(pattern => pattern.Value)
-            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 
     private Dictionary<string, string?> CreateTargetTestDiagnosticDetails(
@@ -2703,31 +2740,6 @@ public partial class MainWindow : Window, IDisposable
         };
 
         window.ShowDialog();
-    }
-
-    private void OpenDiagnosticsHistory_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            _paths.EnsureDirectories();
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = _paths.DiagnosticBundleDirectory,
-                UseShellExecute = true
-            });
-        }
-        catch (Exception exception)
-        {
-            _diagnostics.Failure(
-                "ui.diagnostics.history",
-                "Tanılama geçmişi açılamadı.",
-                exception);
-            MessageBox.Show(
-                "Tanılama geçmişi açılamadı.\n\n" + exception.Message,
-                "Astral tanılama",
-                MessageBoxButton.OK,
-                MessageBoxImage.Error);
-        }
     }
 
     private async void RestartAstral_Click(object sender, RoutedEventArgs e)

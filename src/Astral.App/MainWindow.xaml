@@ -557,7 +557,7 @@
                                            FontSize="11"
                                            Foreground="{StaticResource SecondaryTextBrush}"
                                            TextTrimming="CharacterEllipsis"
-                                           Text="Otomatik hedef testi: bağlantı açılınca seçili hedefler tek tek ölçülür." />
+                                           Text="Otomatik rota testi: bağlantı açılınca seçili hedef hostları ölçülür." />
                             </Border>
                         </StackPanel>
                     </Border>
@@ -914,7 +914,6 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
                     <Button Grid.Column="0"
@@ -952,41 +951,6 @@
                     </Button>
 
                     <Button Grid.Column="1"
-                            x:Name="DiagnosticsHistoryButton"
-                            Margin="10,0,0,0"
-                            Width="132"
-                            Height="40"
-                            VerticalAlignment="Center"
-                            Style="{StaticResource CommandButtonStyle}"
-                            Click="OpenDiagnosticsHistory_Click"
-                            ToolTip="Tanılama geçmişi klasörünü aç"
-                            AutomationProperties.Name="Tanılama geçmişini aç">
-                        <StackPanel Orientation="Horizontal"
-                                    HorizontalAlignment="Center"
-                                    VerticalAlignment="Center">
-                            <Viewbox Width="16"
-                                     Height="16"
-                                     Margin="0,0,8,0"
-                                     Stretch="Uniform">
-                                <Canvas Width="24"
-                                        Height="24"
-                                        ClipToBounds="False">
-                                    <Path Stroke="{StaticResource PrimaryTextBrush}"
-                                          StrokeThickness="1.8"
-                                          StrokeStartLineCap="Round"
-                                          StrokeEndLineCap="Round"
-                                          StrokeLineJoin="Round"
-                                          Fill="Transparent"
-                                          Data="M3.8,6.8 L9,6.8 L10.7,8.8 L20.2,8.8 L20.2,18.8 L3.8,18.8 Z M3.8,9.2 L20.2,9.2 M7,13 L17,13 M7,16 L14,16" />
-                                </Canvas>
-                            </Viewbox>
-                            <TextBlock Text="Geçmiş"
-                                       FontSize="13"
-                                       FontWeight="SemiBold" />
-                        </StackPanel>
-                    </Button>
-
-                    <Button Grid.Column="2"
                             x:Name="RepairButton"
                             Margin="12,0,0,0"
                             Width="104"
@@ -1021,7 +985,7 @@
                         </StackPanel>
                     </Button>
 
-                    <Button Grid.Column="3"
+                    <Button Grid.Column="2"
                             x:Name="CleanProfileButton"
                             Margin="10,0,0,0"
                             Width="150"
@@ -1056,14 +1020,14 @@
                         </StackPanel>
                     </Button>
 
-                    <TextBlock Grid.Column="4"
+                    <TextBlock Grid.Column="3"
                                Margin="18,0"
                                VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource SecondaryTextBrush}"
-                               Text="v2.2.17" />
+                               Text="v2.2.18" />
 
-                    <Button Grid.Column="5"
+                    <Button Grid.Column="4"
                             x:Name="AutoUpdateButton"
                             Margin="0,0,8,0"
                             Width="142"
@@ -1076,7 +1040,7 @@
                             ToolTip="Yeni sürüm varsa burada görünür"
                             AutomationProperties.Name="Yeni sürüm varsa görünen güncelleme düğmesi" />
 
-                    <Button Grid.Column="6"
+                    <Button Grid.Column="5"
                             Margin="0,0,8,0"
                             Width="58"
                             Height="40"
@@ -1102,7 +1066,7 @@
                         </Viewbox>
                     </Button>
 
-                    <Button Grid.Column="7"
+                    <Button Grid.Column="6"
                             x:Name="ReleaseNotesButton"
                             Margin="0,0,8,0"
                             Width="138"
@@ -1137,7 +1101,7 @@
                         </StackPanel>
                     </Button>
 
-                    <Button Grid.Column="8"
+                    <Button Grid.Column="7"
                             Width="58"
                             Height="40"
                             VerticalAlignment="Center"

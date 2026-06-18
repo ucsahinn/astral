@@ -118,6 +118,7 @@ static async Task HandleConnectAsync(
     if (!TryParseHostPort(target, defaultPort: 443, out var host, out var port)
         || !policy.IsAllowedHost(host))
     {
+        WriteDeniedHost("CONNECT", host);
         await WriteProxyResponseAsync(clientStream, 403, cancellationToken);
         return;
     }
@@ -146,6 +147,7 @@ static async Task HandleHttpAsync(
     var targetHost = ResolveHttpHost(requestTarget, hostValue, out var port);
     if (targetHost is null || !policy.IsAllowedHost(targetHost))
     {
+        WriteDeniedHost("HTTP", targetHost);
         await WriteProxyResponseAsync(clientStream, 403, cancellationToken);
         return;
     }
@@ -276,6 +278,26 @@ static Task WriteRawAsync(
 {
     var bytes = Encoding.ASCII.GetBytes(value);
     return stream.WriteAsync(bytes, cancellationToken).AsTask();
+}
+
+static void WriteDeniedHost(string method, string? host)
+{
+    if (string.IsNullOrWhiteSpace(host))
+    {
+        Console.Error.WriteLine($"Astral.WebProxy denied {method}: invalid-host");
+        return;
+    }
+
+    var safeHost = new string(host
+        .Where(ch => char.IsAsciiLetterOrDigit(ch) || ch is '.' or '-' or '_')
+        .Take(253)
+        .ToArray());
+    if (string.IsNullOrWhiteSpace(safeHost))
+    {
+        safeHost = "invalid-host";
+    }
+
+    Console.Error.WriteLine($"Astral.WebProxy denied {method}: {safeHost}");
 }
 
 file sealed record ProxyOptions(

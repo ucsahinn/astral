@@ -197,9 +197,17 @@ static Task TargetRegistryDefinesBuiltInPresetsAsync()
     Assert(registry.TryGet(TargetIds.Wattpad, out var wattpad));
     Assert(wattpad.ScopeKind == TargetScopeKind.Web);
     Assert(wattpad.ExecutableHints.Count == 0);
+    Assert(wattpad.Domains.Any(domain => domain.Value == "api.wattpad.com"));
 
     Assert(registry.TryGet(TargetIds.Blogspot, out var blogspot));
     Assert(blogspot.Domains.Any(domain => domain.Value == "blogspot.com"));
+    Assert(blogspot.Domains.Any(domain => domain.Value == "blogger.com"));
+
+    Assert(registry.TryGet(TargetIds.IMVU, out var imvu));
+    Assert(imvu.Domains.Any(domain => domain.Value == "secure.imvu.com"));
+
+    Assert(registry.TryGet(TargetIds.BigoLive, out var bigoLive));
+    Assert(bigoLive.Domains.Any(domain => domain.Value == "www.bigo.tv"));
 
     Assert(!targets.Any(target =>
         target.Id.Equals("custom-executable", StringComparison.OrdinalIgnoreCase)

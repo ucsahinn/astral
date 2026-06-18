@@ -16,20 +16,22 @@ Bu doküman, GitHub Releases yüzeyindeki sürüm kararlarını ve yayın kapıs
 
 ## Güncel Sürüm Kararı
 
-Güncel patch hedef `v2.2.17` olarak belirlendi.
+Güncel patch hedef `v2.2.18` olarak belirlendi.
 
-Neden `v2.2.17`?
+Neden `v2.2.18`?
 
-- v2.2.16 üstüne WireSock transparent mode doğrulaması tek bir log satırına bağlı kalmayacak şekilde adapter trafik kanıtıyla güçlendirildi.
-- Roblox aktif hedef listesinden çıkarıldı; hedef paneli 8 preset ve 4+4 grid düzeniyle devam eder.
-- Manuel hedef testi butonu kaldırıldı; hedef ölçümü yalnız bağlantı hazır olduktan sonra otomatik çalışır.
-- Tanılama paketi, tanılama geçmişi ve sürüm notu aksiyonları alt barda ayrı butonlarla netleştirildi.
-- v2.2.16 yayınlandığı için bu bağlantı kanıtı ve hedef kapsam hotfix'i ayrı `v2.2.17` sürümü olarak çıkarılır; böylece 2.2.16 kullanıcıları da otomatik güncelleme görür.
+- v2.2.17 sonrası kullanıcı tarafında rota testi OK görünmesine rağmen bazı URL/login akışlarının tamamlanmadığı bildirildi.
+- Otomatik rota testi artık tek temsilci host yerine hedefin tanımlı somut hostlarını sırayla ölçer.
+- Wattpad, Bigo Live, Azar, Tango, LiVU, IMVU ve Blogspot preset kapsamı ek birinci taraf hostlarla genişletildi.
+- Astral.WebProxy allowlist dışı proxy isteklerini token/cookie/path yazmadan host düzeyinde tanılamaya aktarır.
+- Alt bardaki ayrı `Geçmiş` aksiyonu kaldırıldı; `Tanı Paketi` paketi oluşturup klasörü açmaya devam eder.
+- v2.2.17 yayınlandığı için bu rota kapsamı ve UI sadeleştirme hotfix'i ayrı `v2.2.18` sürümü olarak çıkarılır; böylece 2.2.17 kullanıcıları da otomatik güncelleme görür.
 
 ## Public Release Yüzeyi
 
 | Release | Canlı durum | Asset durumu | Karar | Gerekçe |
 | --- | --- | --- | --- | --- |
+| `v2.2.18` | Yayın adayı | Bekliyor | Yayınla | Çoklu host rota testi, ek hedef hostları, WebProxy denied-host tanılaması ve Geçmiş butonu kaldırma hotfixleri. |
 | `v2.2.17` | Yayında | 4 asset | Koru | WireSock trafik kanıtı, 8 hedef kapsamı, otomatik hedef testi ve aksiyon barı netliği hotfixleri. |
 | `v2.2.16` | Yayında | 4 asset | Koru | Kanıtlı hedef kartı durumu, otomatik hedef testi ve aksiyon barı netliği hotfixleri. |
 | `v2.2.15` | Yayında | 4 asset | Koru | WireSock tunnel-started kapısı, ortak log kilidi, hedef hızlı testi ve tanılama hotfixleri. |
@@ -52,13 +54,13 @@ Neden `v2.2.17`?
 
 ## Yayın Kapısı
 
-`v2.2.17` yayınından önce tamamlanması gereken koşullar:
+`v2.2.18` yayınından önce tamamlanması gereken koşullar:
 
-- Proje, updater ve web proxy sürümü `2.2.17` ile aynı.
+- Proje, updater ve web proxy sürümü `2.2.18` ile aynı.
 - `src/Astral.App/app.manifest` kimlik sürümü proje sürümüyle aynı.
-- `Astral-2.2.17-win-x64.zip` ve sabit `Astral-win-x64.zip` aynı içeriği gösterir.
+- `Astral-2.2.18-win-x64.zip` ve sabit `Astral-win-x64.zip` aynı içeriği gösterir.
 - ZIP içinde `Astral.exe`, `Astral.Updater.exe`, `Astral.WebProxy.exe`, update manifest'i ve gerekli runtime dosyaları bulunur.
-- ZIP içindeki update manifest sürümü `2.2.17`.
+- ZIP içindeki update manifest sürümü `2.2.18`.
 - Astral release içinde eski isimli uyumluluk ZIP'i yayınlanmaz.
 - Kod imzalama sertifikası yapılandırılmadıysa paket imzasız olduğu açıkça not edilir.
 - `dotnet build`, Core tests, Windows tests, `scripts/verify.ps1`, `scripts/build-release.ps1`, `git diff --check` ve Gitleaks geçer.

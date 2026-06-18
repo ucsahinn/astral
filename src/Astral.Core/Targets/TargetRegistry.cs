@@ -48,7 +48,13 @@ public sealed class TargetRegistry
                 "Wattpad",
                 TargetCategory.ReadingWriting,
                 TargetScopeKind.Web,
-                ["wattpad.com", "www.wattpad.com"],
+                [
+                    "wattpad.com",
+                    "www.wattpad.com",
+                    "api.wattpad.com",
+                    "img.wattpad.com",
+                    "static.wattpad.com"
+                ],
                 [],
                 "wattpad"),
             Create(
@@ -56,7 +62,13 @@ public sealed class TargetRegistry
                 "Bigo Live",
                 TargetCategory.LiveSocial,
                 TargetScopeKind.Web,
-                ["bigo.tv", "bigolive.tv"],
+                [
+                    "bigo.tv",
+                    "www.bigo.tv",
+                    "mobile.bigo.tv",
+                    "bigolive.tv",
+                    "www.bigolive.tv"
+                ],
                 [],
                 "bigo-live"),
             Create(
@@ -64,7 +76,13 @@ public sealed class TargetRegistry
                 "Azar",
                 TargetCategory.LiveSocial,
                 TargetScopeKind.ApplicationAndWeb,
-                ["azarlive.com", "azarlive.io"],
+                [
+                    "azarlive.com",
+                    "www.azarlive.com",
+                    "api.azarlive.com",
+                    "azarlive.io",
+                    "api.azarlive.io"
+                ],
                 ["Azar.exe"],
                 "azar"),
             Create(
@@ -72,7 +90,11 @@ public sealed class TargetRegistry
                 "Tango",
                 TargetCategory.LiveSocial,
                 TargetScopeKind.ApplicationAndWeb,
-                ["tango.me"],
+                [
+                    "tango.me",
+                    "www.tango.me",
+                    "api.tango.me"
+                ],
                 ["Tango.exe"],
                 "tango"),
             Create(
@@ -80,7 +102,11 @@ public sealed class TargetRegistry
                 "LiVU",
                 TargetCategory.LiveSocial,
                 TargetScopeKind.ApplicationAndWeb,
-                ["livu.me"],
+                [
+                    "livu.me",
+                    "www.livu.me",
+                    "api.livu.me"
+                ],
                 ["LiVU.exe", "Livu.exe"],
                 "livu"),
             Create(
@@ -88,7 +114,13 @@ public sealed class TargetRegistry
                 "IMVU",
                 TargetCategory.LiveSocial,
                 TargetScopeKind.ApplicationAndWeb,
-                ["imvu.com"],
+                [
+                    "imvu.com",
+                    "www.imvu.com",
+                    "secure.imvu.com",
+                    "api.imvu.com",
+                    "userimages-akm.imvu.com"
+                ],
                 ["IMVUClient.exe", "IMVU.exe"],
                 "imvu"),
             Create(
@@ -96,7 +128,13 @@ public sealed class TargetRegistry
                 "Blogspot",
                 TargetCategory.Blog,
                 TargetScopeKind.Web,
-                ["blogspot.com", "*.blogspot.com"],
+                [
+                    "blogspot.com",
+                    "*.blogspot.com",
+                    "blogger.com",
+                    "www.blogger.com",
+                    "blogger.googleusercontent.com"
+                ],
                 [],
                 "blogspot")
         ]);
