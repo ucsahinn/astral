@@ -19,6 +19,7 @@ using Astral.Core.Firewall;
 using Astral.Core.Infrastructure;
 using Astral.Core.Maintenance;
 using Astral.Core.Provisioning;
+using Astral.Core.Targets;
 using Astral.Core.Updates;
 using Astral.Core.WireSock;
 
@@ -169,30 +170,36 @@ static void RenderMainWindow()
         Assert(text.Contains("Debug tanılama", StringComparison.Ordinal));
         Assert(text.Contains("Kapalı. Normal rapor hafif kalır.", StringComparison.Ordinal));
         Assert(text.Contains("Rapor hazırla", StringComparison.Ordinal));
+        Assert(text.Contains("Hızlı test", StringComparison.Ordinal));
+        Assert(text.Contains("Hedef testi:", StringComparison.Ordinal));
         Assert(text.Contains("Hazır", StringComparison.Ordinal));
         Assert(text.Contains("Astral Bağlı Değil", StringComparison.Ordinal));
         Assert(text.Contains(
             "Bağlantı sorunlarını incelemek için rapor hazırla",
             StringComparison.Ordinal));
-        var buttons = FindVisualChildren<Button>(window)
+        var buttonNames = FindVisualChildren<Button>(window)
             .Where(button => button.Visibility == Visibility.Visible)
-            .Select(button => button.Content?.ToString())
-            .OfType<string>()
+            .Select(AutomationProperties.GetName)
             .Where(content => !string.IsNullOrWhiteSpace(content))
             .ToArray();
-        Assert(buttons.Contains("🛠 Onar"));
-        Assert(buttons.Contains("⛔ Profil Temizle"));
-        Assert(buttons.Contains("🧾 Tanılama"));
-        Assert(!buttons.Any(button => button.Contains("WireSock", StringComparison.OrdinalIgnoreCase)));
-        Assert(!buttons.Any(button =>
+        Assert(buttonNames.Contains("Astral onar"));
+        Assert(buttonNames.Contains("Profil temizle"));
+        Assert(buttonNames.Contains("Tanı raporu oluştur"));
+        Assert(buttonNames.Contains("Seçili hedefleri test et"));
+        Assert(buttonNames.Contains("Sürüm notlarını aç"));
+        Assert(!buttonNames.Any(button => button.Contains("WireSock", StringComparison.OrdinalIgnoreCase)));
+        Assert(!buttonNames.Any(button =>
             button.Contains("Denetle", StringComparison.Ordinal)
             || button.Contains("Güncelle", StringComparison.Ordinal)
             || button.Contains("Tekrar dene", StringComparison.Ordinal)
             || button.Contains("Güncel", StringComparison.Ordinal)));
-        Assert(!buttons.Contains("Yükle"));
+        Assert(!buttonNames.Contains("Yükle"));
         var updateButton = FindVisualChildren<Button>(window)
             .Single(button => button.Name == "AutoUpdateButton");
         Assert(updateButton.Visibility == Visibility.Collapsed);
+        var targetQuickTestButton = FindVisualChildren<Button>(window)
+            .Single(button => button.Name == "TargetQuickTestButton");
+        Assert(!targetQuickTestButton.IsEnabled);
         var switches = FindVisualChildren<CheckBox>(window).ToArray();
         var targetToggles = switches
             .Where(toggle => toggle.Name.StartsWith(
@@ -239,6 +246,16 @@ static void RenderMainWindow()
         {
             Assert(MainWindow.TryLoadTargetIconForTesting(iconKey));
         }
+        Assert(MainWindow.TryReadProxyPortFromPacForTesting(
+            "function FindProxyForURL(url, host) { return \"PROXY 127.0.0.1:55010\"; }",
+            out var parsedProxyPort));
+        Assert(parsedProxyPort == 55010);
+        Assert(!MainWindow.TryReadProxyPortFromPacForTesting(
+            "function FindProxyForURL(url, host) { return \"DIRECT\"; }",
+            out _));
+        var registry = TargetRegistry.CreateDefault();
+        Assert(registry.TryGet("blogspot", out var blogspotTarget));
+        Assert(MainWindow.GetTargetTestHostForTesting(blogspotTarget) == "blogspot.com");
 
         var visibleTargetCardTexts = targetToggles
             .SelectMany(toggle => FindVisualChildren<TextBlock>(toggle))
@@ -262,6 +279,7 @@ static void RenderMainWindow()
         }
         Assert(visibleTargetCardTexts.Any(value => value is "Seçili"));
         Assert(visibleTargetCardTexts.Any(value => value is "Hazır"));
+        Assert(visibleTargetCardTexts.Any(value => value is "Test edilmedi"));
 
         foreach (var targetToggle in targetToggles)
         {

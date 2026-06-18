@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
+using System.Text.Json;
 
 namespace Astral.Core.WebProxy;
 
@@ -16,7 +17,59 @@ public interface IScopedWebProxyService
         IProgress<string>? progress,
         CancellationToken cancellationToken);
 
+    Task<ScopedWebProxyStatus> EnsureAppliedAsync(
+        RoutingPlan routingPlan,
+        IProgress<string>? progress,
+        CancellationToken cancellationToken);
+
+    Task<ScopedWebProxyStatus> GetStatusAsync(
+        RoutingPlan routingPlan,
+        CancellationToken cancellationToken);
+
     Task ClearAsync(CancellationToken cancellationToken);
+}
+
+public sealed record ScopedWebProxyStatus(
+    bool Required,
+    bool IsApplied,
+    string Message,
+    string? ExpectedAutoConfigUrl = null,
+    string? CurrentAutoConfigUrl = null,
+    bool PacFileExists = false,
+    bool StateFileExists = false,
+    bool ProxyProcessRunning = false,
+    int? ProxyPort = null)
+{
+    public static ScopedWebProxyStatus NotRequired(string message = "Web proxy kapsamı gerekmiyor.") =>
+        new(false, true, message);
+
+    public IReadOnlyDictionary<string, string?> ToDiagnosticDetails(string prefix = "webProxyScope")
+    {
+        return new Dictionary<string, string?>
+        {
+            [$"{prefix}.required"] = Required.ToString(),
+            [$"{prefix}.applied"] = IsApplied.ToString(),
+            [$"{prefix}.message"] = Message,
+            [$"{prefix}.expectedAutoConfigUrl"] = ExpectedAutoConfigUrl,
+            [$"{prefix}.currentAutoConfigUrl"] = RedactAutoConfigUrl(CurrentAutoConfigUrl),
+            [$"{prefix}.pacFileExists"] = PacFileExists.ToString(),
+            [$"{prefix}.stateFileExists"] = StateFileExists.ToString(),
+            [$"{prefix}.proxyProcessRunning"] = ProxyProcessRunning.ToString(),
+            [$"{prefix}.proxyPort"] = ProxyPort?.ToString(CultureInfo.InvariantCulture)
+        };
+    }
+
+    private static string? RedactAutoConfigUrl(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return value;
+        }
+
+        return value.StartsWith("file:///", StringComparison.OrdinalIgnoreCase)
+            ? "file"
+            : value;
+    }
 }
 
 public sealed class NullScopedWebProxyService : IScopedWebProxyService
@@ -36,6 +89,33 @@ public sealed class NullScopedWebProxyService : IScopedWebProxyService
         return Task.CompletedTask;
     }
 
+    public Task<ScopedWebProxyStatus> EnsureAppliedAsync(
+        RoutingPlan routingPlan,
+        IProgress<string>? progress,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(routingPlan.RequiresWebProxy
+            ? new ScopedWebProxyStatus(
+                Required: true,
+                IsApplied: true,
+                Message: "No-op web proxy servisi kapsamı uygulanmış kabul etti.")
+            : ScopedWebProxyStatus.NotRequired());
+    }
+
+    public Task<ScopedWebProxyStatus> GetStatusAsync(
+        RoutingPlan routingPlan,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(routingPlan.RequiresWebProxy
+            ? new ScopedWebProxyStatus(
+                Required: true,
+                IsApplied: true,
+                Message: "No-op web proxy servisi kapsamı uygulanmış kabul etti.")
+            : ScopedWebProxyStatus.NotRequired());
+    }
+
     public Task ClearAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -49,6 +129,10 @@ public sealed class WindowsScopedWebProxyService : IScopedWebProxyService, IAsyn
     private static readonly TimeSpan ScriptTimeout = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan ProcessStartupValidationDelay =
         TimeSpan.FromMilliseconds(450);
+    private static readonly JsonSerializerOptions StatusJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
 
     private readonly AppPaths _paths;
     private readonly ICommandRunner _commandRunner;
@@ -164,6 +248,104 @@ public sealed class WindowsScopedWebProxyService : IScopedWebProxyService, IAsyn
                 ["proxyPort"] = proxyPort.ToString(CultureInfo.InvariantCulture),
                 ["pac"] = "file"
             });
+    }
+
+    public async Task<ScopedWebProxyStatus> EnsureAppliedAsync(
+        RoutingPlan routingPlan,
+        IProgress<string>? progress,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(routingPlan);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var status = await GetStatusAsync(routingPlan, cancellationToken);
+        if (!routingPlan.RequiresWebProxy || status.IsApplied)
+        {
+            return status;
+        }
+
+        _diagnostics.Warning(
+            "webProxy.ensure",
+            "Scoped PAC ayarında sapma algılandı; seçili web hedefleri için yeniden uygulanıyor.",
+            status.ToDiagnosticDetails());
+        progress?.Report("Seçili web hedefleri için proxy kapsamı yenileniyor");
+
+        await ApplyAsync(routingPlan, progress, cancellationToken);
+        var refreshed = await GetStatusAsync(routingPlan, cancellationToken);
+        if (refreshed.IsApplied)
+        {
+            _diagnostics.Info(
+                "webProxy.ensure",
+                "Scoped PAC ayarı yeniden doğrulandı.",
+                refreshed.ToDiagnosticDetails());
+            return refreshed;
+        }
+
+        throw new InvalidOperationException(
+            "Seçili web hedefleri için scoped PAC ayarı doğrulanamadı: " +
+            refreshed.Message);
+    }
+
+    public async Task<ScopedWebProxyStatus> GetStatusAsync(
+        RoutingPlan routingPlan,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(routingPlan);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (!routingPlan.RequiresWebProxy)
+        {
+            return ScopedWebProxyStatus.NotRequired();
+        }
+
+        var expectedPacUri = new Uri(_paths.WebProxyPacFile).AbsoluteUri;
+        var proxyPort = TryReadProxyPortFromPac(_paths.WebProxyPacFile);
+        var proxyProcessRunning = _proxyProcess is not null && !_proxyProcess.HasExited;
+        var scriptResult = await RunStatusScriptAsync(expectedPacUri, cancellationToken);
+        var pacFileExists = scriptResult.PacFileExists ?? File.Exists(_paths.WebProxyPacFile);
+        var stateFileExists = scriptResult.StateFileExists ?? File.Exists(_paths.WebProxyStateFile);
+        var currentAutoConfigUrl = scriptResult.CurrentAutoConfigURL;
+        var stateOwnerValid = string.Equals(
+            scriptResult.StateOwner,
+            "Astral",
+            StringComparison.Ordinal);
+        var stateAppliedValid = string.Equals(
+            scriptResult.StateAppliedAutoConfigURL,
+            expectedPacUri,
+            StringComparison.OrdinalIgnoreCase);
+        var autoConfigValid = string.Equals(
+            currentAutoConfigUrl,
+            expectedPacUri,
+            StringComparison.OrdinalIgnoreCase);
+        var isApplied = pacFileExists
+            && stateFileExists
+            && stateOwnerValid
+            && stateAppliedValid
+            && autoConfigValid
+            && proxyProcessRunning
+            && proxyPort is not null;
+
+        var message = isApplied
+            ? "Scoped PAC aktif ve seçili web hedefleri yerel proxyye yönleniyor."
+            : CreateStatusMessage(
+                pacFileExists,
+                stateFileExists,
+                stateOwnerValid,
+                stateAppliedValid,
+                autoConfigValid,
+                proxyProcessRunning,
+                proxyPort);
+
+        return new ScopedWebProxyStatus(
+            Required: true,
+            IsApplied: isApplied,
+            Message: message,
+            ExpectedAutoConfigUrl: expectedPacUri,
+            CurrentAutoConfigUrl: currentAutoConfigUrl,
+            PacFileExists: pacFileExists,
+            StateFileExists: stateFileExists,
+            ProxyProcessRunning: proxyProcessRunning,
+            ProxyPort: proxyPort);
     }
 
     public async Task ClearAsync(CancellationToken cancellationToken)
@@ -369,6 +551,50 @@ public sealed class WindowsScopedWebProxyService : IScopedWebProxyService, IAsyn
             diagnostic.Trim().ReplaceLineEndings(" "));
     }
 
+    private async Task<WebProxyStatusScriptResult> RunStatusScriptAsync(
+        string expectedPacUri,
+        CancellationToken cancellationToken)
+    {
+        _paths.EnsureDirectories();
+        var result = await _commandRunner.RunAsync(
+            _powerShellPath,
+            [
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                BuildStatusScript(expectedPacUri)
+            ],
+            _paths.DataDirectory,
+            ScriptTimeout,
+            cancellationToken);
+
+        if (!result.Succeeded)
+        {
+            var diagnostic = string.IsNullOrWhiteSpace(result.StandardError)
+                ? result.StandardOutput
+                : result.StandardError;
+            throw new InvalidOperationException(
+                "Web proxy PAC durumu okunamadı: " +
+                (string.IsNullOrWhiteSpace(diagnostic)
+                    ? $"PowerShell exit code {result.ExitCode.ToString(CultureInfo.InvariantCulture)}."
+                    : diagnostic.Trim().ReplaceLineEndings(" ")));
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<WebProxyStatusScriptResult>(
+                    result.StandardOutput,
+                    StatusJsonOptions)
+                ?? new WebProxyStatusScriptResult();
+        }
+        catch (JsonException exception)
+        {
+            throw new InvalidOperationException(
+                "Web proxy PAC durumu okunamadı: PowerShell JSON çıktısı geçersiz.",
+                exception);
+        }
+    }
+
     private string BuildApplyPacScript(string pacUri)
     {
         return string.Join(Environment.NewLine, [
@@ -376,11 +602,17 @@ public sealed class WindowsScopedWebProxyService : IScopedWebProxyService, IAsyn
             "$keyPath = 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings'",
             $"$statePath = '{QuotePowerShell(_paths.WebProxyStateFile)}'",
             $"$pacUrl = '{QuotePowerShell(pacUri)}'",
+            $"$legacyPacPath = '{QuotePowerShell(GetLegacySharedPacFile())}'",
             "$current = Get-ItemProperty -Path $keyPath",
+            "$previousAutoConfigUrl = $current.AutoConfigURL",
+            "$legacyPacUrl = ([System.Uri]$legacyPacPath).AbsoluteUri",
+            "if ($previousAutoConfigUrl -eq $pacUrl -or $previousAutoConfigUrl -eq $legacyPacUrl) {",
+            "    $previousAutoConfigUrl = $null",
+            "}",
             "$state = [ordered]@{",
             "    Owner = 'Astral'",
             "    AppliedAutoConfigURL = $pacUrl",
-            "    PreviousAutoConfigURL = $current.AutoConfigURL",
+            "    PreviousAutoConfigURL = $previousAutoConfigUrl",
             "}",
             "$state | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath $statePath -Encoding UTF8",
             "Set-ItemProperty -Path $keyPath -Name AutoConfigURL -Value $pacUrl | Out-Null"
@@ -405,6 +637,34 @@ public sealed class WindowsScopedWebProxyService : IScopedWebProxyService, IAsyn
             "    }",
             "}",
             "Remove-Item -LiteralPath $statePath -Force -ErrorAction SilentlyContinue"
+        ]);
+    }
+
+    private string BuildStatusScript(string expectedPacUri)
+    {
+        return string.Join(Environment.NewLine, [
+            "$ErrorActionPreference = 'Stop'",
+            "$keyPath = 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings'",
+            $"$statePath = '{QuotePowerShell(_paths.WebProxyStateFile)}'",
+            $"$pacPath = '{QuotePowerShell(_paths.WebProxyPacFile)}'",
+            $"$expectedPacUrl = '{QuotePowerShell(expectedPacUri)}'",
+            "$current = Get-ItemProperty -Path $keyPath",
+            "$stateOwner = $null",
+            "$stateApplied = $null",
+            "$stateExists = Test-Path -LiteralPath $statePath",
+            "if ($stateExists) {",
+            "    $state = Get-Content -Raw -LiteralPath $statePath | ConvertFrom-Json",
+            "    $stateOwner = [string]$state.Owner",
+            "    $stateApplied = [string]$state.AppliedAutoConfigURL",
+            "}",
+            "[ordered]@{",
+            "    CurrentAutoConfigURL = [string]$current.AutoConfigURL",
+            "    ExpectedAutoConfigURL = $expectedPacUrl",
+            "    PacFileExists = [bool](Test-Path -LiteralPath $pacPath)",
+            "    StateFileExists = [bool]$stateExists",
+            "    StateOwner = $stateOwner",
+            "    StateAppliedAutoConfigURL = $stateApplied",
+            "} | ConvertTo-Json -Compress"
         ]);
     }
 
@@ -442,6 +702,109 @@ public sealed class WindowsScopedWebProxyService : IScopedWebProxyService, IAsyn
         }
     }
 
+    private string GetLegacySharedPacFile()
+    {
+        return Path.Combine(
+            _paths.SharedDataDirectory,
+            "web-proxy",
+            "astral-scoped.pac");
+    }
+
+    private static int? TryReadProxyPortFromPac(string pacPath)
+    {
+        try
+        {
+            if (!File.Exists(pacPath))
+            {
+                return null;
+            }
+
+            var script = File.ReadAllText(pacPath);
+            const string marker = "PROXY 127.0.0.1:";
+            var markerIndex = script.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+            if (markerIndex < 0)
+            {
+                return null;
+            }
+
+            var start = markerIndex + marker.Length;
+            var end = start;
+            while (end < script.Length && char.IsDigit(script[end]))
+            {
+                end++;
+            }
+
+            if (end == start)
+            {
+                return null;
+            }
+
+            return int.TryParse(
+                script[start..end],
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out var port)
+                && port is > 0 and <= 65535
+                    ? port
+                    : null;
+        }
+        catch (Exception exception)
+            when (exception is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    private static string CreateStatusMessage(
+        bool pacFileExists,
+        bool stateFileExists,
+        bool stateOwnerValid,
+        bool stateAppliedValid,
+        bool autoConfigValid,
+        bool proxyProcessRunning,
+        int? proxyPort)
+    {
+        var missing = new List<string>();
+        if (!pacFileExists)
+        {
+            missing.Add("PAC dosyası yok");
+        }
+
+        if (!stateFileExists)
+        {
+            missing.Add("PAC state dosyası yok");
+        }
+        else
+        {
+            if (!stateOwnerValid)
+            {
+                missing.Add("PAC state sahibi geçersiz");
+            }
+
+            if (!stateAppliedValid)
+            {
+                missing.Add("PAC state URL eşleşmiyor");
+            }
+        }
+
+        if (!autoConfigValid)
+        {
+            missing.Add("Windows AutoConfigURL seçili PAC'a işaret etmiyor");
+        }
+
+        if (!proxyProcessRunning)
+        {
+            missing.Add("Astral.WebProxy süreci çalışmıyor");
+        }
+
+        if (proxyPort is null)
+        {
+            missing.Add("PAC içinden yerel proxy portu okunamadı");
+        }
+
+        return "Scoped PAC doğrulanamadı: " + string.Join("; ", missing) + ".";
+    }
+
     private static string GetDefaultPowerShellPath()
     {
         return Path.Combine(
@@ -450,4 +813,12 @@ public sealed class WindowsScopedWebProxyService : IScopedWebProxyService, IAsyn
             "v1.0",
             "powershell.exe");
     }
+
+    private sealed record WebProxyStatusScriptResult(
+        string? CurrentAutoConfigURL = null,
+        string? ExpectedAutoConfigURL = null,
+        bool? PacFileExists = null,
+        bool? StateFileExists = null,
+        string? StateOwner = null,
+        string? StateAppliedAutoConfigURL = null);
 }

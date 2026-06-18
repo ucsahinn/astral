@@ -16,22 +16,23 @@ Bu doküman, GitHub Releases yüzeyindeki sürüm kararlarını ve yayın kapıs
 
 ## Güncel Sürüm Kararı
 
-Güncel patch hedef `v2.2.13` olarak belirlendi.
+Güncel patch hedef `v2.2.14` olarak belirlendi.
 
-Neden `v2.2.13`?
+Neden `v2.2.14`?
 
-- v2.2.12 üstüne WireSock `AllowedApps` kapsamı daha doğrudan hale getirildi.
-- Profil üretimi plain `AllowedApps` direktifiyle yazılıyor ve eski/geniş `AllowedApps` / `#@ws:AllowedApps` satırlarını temizliyor.
-- Live smoke seçili olmayan normal internet hedefinin DIRECT kalmasını ayrıca doğruluyor.
-- WebProxy başlatmadan önce aynı executable path'e ait orphan proxy süreçleri temizleniyor; port fallback ihtiyacı ve kapanma takılması azalıyor.
-- Güncel tanılama ve smoke scripti `wireSockMode`, `wireSockProcessExited` ve `transparent-process-running` alanlarıyla aynı doğrulama modelini kullanır.
-- `discord.com:443` doğrudan ağ probu ISP/servis durumuna bağlı olduğu için canlı smoke'ta bilgi amaçlı kalır; release başarısı için hedef kapsamı, profil, WebProxy, WireSock lifecycle ve cleanup kanıtı esas alınır.
+- v2.2.13 üstüne scoped PAC doğrulaması ve self-heal kapısı eklendi.
+- Web hedefleri için `Connected` öncesi PAC dosyası, state dosyası, Windows `AutoConfigURL` ve `Astral.WebProxy` süreci birlikte doğrulanır.
+- PAC/state dosyaları protected `%ProgramData%` yerine kullanıcı tarafından okunabilir `%LOCALAPPDATA%\Astral\web-proxy` altına taşındı.
+- Tanılama paketleri `webProxyScope.*` alanlarıyla routing plan ile gerçek Windows PAC durumunu ayrı raporlar.
+- Hızlı hedef testi seçili web hedeflerini tek tek ölçer ve sorunlu hedefi diğerlerinden ayrı gösterir.
+- v2.2.13'teki plain `AllowedApps`, normal internet DIRECT smoke ve WebProxy orphan cleanup kararları korunur.
 
 ## Public Release Yüzeyi
 
 | Release | Canlı durum | Asset durumu | Karar | Gerekçe |
 | --- | --- | --- | --- | --- |
-| `v2.2.13` | Yayın adayı | Bekliyor | Yayınla | Plain `AllowedApps`, normal internet DIRECT smoke ve scope hardening hotfixleri. |
+| `v2.2.14` | Yayın adayı | Bekliyor | Yayınla | Scoped PAC doğrulama, kullanıcı alanı PAC dosyası, hedef hızlı testi ve tanılama hotfixleri. |
+| `v2.2.13` | Tarihsel aday | Yerine geçti | Koru | Plain `AllowedApps`, normal internet DIRECT smoke ve scope hardening hotfixleri. |
 | `v2.2.12` | Tarihsel aday | Yerine geçti | Koru | Live smoke sınıflandırması, WireSock transparent readiness ve `#@ws:AllowedApps` hotfixleri. |
 | `v2.2.11` | Tarihsel aday | Yerine geçti | Koru | WireSock transparent readiness, `#@ws:AllowedApps` ve WebProxy orphan cleanup hotfixleri. |
 | `v2.2.10` | Tarihsel aday | Yerine geçti | Koru | Gerçek hedef ikonları, state sistemi, lifecycle hotfixleri ve Astral-only update hattı. |
@@ -49,12 +50,12 @@ Neden `v2.2.13`?
 
 ## Yayın Kapısı
 
-`v2.2.13` yayınından önce tamamlanması gereken koşullar:
+`v2.2.14` yayınından önce tamamlanması gereken koşullar:
 
-- Proje, updater ve web proxy sürümü `2.2.13` ile aynı.
-- `Astral-2.2.13-win-x64.zip` ve sabit `Astral-win-x64.zip` aynı içeriği gösterir.
+- Proje, updater ve web proxy sürümü `2.2.14` ile aynı.
+- `Astral-2.2.14-win-x64.zip` ve sabit `Astral-win-x64.zip` aynı içeriği gösterir.
 - ZIP içinde `Astral.exe`, `Astral.Updater.exe`, `Astral.WebProxy.exe`, update manifest'i ve gerekli runtime dosyaları bulunur.
-- ZIP içindeki update manifest sürümü `2.2.13`.
+- ZIP içindeki update manifest sürümü `2.2.14`.
 - Astral release içinde eski isimli uyumluluk ZIP'i yayınlanmaz.
 - Kod imzalama sertifikası yapılandırılmadıysa paket imzasız olduğu açıkça not edilir.
 - `dotnet build`, Core tests, Windows tests, `scripts/verify.ps1`, `scripts/build-release.ps1`, `git diff --check` ve Gitleaks geçer.

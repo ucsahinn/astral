@@ -82,11 +82,11 @@
                                 VerticalAlignment="Center">
                         <TextBlock FontSize="22"
                                    FontWeight="SemiBold"
-                                   Text="Astral v2.2.13" />
+                                   Text="Astral v2.2.14" />
                         <TextBlock Margin="0,5,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
-                                   Text="WireSock AllowedApps kapsamı, normal internet kontrolü ve bağlantı hotfix'i" />
+                                   Text="Scoped PAC doğrulama, hedef hızlı testi ve bağlantı hotfix'i" />
                     </StackPanel>
                 </Grid>
 
@@ -109,7 +109,7 @@
                                            FontSize="14"
                                            LineHeight="21"
                                            TextWrapping="Wrap"
-                                           Text="Bu sürüm Astral'ın seçili uygulama ve web hedefleri için dar kapsamlı bağlantı yöneticisi davranışını güçlendirir. Hedef kartları gerçek ürün ikonları ve açık state bilgisiyle görünür; uygulama hedef programları açmaz veya yenilemez, yalnızca seçili girişlerin tünel kapsamını hazırlar." />
+                                           Text="Bu sürüm Astral bağlı görünürken web hedeflerinin scoped PAC ayarı eksik kalması riskini kapatır. Seçili web hedefleri için PAC dosyası kullanıcı veri alanında tutulur, bağlantı Connected durumuna geçmeden önce canlı olarak doğrulanır ve hızlı hedef testi gerekirse kapsamı yeniler." />
                             </StackPanel>
                         </Border>
 
@@ -128,27 +128,27 @@
                                            FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Discord, Roblox, Wattpad, Bigo Live, Azar, Tango, LiVU, IMVU ve Blogspot için gerçek renkli hedef ikonları eklendi." />
+                                           Text="&#x2022; Web hedefleri için PAC ve Windows AutoConfigURL durumu Connected öncesi doğrulanır; sapma varsa scoped kapsam otomatik yenilenir." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Hedef kartları Hazır, Seçili, Bağlanıyor, Kapsamda, Sorunlu ve Pasif durumlarını tooltip ve durum satırıyla gösterir." />
+                                           Text="&#x2022; PAC/state dosyaları tarayıcıların okuyabileceği kullanıcı veri alanına taşındı; protected ProgramData PAC yolu yeni oturumlarda kullanılmaz." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Web hedeflerinde genel tarayıcı exe'leri tünele alınmıyor. Sadece Astral.WebProxy tünele dahil ediliyor ve yalnız seçili domainler proxy/PAC kuralına giriyor." />
+                                           Text="&#x2022; Hızlı test seçili web hedeflerini Astral.WebProxy üzerinden tek tek ölçer ve sorunlu hedefi diğer hedeflerden ayrı gösterir." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Kapanış, yeniden başlatma, onarım ve profil temizleme akışlarında timeout ve UI donma riski azaltıldı." />
+                                           Text="&#x2022; Tanılama paketlerine webProxyScope.* alanları eklendi; planlanan kapsam ile gerçek PAC durumu ayrı raporlanır." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; WireSock profili doğrudan AllowedApps satırıyla yazılıyor; seçili olmayan uygulamaların tünele düşme riski azaltıldı." />
+                                           Text="&#x2022; Release-notes ikonu artık sürüm notlarını açar; tanılama aksiyonları ve alt bar ikonları aynı görsel sisteme bağlandı." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Güncelleme asset'leri yalnız Astral adıyla doğrulanıyor ve yeni sürüm yoksa güncelleme butonu görünmez kalıyor." />
+                                           Text="&#x2022; Arka plan/video görünürlüğü, panel kontrastı ve hedef kart hizalaması mevcut Astral düzeni korunarak iyileştirildi." />
                             </StackPanel>
                         </Border>
 
@@ -167,7 +167,7 @@
                                            FontSize="13"
                                            LineHeight="21"
                                            TextWrapping="Wrap"
-                                           Text="Astral bağlantı sırasında hedef kapsamını dar tutar: uygulama hedefleri AllowedApps içinde kalır, web hedeflerinde ise yalnız Astral.WebProxy tünele alınır. Normal web trafiği DIRECT kalmalıdır." />
+                                           Text="Astral bağlantı sırasında hedef kapsamını dar tutar: uygulama hedefleri AllowedApps içinde kalır, web hedeflerinde ise yalnız Astral.WebProxy tünele alınır. PAC dosyası sadece seçili domainlerde PROXY, diğer tüm domainlerde DIRECT döndürür." />
                                 <TextBlock Margin="0,8,0,0"
                                            FontSize="13"
                                            LineHeight="21"
@@ -194,7 +194,7 @@
                     <TextBlock VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource MutedTextBrush}"
-                               Text="Bu not, v2.2.13 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
+                               Text="Bu not, v2.2.14 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
                     <Button Grid.Column="1"
                             Margin="0,0,10,0"
                             Height="40"

@@ -37,7 +37,7 @@ public sealed class AppPaths
         ToolsDirectory = Path.Combine(SharedDataDirectory, "tools");
         InstallerDirectory = Path.Combine(SharedDataDirectory, "installers");
         ProfileDirectory = Path.Combine(SharedDataDirectory, "profiles");
-        WebProxyDirectory = Path.Combine(SharedDataDirectory, "web-proxy");
+        WebProxyDirectory = Path.Combine(DataDirectory, "web-proxy");
         LogDirectory = Path.Combine(DataDirectory, "logs");
         DiagnosticBundleDirectory = Path.Combine(DataDirectory, "diagnostic-bundles");
         SettingsFile = Path.Combine(DataDirectory, "settings.json");
@@ -126,7 +126,7 @@ public sealed class AppPaths
         PrepareDirectory(ToolsDirectory, ProtectSharedData);
         PrepareDirectory(InstallerDirectory, ProtectSharedData);
         PrepareDirectory(ProfileDirectory, ProtectSharedData);
-        PrepareDirectory(WebProxyDirectory, ProtectSharedData);
+        PrepareDirectory(WebProxyDirectory, restrictAccess: false);
         PrepareDirectory(WireSockInstallerStagingDirectory, ProtectSharedData);
     }
 

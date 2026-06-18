@@ -5,6 +5,7 @@ using System.IO;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Text;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -48,7 +49,7 @@ public partial class MainWindow : Window, IDisposable
     private static readonly Uri RepositoryUri = new(
         "https://github.com/ucsahinn/astral");
     private static readonly Uri ReleaseNotesUri = new(
-        "https://github.com/ucsahinn/astral/releases/tag/v2.2.13");
+        "https://github.com/ucsahinn/astral/releases/tag/v2.2.14");
     private static readonly Uri BackgroundVideoUri = new(
         "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260606_154941_df1a96e1-a06f-450c-bd02-d863414cc1a0.mp4");
     private static readonly string LocalBackgroundVideoPath = Path.Combine(
@@ -70,6 +71,10 @@ public partial class MainWindow : Window, IDisposable
         new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, TextBlock> _targetStatusLabels =
         new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, TextBlock> _targetTestLabels =
+        new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Border> _targetStatusDots =
+        new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Border> _targetIconBadges =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Border> _targetWarningBadges =
@@ -79,11 +84,15 @@ public partial class MainWindow : Window, IDisposable
     private bool _isApplyingSettings;
     private bool _isRunInBackgroundEnabled;
     private bool _isToggleOperationRunning;
+    private bool _isTargetTestRunning;
     private bool _isUpdateCheckRunning;
     private bool _isUpdateOperationRunning;
     private bool _isUpdateProgressPinned;
     private string? _lastLoggedUpdateProgressKey;
     private int _lastLoggedUpdateProgressPercent = -1;
+    private string _lastTargetTestSummary = "Hedef testi çalıştırılmadı.";
+    private readonly Dictionary<string, TargetProbeResult> _targetProbeResults =
+        new(StringComparer.OrdinalIgnoreCase);
     private AppUpdateCheckResult? _pendingUpdate;
     private bool _backgroundVideoRemoteFallbackTried;
     private bool _isBackgroundVideoStarted;
@@ -235,6 +244,7 @@ public partial class MainWindow : Window, IDisposable
             ? "Devam eden işlem bitince onarım kullanılabilir."
             : "Bağlantı dosyalarını güvenle yenile";
         ApplyUpdateControls(snapshot.IsBusy);
+        ApplyTargetTestButtonState(snapshot);
         StatusMessage.Text = GetStatusMessage(snapshot);
         StatusDetail.Text = GetDetail(snapshot);
         RefreshTargetScopeView(snapshot.IsBusy || snapshot.IsConnected);
@@ -697,6 +707,8 @@ public partial class MainWindow : Window, IDisposable
         TargetCardsBottomPanel.Children.Clear();
         _targetToggles.Clear();
         _targetStatusLabels.Clear();
+        _targetTestLabels.Clear();
+        _targetStatusDots.Clear();
         _targetIconBadges.Clear();
         _targetWarningBadges.Clear();
         _targetOrder.Clear();
@@ -709,8 +721,8 @@ public partial class MainWindow : Window, IDisposable
                 Name = "TargetToggle_" + CreateSafeTargetName(target.Id),
                 Tag = target,
                 Width = 116,
-                Height = 58,
-                Margin = new Thickness(3),
+                Height = 66,
+                Margin = new Thickness(2),
                 Padding = new Thickness(6),
                 Style = (Style)FindResource("TargetCardCheckBoxStyle"),
                 ToolTip = $"{target.Label} hedefi hazır",
@@ -779,6 +791,9 @@ public partial class MainWindow : Window, IDisposable
         }
 
         _settingsStore.SetTargetSelection(selection);
+        _targetProbeResults.Clear();
+        _lastTargetTestSummary = "Hedef testi çalıştırılmadı.";
+        TargetTestSummary.Text = "Hedef testi: bağlantı açılınca seçili hedefler tek tek ölçülür.";
         _diagnostics.Info(
             "ui.targetSelection",
             "Hedef seçimi güncellendi.",
@@ -820,7 +835,7 @@ public partial class MainWindow : Window, IDisposable
                 if (toggle.Tag is TargetDefinition target)
                 {
                     var selected = toggle.IsChecked == true;
-                    var state = GetTargetCardState(snapshot, locked, selected);
+                    var state = GetTargetCardState(target, snapshot, locked, selected);
                     ApplyTargetCardState(target, state);
                     toggle.ToolTip = CreateTargetToolTip(target, state);
                     AutomationProperties.SetHelpText(
@@ -836,7 +851,8 @@ public partial class MainWindow : Window, IDisposable
 
     }
 
-    private static TargetCardState GetTargetCardState(
+    private TargetCardState GetTargetCardState(
+        TargetDefinition target,
         TunnelSnapshot snapshot,
         bool locked,
         bool selected)
@@ -844,6 +860,18 @@ public partial class MainWindow : Window, IDisposable
         if (!selected)
         {
             return locked ? TargetCardState.Passive : TargetCardState.Ready;
+        }
+
+        if (_targetProbeResults.TryGetValue(target.Id, out var probe))
+        {
+            return probe.Status switch
+            {
+                TargetProbeStatus.Running => TargetCardState.Connecting,
+                TargetProbeStatus.Success => TargetCardState.InScope,
+                TargetProbeStatus.Failed => TargetCardState.Problem,
+                TargetProbeStatus.Skipped => TargetCardState.Selected,
+                _ => TargetCardState.Selected
+            };
         }
 
         return snapshot.State switch
@@ -865,6 +893,20 @@ public partial class MainWindow : Window, IDisposable
         {
             label.Text = GetTargetCardStateText(state);
             label.Foreground = GetTargetCardStateBrush(state);
+        }
+
+        if (_targetStatusDots.GetValueOrDefault(target.Id) is { } dot)
+        {
+            dot.Background = GetTargetCardStateBrush(state);
+            dot.Opacity = state is TargetCardState.Passive ? 0.62 : 1;
+        }
+
+        if (_targetTestLabels.GetValueOrDefault(target.Id) is { } testLabel)
+        {
+            testLabel.Text = GetTargetTestLabel(target.Id);
+            testLabel.Foreground = _targetProbeResults.TryGetValue(target.Id, out var probe)
+                ? GetTargetProbeBrush(probe.Status)
+                : new SolidColorBrush(MediaColor.FromRgb(120, 148, 166));
         }
 
         if (_targetWarningBadges.GetValueOrDefault(target.Id) is { } warningBadge)
@@ -911,11 +953,15 @@ public partial class MainWindow : Window, IDisposable
         }
     }
 
-    private static WpfToolTip CreateTargetToolTip(
+    private WpfToolTip CreateTargetToolTip(
         TargetDefinition target,
         TargetCardState state)
     {
         var stateText = GetTargetCardStateText(state);
+        var probeText = _targetProbeResults.TryGetValue(target.Id, out var probe)
+            ? $"Son test: {GetTargetProbeStatusText(probe.Status)}"
+                + (string.IsNullOrWhiteSpace(probe.Host) ? string.Empty : $" ({probe.Host})")
+            : "Son test: çalıştırılmadı";
         return new WpfToolTip
         {
             Content = new StackPanel
@@ -935,12 +981,32 @@ public partial class MainWindow : Window, IDisposable
                     },
                     new TextBlock
                     {
-                        Text = "Son doğrulama: canlı oturum",
+                        Text = probeText,
                         Margin = new Thickness(0, 3, 0, 0),
+                        TextWrapping = TextWrapping.Wrap,
+                        Foreground = new SolidColorBrush(MediaColor.FromRgb(170, 211, 226))
+                    },
+                    new TextBlock
+                    {
+                        Text = "Hızlı test, seçili web hedefleri için yerel proxy üzerinden CONNECT 443 dener.",
+                        Margin = new Thickness(0, 3, 0, 0),
+                        TextWrapping = TextWrapping.Wrap,
                         Foreground = new SolidColorBrush(MediaColor.FromRgb(170, 211, 226))
                     }
                 }
             }
+        };
+    }
+
+    private static string GetTargetProbeStatusText(TargetProbeStatus status)
+    {
+        return status switch
+        {
+            TargetProbeStatus.Running => "test ediliyor",
+            TargetProbeStatus.Success => "başarılı",
+            TargetProbeStatus.Failed => "sorunlu",
+            TargetProbeStatus.Skipped => "atlandı",
+            _ => "çalıştırılmadı"
         };
     }
 
@@ -970,6 +1036,401 @@ public partial class MainWindow : Window, IDisposable
         };
     }
 
+    private string GetTargetTestLabel(string targetId)
+    {
+        if (!_targetProbeResults.TryGetValue(targetId, out var result))
+        {
+            return "Test edilmedi";
+        }
+
+        return result.Status switch
+        {
+            TargetProbeStatus.Running => "Test ediliyor",
+            TargetProbeStatus.Success => "Başarılı",
+            TargetProbeStatus.Failed => "Sorunlu",
+            TargetProbeStatus.Skipped => "Atlandı",
+            _ => "Test edilmedi"
+        };
+    }
+
+    private static SolidColorBrush GetTargetProbeBrush(TargetProbeStatus status)
+    {
+        return status switch
+        {
+            TargetProbeStatus.Running => new SolidColorBrush(MediaColor.FromRgb(255, 217, 85)),
+            TargetProbeStatus.Success => new SolidColorBrush(MediaColor.FromRgb(93, 255, 146)),
+            TargetProbeStatus.Failed => new SolidColorBrush(MediaColor.FromRgb(255, 122, 122)),
+            TargetProbeStatus.Skipped => new SolidColorBrush(MediaColor.FromRgb(170, 211, 226)),
+            _ => new SolidColorBrush(MediaColor.FromRgb(120, 148, 166))
+        };
+    }
+
+    private void ApplyTargetTestButtonState(TunnelSnapshot snapshot)
+    {
+        if (_isTargetTestRunning)
+        {
+            TargetQuickTestButton.IsEnabled = false;
+            TargetQuickTestButton.ToolTip = "Hedef testi çalışıyor.";
+            return;
+        }
+
+        var hasSelectedWebTarget = _controller.CurrentRoutingPlan
+            .SelectedTargets
+            .Any(target => target.HasWebScope && target.Domains.Count > 0);
+        var enabled = snapshot.IsConnected
+            && !snapshot.IsBusy
+            && hasSelectedWebTarget;
+        TargetQuickTestButton.IsEnabled = enabled;
+        TargetQuickTestButton.ToolTip = enabled
+            ? "Seçili hedefleri sırayla hızlı test et"
+            : "Hızlı test için önce bağlantıyı açın.";
+    }
+
+    private async void TestSelectedTargets_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isTargetTestRunning)
+        {
+            return;
+        }
+
+        var snapshot = _controller.Snapshot;
+        if (!snapshot.IsConnected || snapshot.IsBusy)
+        {
+            TargetTestSummary.Text = "Hedef testi için önce Astral bağlantısını açın.";
+            ApplyTargetTestButtonState(snapshot);
+            return;
+        }
+
+        var selectedTargets = _controller.CurrentRoutingPlan
+            .SelectedTargets
+            .Where(target => _targetToggles.TryGetValue(target.Id, out var toggle)
+                && toggle.IsChecked == true)
+            .ToArray();
+        if (selectedTargets.Length == 0)
+        {
+            TargetTestSummary.Text = "Test edilecek seçili hedef yok.";
+            return;
+        }
+
+        _isTargetTestRunning = true;
+        TargetQuickTestButton.IsEnabled = false;
+        TargetTestSummary.Text = "Hedef testi başladı; seçili hedefler sırayla ölçülüyor.";
+        _lastTargetTestSummary = "Hedef testi çalışıyor.";
+        _diagnostics.Info(
+            "ui.targetTest.start",
+            "Seçili hedefler için hızlı test başlatıldı.",
+            new Dictionary<string, string?>
+            {
+                ["selectedTargets"] = string.Join(", ", selectedTargets.Select(target => target.Label))
+            });
+
+        using var timeoutSource = new CancellationTokenSource(TimeSpan.FromSeconds(40));
+        using var linkedSource = CancellationTokenSource.CreateLinkedTokenSource(
+            timeoutSource.Token,
+            _windowLifetimeCancellation.Token);
+
+        var results = new List<TargetProbeResult>();
+        try
+        {
+            var scopeStatus = await _controller.EnsureCurrentWebProxyScopeAsync(
+                "target-quick-test",
+                linkedSource.Token);
+            if (scopeStatus.Required && !scopeStatus.IsApplied)
+            {
+                foreach (var target in selectedTargets)
+                {
+                    var host = GetTargetTestHost(target);
+                    if (host is null)
+                    {
+                        var skipped = new TargetProbeResult(
+                            TargetProbeStatus.Skipped,
+                            null,
+                            "Web domaini yok; uygulama kapsamı profil üzerinden doğrulanır.",
+                            DateTimeOffset.Now);
+                        _targetProbeResults[target.Id] = skipped;
+                        results.Add(skipped);
+                        continue;
+                    }
+
+                    var failed = new TargetProbeResult(
+                        TargetProbeStatus.Failed,
+                        host,
+                        scopeStatus.Message,
+                        DateTimeOffset.Now);
+                    _targetProbeResults[target.Id] = failed;
+                    results.Add(failed);
+                }
+
+                _lastTargetTestSummary =
+                    "Scoped web kapsamı doğrulanamadı: " + scopeStatus.Message;
+                TargetTestSummary.Text = _lastTargetTestSummary;
+                _diagnostics.WriteHealth(
+                    "hedef testi scoped proxy doğrulamasında durdu",
+                    CreateTargetTestDiagnosticDetails(results)
+                        .Concat(scopeStatus.ToDiagnosticDetails())
+                        .ToDictionary(pair => pair.Key, pair => pair.Value));
+                RefreshTargetScopeView(locked: true);
+                return;
+            }
+
+            foreach (var target in selectedTargets)
+            {
+                linkedSource.Token.ThrowIfCancellationRequested();
+                var host = GetTargetTestHost(target);
+                if (host is null)
+                {
+                    var skipped = new TargetProbeResult(
+                        TargetProbeStatus.Skipped,
+                        null,
+                        "Web domaini yok; uygulama kapsamı profil üzerinden doğrulanır.",
+                        DateTimeOffset.Now);
+                    _targetProbeResults[target.Id] = skipped;
+                    results.Add(skipped);
+                    RefreshTargetScopeView(_controller.Snapshot.IsBusy
+                        || _controller.Snapshot.IsConnected);
+                    continue;
+                }
+
+                var running = new TargetProbeResult(
+                    TargetProbeStatus.Running,
+                    host,
+                    "Test ediliyor",
+                    DateTimeOffset.Now);
+                _targetProbeResults[target.Id] = running;
+                RefreshTargetScopeView(locked: true);
+
+                var result = await ProbeTargetViaScopedProxyAsync(
+                    target,
+                    host,
+                    linkedSource.Token);
+                _targetProbeResults[target.Id] = result;
+                results.Add(result);
+                RefreshTargetScopeView(locked: true);
+            }
+
+            var successCount = results.Count(result =>
+                result.Status is TargetProbeStatus.Success);
+            var failedCount = results.Count(result =>
+                result.Status is TargetProbeStatus.Failed);
+            var skippedCount = results.Count(result =>
+                result.Status is TargetProbeStatus.Skipped);
+            _lastTargetTestSummary =
+                $"{successCount} başarılı, {failedCount} sorunlu, {skippedCount} atlandı.";
+            TargetTestSummary.Text = "Hedef testi: " + _lastTargetTestSummary;
+            _diagnostics.Info(
+                "ui.targetTest.complete",
+                "Hızlı hedef testi tamamlandı.",
+                CreateTargetTestDiagnosticDetails(results));
+            _diagnostics.WriteHealth(
+                "hedef testi tamamlandı",
+                CreateTargetTestDiagnosticDetails(results));
+        }
+        catch (OperationCanceledException)
+        {
+            _lastTargetTestSummary = "Hedef testi iptal edildi veya zaman aşımına uğradı.";
+            TargetTestSummary.Text = _lastTargetTestSummary;
+            _diagnostics.Warning(
+                "ui.targetTest.cancelled",
+                "Hızlı hedef testi iptal edildi veya zaman aşımına uğradı.");
+        }
+        finally
+        {
+            _isTargetTestRunning = false;
+            ApplyTargetTestButtonState(_controller.Snapshot);
+            RefreshTargetScopeView(_controller.Snapshot.IsBusy
+                || _controller.Snapshot.IsConnected);
+        }
+    }
+
+    private async Task<TargetProbeResult> ProbeTargetViaScopedProxyAsync(
+        TargetDefinition target,
+        string host,
+        CancellationToken cancellationToken)
+    {
+        var startedAt = DateTimeOffset.Now;
+        try
+        {
+            if (!TryReadProxyPortFromPacFile(out var proxyPort))
+            {
+                return new TargetProbeResult(
+                    TargetProbeStatus.Failed,
+                    host,
+                    "Aktif proxy portu bulunamadı.",
+                    startedAt);
+            }
+
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken,
+                timeout.Token);
+            using var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, proxyPort)
+                .WaitAsync(TimeSpan.FromSeconds(4), linked.Token);
+            await using var stream = client.GetStream();
+            var request = Encoding.ASCII.GetBytes(
+                $"CONNECT {host}:443 HTTP/1.1\r\nHost: {host}:443\r\nProxy-Connection: close\r\n\r\n");
+            await stream.WriteAsync(request, linked.Token);
+            var buffer = new byte[256];
+            var read = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), linked.Token);
+            var response = read <= 0
+                ? string.Empty
+                : Encoding.ASCII.GetString(buffer, 0, read);
+
+            if (response.StartsWith(
+                    "HTTP/1.1 200",
+                    StringComparison.OrdinalIgnoreCase)
+                || response.StartsWith(
+                    "HTTP/1.0 200",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return new TargetProbeResult(
+                    TargetProbeStatus.Success,
+                    host,
+                    "CONNECT 443 başarılı.",
+                    startedAt);
+            }
+
+            var status = response.Split(
+                    ["\r\n", "\n"],
+                    StringSplitOptions.RemoveEmptyEntries)
+                .FirstOrDefault()
+                ?? "Yanıt alınamadı.";
+            return new TargetProbeResult(
+                TargetProbeStatus.Failed,
+                host,
+                status,
+                startedAt);
+        }
+        catch (OperationCanceledException)
+        {
+            return new TargetProbeResult(
+                TargetProbeStatus.Failed,
+                host,
+                "Zaman aşımı.",
+                startedAt);
+        }
+        catch (Exception exception)
+            when (exception is SocketException
+                or IOException
+                or InvalidOperationException
+                or TimeoutException)
+        {
+            return new TargetProbeResult(
+                TargetProbeStatus.Failed,
+                host,
+                exception.Message,
+                startedAt);
+        }
+    }
+
+    private bool TryReadProxyPortFromPacFile(out int proxyPort)
+    {
+        proxyPort = 0;
+        try
+        {
+            if (!File.Exists(_paths.WebProxyPacFile))
+            {
+                return false;
+            }
+
+            var script = File.ReadAllText(_paths.WebProxyPacFile);
+            return TryReadProxyPortFromPac(script, out proxyPort);
+        }
+        catch (Exception exception)
+            when (exception is IOException
+                or UnauthorizedAccessException
+                or NotSupportedException)
+        {
+            _diagnostics.Warning(
+                "ui.targetTest",
+                "PAC dosyası hızlı test için okunamadı.",
+                new Dictionary<string, string?>
+                {
+                    ["diagnostic"] = exception.Message
+                });
+            return false;
+        }
+    }
+
+    internal static bool TryReadProxyPortFromPacForTesting(
+        string pacScript,
+        out int proxyPort)
+    {
+        return TryReadProxyPortFromPac(pacScript, out proxyPort);
+    }
+
+    private static bool TryReadProxyPortFromPac(
+        string pacScript,
+        out int proxyPort)
+    {
+        proxyPort = 0;
+        const string marker = "PROXY 127.0.0.1:";
+        var index = pacScript.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+        if (index < 0)
+        {
+            return false;
+        }
+
+        var start = index + marker.Length;
+        var end = start;
+        while (end < pacScript.Length && char.IsDigit(pacScript[end]))
+        {
+            end++;
+        }
+
+        return end > start
+            && int.TryParse(
+                pacScript[start..end],
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out proxyPort)
+            && proxyPort is > 0 and <= 65535;
+    }
+
+    internal static string? GetTargetTestHostForTesting(TargetDefinition target)
+    {
+        return GetTargetTestHost(target);
+    }
+
+    private static string? GetTargetTestHost(TargetDefinition target)
+    {
+        return target.Domains
+            .OrderBy(pattern => pattern.IsWildcard)
+            .Select(pattern => pattern.Value)
+            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+    }
+
+    private Dictionary<string, string?> CreateTargetTestDiagnosticDetails(
+        IReadOnlyList<TargetProbeResult> results)
+    {
+        var details = new Dictionary<string, string?>
+        {
+            ["summary"] = _lastTargetTestSummary,
+            ["selectedTargets"] = _controller.CurrentRoutingPlan.Summary
+        };
+
+        var index = 0;
+        foreach (var target in _controller.CurrentRoutingPlan.SelectedTargets)
+        {
+            if (!_targetProbeResults.TryGetValue(target.Id, out var result))
+            {
+                continue;
+            }
+
+            details[$"target.{index}.id"] = target.Id;
+            details[$"target.{index}.label"] = target.Label;
+            details[$"target.{index}.host"] = result.Host;
+            details[$"target.{index}.status"] = result.Status.ToString();
+            details[$"target.{index}.message"] = result.Message;
+            details[$"target.{index}.testedAt"] = result.TestedAt
+                .ToString("O", CultureInfo.InvariantCulture);
+            index++;
+        }
+
+        details["resultCount"] = results.Count.ToString(CultureInfo.InvariantCulture);
+        return details;
+    }
+
     private enum TargetCardState
     {
         Ready,
@@ -979,6 +1440,21 @@ public partial class MainWindow : Window, IDisposable
         Problem,
         Passive
     }
+
+    private enum TargetProbeStatus
+    {
+        NotTested,
+        Running,
+        Success,
+        Failed,
+        Skipped
+    }
+
+    private sealed record TargetProbeResult(
+        TargetProbeStatus Status,
+        string? Host,
+        string Message,
+        DateTimeOffset TestedAt);
 
     private void SetTargetCardsEnabled(bool enabled)
     {
@@ -1039,25 +1515,53 @@ public partial class MainWindow : Window, IDisposable
         textStack.Children.Add(new TextBlock
         {
             Text = target.Label,
-            FontSize = 10.5,
+            FontSize = 11.4,
             FontWeight = FontWeights.SemiBold,
             Foreground = WpfBrushes.White,
             TextTrimming = TextTrimming.CharacterEllipsis,
-            MaxWidth = 56
+            MaxWidth = 68
         });
+        var statusRow = new StackPanel
+        {
+            Orientation = System.Windows.Controls.Orientation.Horizontal,
+            Margin = new Thickness(0, 2, 0, 0)
+        };
+        var statusDot = new Border
+        {
+            Width = 6,
+            Height = 6,
+            CornerRadius = new CornerRadius(3),
+            Margin = new Thickness(0, 3, 4, 0),
+            Background = new SolidColorBrush(MediaColor.FromRgb(170, 211, 226))
+        };
+        statusRow.Children.Add(statusDot);
+        _targetStatusDots[target.Id] = statusDot;
         var statusLabel = new TextBlock
         {
             Text = "Hazır",
-            Margin = new Thickness(0, 2, 0, 0),
-            FontSize = 8.8,
+            FontSize = 9.8,
             FontWeight = FontWeights.SemiBold,
             Foreground = new SolidColorBrush(MediaColor.FromRgb(170, 211, 226)),
             TextTrimming = TextTrimming.CharacterEllipsis,
-            MaxWidth = 56
+            MaxWidth = 60
         };
-        textStack.Children.Add(statusLabel);
+        statusRow.Children.Add(statusLabel);
+        textStack.Children.Add(statusRow);
         grid.Children.Add(textStack);
         _targetStatusLabels[target.Id] = statusLabel;
+
+        var testLabel = new TextBlock
+        {
+            Text = "Test edilmedi",
+            Margin = new Thickness(0, 1, 0, 0),
+            FontSize = 8.7,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(MediaColor.FromRgb(120, 148, 166)),
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            MaxWidth = 68
+        };
+        textStack.Children.Add(testLabel);
+        _targetTestLabels[target.Id] = testLabel;
 
         var warningBadge = new Border
         {
@@ -2029,17 +2533,21 @@ public partial class MainWindow : Window, IDisposable
         return Drawing.SystemIcons.Application;
     }
 
-    private void OpenDiagnostics_Click(object sender, RoutedEventArgs e)
+    private async void OpenDiagnostics_Click(object sender, RoutedEventArgs e)
     {
         try
         {
             _paths.EnsureDirectories();
             _diagnostics.Info("ui.diagnostics", "Tanılama istendi.");
+            await _controller.EnsureCurrentWebProxyScopeAsync(
+                "diagnostics",
+                _windowLifetimeCancellation.Token);
             var details = new Dictionary<string, string?>(
                 _controller.CreateDiagnosticDetails(),
                 StringComparer.Ordinal);
             details["debugDiagnostics"] =
                 _settingsStore.IsDebugDiagnosticsEnabled().ToString();
+            details["lastTargetTest"] = _lastTargetTestSummary;
             foreach (var detail in PortableInstallDiagnostics.Capture())
             {
                 details[detail.Key] = detail.Value;

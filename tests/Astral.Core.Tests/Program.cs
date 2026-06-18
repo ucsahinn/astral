@@ -30,7 +30,9 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Hedef çözümleyici eski özel hedef girdilerini kapsama almaz", TargetScopeResolverIgnoresLegacyCustomTargetsAsync),
     ("Web proxy politikası yalnızca seçili domainleri kabul eder", WebProxyPolicyAllowsOnlySelectedDomainsAsync),
     ("PAC üretici yalnızca seçili domainleri proxyye yönlendirir", ProxyPacRoutesOnlySelectedDomainsAsync),
+    ("Web proxy PAC dosyası kullanıcı veri alanında tutulur", AppPathsStoresWebProxyPacUnderUserDataDirectoryAsync),
     ("Web proxy varsayılan port doluyken yedek porta geçer", ScopedWebProxyUsesFallbackPortWhenPreferredPortIsBusyAsync),
+    ("Web proxy PAC sapmasında kapsamı yeniden uygular", ScopedWebProxyEnsureReappliesMissingPacScopeAsync),
     ("Web proxy erken kapanırsa PAC uygulanmaz", ScopedWebProxyRejectsExitedProcessBeforeApplyingPacAsync),
     ("Discord kapsamı parametresiz çağrıda sadece uygulamayı içerir", DiscordScopeDefaultsToAppOnlyAsync),
     ("Eski web kapsamı çağrısı tarayıcıları profile eklemez", DiscordScopeDoesNotIncludeBrowsersWhenLegacyFlagIsEnabledAsync),
@@ -75,6 +77,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("WireSock hazırlığı doğrulanmış yerel kurucuyu indirmeden kullanır", BootstrapUsesVerifiedLocalInstallerAsync),
     ("WireSock hazırlığı yeniden başlatma gerektiren başarı kodunu kabul eder", BootstrapAcceptsRestartRequiredExitCodeAsync),
     ("Denetleyici idempotent bağlanır ve keser", ControllerLifecycleAsync),
+    ("Denetleyici scoped PAC doğrulanmazsa bağlı raporlamaz", ControllerDoesNotReportConnectedWhenScopedPacMissingAsync),
     ("Denetleyici web-only hedefte Discord sürecine dokunmaz", ControllerConnectsWebOnlyTargetWithoutDiscordProcessAsync),
     ("Denetleyici temiz kapanışta firewall scriptini tekrar çalıştırmaz", ControllerDisposeSkipsDisconnectedCleanupAsync),
     ("Denetleyici kilit doğrulanmadan kapanışta kilidi yeniler", ControllerDisposeRefreshesUnconfirmedDisconnectedLockAsync),
@@ -459,6 +462,39 @@ static Task ProxyPacRoutesOnlySelectedDomainsAsync()
     return Task.CompletedTask;
 }
 
+static Task AppPathsStoresWebProxyPacUnderUserDataDirectoryAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var paths = new AppPaths(
+        Path.Combine(root, "local"),
+        Path.Combine(root, "shared"));
+
+    try
+    {
+        Assert(paths.WebProxyPacFile.StartsWith(
+            paths.DataDirectory,
+            StringComparison.OrdinalIgnoreCase));
+        Assert(paths.WebProxyStateFile.StartsWith(
+            paths.DataDirectory,
+            StringComparison.OrdinalIgnoreCase));
+        Assert(!paths.WebProxyPacFile.StartsWith(
+            paths.SharedDataDirectory,
+            StringComparison.OrdinalIgnoreCase));
+
+        paths.EnsureDirectories();
+
+        Assert(Directory.Exists(paths.WebProxyDirectory));
+        Assert(File.GetAttributes(paths.WebProxyDirectory)
+            .HasFlag(FileAttributes.Directory));
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+
+    return Task.CompletedTask;
+}
+
 static async Task ScopedWebProxyUsesFallbackPortWhenPreferredPortIsBusyAsync()
 {
     var root = CreateTemporaryDirectory();
@@ -501,6 +537,75 @@ static async Task ScopedWebProxyUsesFallbackPortWhenPreferredPortIsBusyAsync()
     {
         await service.ClearAsync(CancellationToken.None);
         listener.Stop();
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task ScopedWebProxyEnsureReappliesMissingPacScopeAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var paths = new AppPaths(
+        Path.Combine(root, "local"),
+        Path.Combine(root, "shared"));
+    var expectedPacUri = new Uri(paths.WebProxyPacFile).AbsoluteUri;
+    var missingPacStatus = JsonSerializer.Serialize(new
+    {
+        CurrentAutoConfigURL = "",
+        ExpectedAutoConfigURL = expectedPacUri,
+        PacFileExists = false,
+        StateFileExists = false,
+        StateOwner = "",
+        StateAppliedAutoConfigURL = ""
+    });
+    var healthyPacStatus = JsonSerializer.Serialize(new
+    {
+        CurrentAutoConfigURL = expectedPacUri,
+        ExpectedAutoConfigURL = expectedPacUri,
+        PacFileExists = true,
+        StateFileExists = true,
+        StateOwner = "Astral",
+        StateAppliedAutoConfigURL = expectedPacUri
+    });
+    var runner = new SequencedCommandRunner(
+        new CommandResult(0, missingPacStatus, string.Empty),
+        new CommandResult(0, string.Empty, string.Empty),
+        new CommandResult(0, healthyPacStatus, string.Empty));
+    var process = new FakeManagedProcess();
+    var launcher = new FakeProcessLauncher(process, logLines: []);
+    var webProxyExecutable = Path.Combine(root, "Astral.WebProxy.exe");
+    var service = new WindowsScopedWebProxyService(
+        paths,
+        runner,
+        launcher,
+        webProxyExecutable,
+        powerShellPath: "powershell.exe");
+    File.WriteAllText(webProxyExecutable, "proxy");
+    var plan = CreateWebProxyRoutingPlan(root);
+
+    try
+    {
+        var status = await service.EnsureAppliedAsync(
+            plan,
+            progress: null,
+            CancellationToken.None);
+
+        Assert(status.IsApplied);
+        Assert(status.ProxyPort is > 0 and <= 65535);
+        Assert(File.Exists(paths.WebProxyPacFile));
+        Assert(runner.Commands.Count == 3);
+        Assert(runner.Commands[0].Contains(
+            "CurrentAutoConfigURL",
+            StringComparison.Ordinal));
+        Assert(runner.Commands[1].Contains(
+            "Set-ItemProperty",
+            StringComparison.Ordinal));
+        Assert(runner.Commands[2].Contains(
+            "CurrentAutoConfigURL",
+            StringComparison.Ordinal));
+    }
+    finally
+    {
+        await service.ClearAsync(CancellationToken.None);
         Directory.Delete(root, recursive: true);
     }
 }
@@ -2337,6 +2442,56 @@ static async Task ControllerLifecycleAsync()
     finally
     {
         Environment.SetEnvironmentVariable("PATH", originalPath);
+        await controller.DisposeAsync();
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task ControllerDoesNotReportConnectedWhenScopedPacMissingAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var process = new FakeManagedProcess();
+    var webProxyService = new FakeScopedWebProxyService
+    {
+        EnsureStatus = new ScopedWebProxyStatus(
+            Required: true,
+            IsApplied: false,
+            Message: "Windows AutoConfigURL seçili PAC'a işaret etmiyor.")
+    };
+    var accessLock = new FakeDiscordAccessLock();
+    var controller = new DiscordTunnelController(
+        new AppPaths(root),
+        new DiscordAppScope(root, root, root),
+        new FakeWireSockBootstrapper(Path.Combine(
+            root,
+            "WireSock VPN Client",
+            "bin",
+            WireSockPackage.CliExecutableFileName)),
+        new FakeProfileProvisioner(Path.Combine(root, "discord.conf")),
+        new FakeProcessLauncher(process),
+        TimeSpan.Zero,
+        accessLock,
+        webProxyService: webProxyService)
+    {
+        IncludeBrowserAccess = true
+    };
+
+    try
+    {
+        await controller.ConnectAsync();
+
+        Assert(controller.Snapshot.State == TunnelState.Error);
+        Assert(!controller.Snapshot.IsConnected);
+        Assert(controller.Snapshot.Message.Contains(
+            "web",
+            StringComparison.OrdinalIgnoreCase));
+        Assert(webProxyService.ApplyCount == 1);
+        Assert(webProxyService.EnsureCount == 1);
+        Assert(webProxyService.ClearCount == 1);
+        Assert(accessLock.EnableCount == 1);
+    }
+    finally
+    {
         await controller.DisposeAsync();
         Directory.Delete(root, recursive: true);
     }
@@ -5352,9 +5507,17 @@ file sealed class FakeScopedWebProxyService : IScopedWebProxyService
 {
     public int ApplyCount { get; private set; }
 
+    public int EnsureCount { get; private set; }
+
+    public int StatusCount { get; private set; }
+
     public int ClearCount { get; private set; }
 
     public RoutingPlan? LastPlan { get; private set; }
+
+    public ScopedWebProxyStatus? EnsureStatus { get; init; }
+
+    public ScopedWebProxyStatus? Status { get; init; }
 
     public Task ApplyAsync(
         RoutingPlan routingPlan,
@@ -5367,11 +5530,42 @@ file sealed class FakeScopedWebProxyService : IScopedWebProxyService
         return Task.CompletedTask;
     }
 
+    public Task<ScopedWebProxyStatus> EnsureAppliedAsync(
+        RoutingPlan routingPlan,
+        IProgress<string>? progress,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        EnsureCount++;
+        LastPlan = routingPlan;
+        return Task.FromResult(EnsureStatus ?? CreateDefaultStatus(routingPlan));
+    }
+
+    public Task<ScopedWebProxyStatus> GetStatusAsync(
+        RoutingPlan routingPlan,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        StatusCount++;
+        LastPlan = routingPlan;
+        return Task.FromResult(Status ?? CreateDefaultStatus(routingPlan));
+    }
+
     public Task ClearAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         ClearCount++;
         return Task.CompletedTask;
+    }
+
+    private static ScopedWebProxyStatus CreateDefaultStatus(RoutingPlan routingPlan)
+    {
+        return routingPlan.RequiresWebProxy
+            ? new ScopedWebProxyStatus(
+                Required: true,
+                IsApplied: true,
+                Message: "Fake scoped web proxy sağlıklı.")
+            : ScopedWebProxyStatus.NotRequired();
     }
 }
 
@@ -5984,6 +6178,30 @@ file sealed class RecordingCommandRunner(CommandResult? result = null) : IComman
         Commands.Add(string.Join(" ", arguments));
         Timeouts.Add(timeout);
         return Task.FromResult(result ?? new CommandResult(0, string.Empty, string.Empty));
+    }
+}
+
+file sealed class SequencedCommandRunner(params CommandResult[] results) : ICommandRunner
+{
+    private int _index;
+
+    public List<string> Commands { get; } = [];
+
+    public Task<CommandResult> RunAsync(
+        string executable,
+        IReadOnlyList<string> arguments,
+        string workingDirectory,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        Commands.Add(string.Join(" ", arguments));
+        if (_index >= results.Length)
+        {
+            return Task.FromResult(new CommandResult(0, string.Empty, string.Empty));
+        }
+
+        return Task.FromResult(results[_index++]);
     }
 }
 
