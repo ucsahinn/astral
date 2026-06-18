@@ -31,7 +31,7 @@ Neden `v2.2.18`?
 
 | Release | Canlı durum | Asset durumu | Karar | Gerekçe |
 | --- | --- | --- | --- | --- |
-| `v2.2.18` | Yayın adayı | Bekliyor | Yayınla | Çoklu host rota testi, ek hedef hostları, WebProxy denied-host tanılaması ve Geçmiş butonu kaldırma hotfixleri. |
+| `v2.2.18` | Yayında | 4 asset | Koru | Çoklu host rota testi, ek hedef hostları, WebProxy denied-host tanılaması ve Geçmiş butonu kaldırma hotfixleri. |
 | `v2.2.17` | Yayında | 4 asset | Koru | WireSock trafik kanıtı, 8 hedef kapsamı, otomatik hedef testi ve aksiyon barı netliği hotfixleri. |
 | `v2.2.16` | Yayında | 4 asset | Koru | Kanıtlı hedef kartı durumu, otomatik hedef testi ve aksiyon barı netliği hotfixleri. |
 | `v2.2.15` | Yayında | 4 asset | Koru | WireSock tunnel-started kapısı, ortak log kilidi, hedef hızlı testi ve tanılama hotfixleri. |
