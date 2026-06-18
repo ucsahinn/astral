@@ -32,10 +32,10 @@
         <Rectangle IsHitTestVisible="False">
             <Rectangle.Fill>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                    <GradientStop Color="#94040710" Offset="0" />
-                    <GradientStop Color="#66091322" Offset="0.34" />
-                    <GradientStop Color="#28071120" Offset="0.72" />
-                    <GradientStop Color="#32040710" Offset="1" />
+                    <GradientStop Color="#7E040710" Offset="0" />
+                    <GradientStop Color="#56091322" Offset="0.34" />
+                    <GradientStop Color="#22071120" Offset="0.72" />
+                    <GradientStop Color="#2C040710" Offset="1" />
                 </LinearGradientBrush>
             </Rectangle.Fill>
         </Rectangle>
@@ -54,7 +54,7 @@
             </Rectangle.Fill>
         </Rectangle>
 
-        <Rectangle IsHitTestVisible="False" Opacity="0.40">
+        <Rectangle IsHitTestVisible="False" Opacity="0.32">
             <Rectangle.Fill>
                 <LinearGradientBrush StartPoint="0,1" EndPoint="0,0">
                     <GradientStop Color="#A7040710" Offset="0" />
@@ -559,7 +559,7 @@
                                            Text="Hedef testi: bağlantı açılınca seçili hedefler tek tek ölçülür." />
                                 <Button Grid.Column="1"
                                         x:Name="TargetQuickTestButton"
-                                        Width="128"
+                                        Width="146"
                                         Height="32"
                                         Margin="10,0,0,0"
                                         VerticalAlignment="Center"
@@ -984,13 +984,13 @@
                     </Grid.ColumnDefinitions>
 
                     <Button Grid.Column="0"
-                            Width="128"
+                            Width="144"
                             Height="40"
                             VerticalAlignment="Center"
                             Style="{StaticResource CommandButtonStyle}"
                             Click="OpenDiagnostics_Click"
-                            ToolTip="Tanı raporu oluştur"
-                            AutomationProperties.Name="Tanı raporu oluştur">
+                            ToolTip="Tanı paketi oluştur ve klasörü aç"
+                            AutomationProperties.Name="Tanı paketi oluştur">
                         <StackPanel Orientation="Horizontal"
                                     HorizontalAlignment="Center"
                                     VerticalAlignment="Center">
@@ -1010,7 +1010,7 @@
                                           Data="M6,3.5 L15.5,3.5 L20,8 L20,20.5 L6,20.5 Z M15.5,3.5 L15.5,8 L20,8 M9,11 L16.5,11 M9,14.5 L16.5,14.5 M9,18 L13.5,18" />
                                 </Canvas>
                             </Viewbox>
-                            <TextBlock Text="Tanılama"
+                            <TextBlock Text="Rapor Oluştur"
                                        FontSize="13"
                                        FontWeight="SemiBold" />
                         </StackPanel>
@@ -1091,7 +1091,7 @@
                                VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource SecondaryTextBrush}"
-                               Text="v2.2.15" />
+                               Text="v2.2.16" />
 
                     <Button Grid.Column="4"
                             x:Name="AutoUpdateButton"
@@ -1135,28 +1135,36 @@
                     <Button Grid.Column="6"
                             x:Name="ReleaseNotesButton"
                             Margin="0,0,8,0"
-                            Width="68"
+                            Width="138"
                             Height="40"
                             VerticalAlignment="Center"
                             Style="{StaticResource CommandButtonStyle}"
                             Click="OpenReleaseNotes_Click"
                             ToolTip="Sürüm notlarını aç"
                             AutomationProperties.Name="Sürüm notlarını aç">
-                        <Viewbox Width="20"
-                                 Height="20"
-                                 Stretch="Uniform">
-                            <Canvas Width="24"
-                                    Height="24"
-                                    ClipToBounds="False">
-                                <Path Stroke="{StaticResource PrimaryTextBrush}"
-                                      StrokeThickness="1.8"
-                                      StrokeStartLineCap="Round"
-                                      StrokeEndLineCap="Round"
-                                      StrokeLineJoin="Round"
-                                      Fill="Transparent"
-                                      Data="M5,6.5 L18,4 L18,16 L5,13.5 Z M18,8.5 L21,8.5 L21,11.5 L18,11.5 M8,14 L9.2,20 L12.2,20 L11,14.7 M8,9.8 L14.5,8.6 M8,11.7 L14.5,10.5" />
-                            </Canvas>
-                        </Viewbox>
+                        <StackPanel Orientation="Horizontal"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center">
+                            <Viewbox Width="17"
+                                     Height="17"
+                                     Margin="0,0,8,0"
+                                     Stretch="Uniform">
+                                <Canvas Width="24"
+                                        Height="24"
+                                        ClipToBounds="False">
+                                    <Path Stroke="{StaticResource PrimaryTextBrush}"
+                                          StrokeThickness="1.8"
+                                          StrokeStartLineCap="Round"
+                                          StrokeEndLineCap="Round"
+                                          StrokeLineJoin="Round"
+                                          Fill="Transparent"
+                                          Data="M5,5.5 L15.5,5.5 L19,9 L19,20 L5,20 Z M15.5,5.5 L15.5,9 L19,9 M8,12 L16,12 M8,15 L16,15 M8,18 L13,18" />
+                                </Canvas>
+                            </Viewbox>
+                            <TextBlock Text="Sürüm Notları"
+                                       FontSize="12"
+                                       FontWeight="SemiBold" />
+                        </StackPanel>
                     </Button>
 
                     <Button Grid.Column="7"

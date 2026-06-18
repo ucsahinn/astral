@@ -91,6 +91,7 @@ static void RenderWindows()
                 try
                 {
                     RenderMainWindow();
+                    VerifyConnectedTargetCardsRequireProbeEvidence();
                     VerifyWindowLifetimeBehavior();
                     VerifyPortableInstallDiagnosticsSanitizesLegacyBrand();
                     RenderConsentWindow();
@@ -184,7 +185,7 @@ static void RenderMainWindow()
             .ToArray();
         Assert(buttonNames.Contains("Astral onar"));
         Assert(buttonNames.Contains("Profil temizle"));
-        Assert(buttonNames.Contains("Tanı raporu oluştur"));
+        Assert(buttonNames.Contains("Tanı paketi oluştur"));
         Assert(buttonNames.Contains("Tanılama raporu hazırla"));
         Assert(buttonNames.Contains("Seçili hedefleri hızlı test et"));
         Assert(buttonNames.Contains("Sürüm notlarını aç"));
@@ -397,6 +398,47 @@ static void VerifyWindowLifetimeBehavior()
     VerifyTrayExitDoesNotHangWhenControllerCleanupIsSlow();
 
     Console.WriteLine("GEÇTİ Pencere kapanış ve arka plan davranışı doğrulandı");
+}
+
+static void VerifyConnectedTargetCardsRequireProbeEvidence()
+{
+    MainWindow? window = null;
+    var root = CreateTemporaryDirectory();
+    var launcher = new FakeProcessLauncher(
+        wireSockLogLines: ["Wireguard tunnel has been started."]);
+
+    try
+    {
+        window = CreateMainWindow(root, launcher);
+        window.Show();
+        window.UpdateLayout();
+
+        RunDispatcherTask(
+            GetController(window).ConnectAsync(CancellationToken.None),
+            TimeSpan.FromSeconds(3));
+        window.UpdateLayout();
+
+        var discordCard = FindVisualChildren<CheckBox>(window)
+            .Single(toggle => toggle.Name == "TargetToggle_discord");
+        var cardTexts = FindVisualChildren<TextBlock>(discordCard)
+            .Select(block => block.Text)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .ToArray();
+
+        Assert(!cardTexts.Contains("Kapsamda", StringComparer.Ordinal));
+        Assert(cardTexts.Contains("Test bekliyor", StringComparer.Ordinal));
+
+        var targetQuickTestButton = FindVisualChildren<Button>(window)
+            .Single(button => button.Name == "TargetQuickTestButton");
+        Assert(targetQuickTestButton.IsEnabled);
+
+        Console.WriteLine("GEÇTİ Bağlı hedef kartı test kanıtı olmadan kapsamda görünmedi");
+    }
+    finally
+    {
+        ForceCloseWindow(window);
+        Directory.Delete(root, recursive: true);
+    }
 }
 
 static void VerifyTrayExitDoesNotHangWhenControllerCleanupIsSlow()

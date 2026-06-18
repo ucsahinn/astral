@@ -82,11 +82,11 @@
                                 VerticalAlignment="Center">
                         <TextBlock FontSize="22"
                                    FontWeight="SemiBold"
-                                   Text="Astral v2.2.15" />
+                                   Text="Astral v2.2.16" />
                         <TextBlock Margin="0,5,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
-                                   Text="Scoped PAC, WireSock tünel onayı ve hedef hızlı testi hotfix'i" />
+                                   Text="Kanıtlı hedef durumu ve premium aksiyon barı hotfix'i" />
                     </StackPanel>
                 </Grid>
 
@@ -109,7 +109,7 @@
                                            FontSize="14"
                                            LineHeight="21"
                                            TextWrapping="Wrap"
-                                           Text="Bu sürüm Astral bağlı görünürken web hedeflerinin scoped PAC ayarı eksik kalması veya WireSock tünel başlangıç onayı oluşmadan bağlantının hazır görünmesi riskini kapatır. PAC dosyası kullanıcı veri alanında tutulur, bağlantı Connected durumuna geçmeden önce canlı doğrulama yapılır ve hızlı hedef testi gerekirse kapsamı yeniler." />
+                                           Text="Bu sürüm Astral bağlı görünürken seçili hedeflerin test kanıtı olmadan kapsamda görünmesi riskini kapatır. Bağlantı hazır olduktan sonra hedefler tek tek ölçülür; her kart kendi sonucunu gösterir ve sorunlu hedefler diğerlerinden ayrılır." />
                             </StackPanel>
                         </Border>
 
@@ -128,35 +128,35 @@
                                            FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Web hedefleri için PAC ve Windows AutoConfigURL durumu Connected öncesi doğrulanır; sapma varsa scoped kapsam otomatik yenilenir." />
+                                           Text="&#x2022; Hedef kartları artık global Connected durumunu tek başına başarı kanıtı saymaz; test sonucu yoksa Test bekliyor durumunda kalır." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; WireSock tünel başlangıç onayı oluşmadan Astral artık Connected durumuna geçmez; başarısız denemede PAC/proxy kapsamı geri temizlenir." />
+                                           Text="&#x2022; Bağlantı hazır olduğunda seçili hedefler otomatik sıraya alınır; manuel Hızlı test düğmesi aynı per-target ölçümü tekrar çalıştırır." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; PAC/state dosyaları tarayıcıların okuyabileceği kullanıcı veri alanına taşındı; protected ProgramData PAC yolu yeni oturumlarda kullanılmaz." />
+                                           Text="&#x2022; Kapsam kartı artık bağlantı sırasında hedef test sonucu yoksa bekliyor yazar; sonuç gelince OK ve sorunlu sayıları ayrı görünür." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Hızlı test seçili web hedeflerini Astral.WebProxy üzerinden tek tek ölçer ve sorunlu hedefi diğer hedeflerden ayrı gösterir." />
+                                           Text="&#x2022; Seçili kart rengi sakin cyan'a alındı; yeşil başarı vurgusu yalnızca kapsam/test kanıtı geldikten sonra kullanılır." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Tanılama paketlerine webProxyScope.* alanları eklendi; planlanan kapsam ile gerçek PAC durumu ayrı raporlanır." />
+                                           Text="&#x2022; Tanılama ve sürüm notu aksiyonları görünür etiketlerle ayrıldı: Rapor Oluştur tanı paketi üretir, Sürüm Notları bu pencereyi açar." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; WireSock ve Astral.WebProxy aynı tunnel.log dosyasına yazarken satır bozulmasını önlemek için log yazımı dosya bazında kilitlendi." />
+                                           Text="&#x2022; Alt aksiyon barı ve hedef paneli korunarak daha okunur hale getirildi; arka plan/video görünürlüğü kontrollü artırıldı." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Release-notes ikonu artık sürüm notlarını açar; tanılama aksiyonları ve alt bar ikonları aynı görsel sisteme bağlandı." />
+                                           Text="&#x2022; Kapanış ve restart akışında otomatik hedef testi kuyruğu pencere kapanırken güvenli biçimde düşer." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Arka plan/video görünürlüğü, panel kontrastı ve hedef kart hizalaması mevcut Astral düzeni korunarak iyileştirildi." />
+                                           Text="&#x2022; Per-target durum regresyonu Windows UI testine eklendi; bağlı kart test kanıtı olmadan Kapsamda görünmez." />
                             </StackPanel>
                         </Border>
 
@@ -202,7 +202,7 @@
                     <TextBlock VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource MutedTextBrush}"
-                               Text="Bu not, v2.2.15 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
+                               Text="Bu not, v2.2.16 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
                     <Button Grid.Column="1"
                             Margin="0,0,10,0"
                             Height="40"

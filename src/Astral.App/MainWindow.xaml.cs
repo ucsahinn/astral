@@ -13,6 +13,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using System.Xml.Linq;
 using Astral.App.Installation;
 using Astral.Core.Configuration;
@@ -49,7 +50,7 @@ public partial class MainWindow : Window, IDisposable
     private static readonly Uri RepositoryUri = new(
         "https://github.com/ucsahinn/astral");
     private static readonly Uri ReleaseNotesUri = new(
-        "https://github.com/ucsahinn/astral/releases/tag/v2.2.15");
+        "https://github.com/ucsahinn/astral/releases/tag/v2.2.16");
     private static readonly Uri BackgroundVideoUri = new(
         "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260606_154941_df1a96e1-a06f-450c-bd02-d863414cc1a0.mp4");
     private static readonly string LocalBackgroundVideoPath = Path.Combine(
@@ -85,6 +86,7 @@ public partial class MainWindow : Window, IDisposable
     private bool _isRunInBackgroundEnabled;
     private bool _isToggleOperationRunning;
     private bool _isTargetTestRunning;
+    private bool _automaticTargetTestQueued;
     private bool _isUpdateCheckRunning;
     private bool _isUpdateOperationRunning;
     private bool _isUpdateProgressPinned;
@@ -106,6 +108,7 @@ public partial class MainWindow : Window, IDisposable
     private bool _exitRequested;
     private bool _isClosing;
     private bool _disposed;
+    private TunnelState _lastObservedTunnelState = TunnelState.Disconnected;
 
     public MainWindow(
         DiscordTunnelController controller,
@@ -233,9 +236,24 @@ public partial class MainWindow : Window, IDisposable
 
     private void ApplySnapshot(TunnelSnapshot snapshot)
     {
+        var previousState = _lastObservedTunnelState;
+        _lastObservedTunnelState = snapshot.State;
+
         if (!_isUpdateOperationRunning && snapshot.IsBusy)
         {
             _isUpdateProgressPinned = false;
+        }
+
+        if (!snapshot.IsConnected && !snapshot.IsBusy)
+        {
+            _automaticTargetTestQueued = false;
+            _targetProbeResults.Clear();
+            _lastTargetTestSummary = "Hedef testi çalıştırılmadı.";
+            if (!_isTargetTestRunning)
+            {
+                TargetTestSummary.Text =
+                    "Hedef testi: bağlantı açılınca seçili hedefler tek tek ölçülür.";
+            }
         }
 
         ToggleButton.IsEnabled = !_isToggleOperationRunning && !snapshot.IsBusy;
@@ -250,6 +268,7 @@ public partial class MainWindow : Window, IDisposable
         RefreshTargetScopeView(snapshot.IsBusy || snapshot.IsConnected);
         RefreshLiveStatusCards(snapshot);
         UpdateBackgroundVideoForSnapshot(snapshot);
+        QueueAutomaticTargetTestIfNeeded(snapshot, previousState);
 
         var templateLabel = ToggleButton.Template.FindName(
             "ToggleButtonLabel",
@@ -318,13 +337,31 @@ public partial class MainWindow : Window, IDisposable
 
         var routingPlan = _controller.CurrentRoutingPlan;
         var selectedTargetCount = _controller.TargetSelection.SelectedTargetIds.Count;
-        ScopeSummary.Text = snapshot.IsConnected
-            ? $"{selectedTargetCount} hedef aktif"
-            : $"{selectedTargetCount} hedef seçili";
+        if (snapshot.IsConnected && _targetProbeResults.Count > 0)
+        {
+            var successful = _targetProbeResults.Values.Count(result =>
+                result.Status is TargetProbeStatus.Success
+                    or TargetProbeStatus.ProfileScope);
+            var failed = _targetProbeResults.Values.Count(result =>
+                result.Status is TargetProbeStatus.Failed);
+            ScopeSummary.Text = failed > 0
+                ? $"{failed} sorunlu · {successful} OK"
+                : $"{successful} hedef OK";
+        }
+        else if (snapshot.IsConnected)
+        {
+            ScopeSummary.Text = $"{selectedTargetCount} hedef test bekliyor";
+        }
+        else
+        {
+            ScopeSummary.Text = $"{selectedTargetCount} hedef seçili";
+        }
         ScopeSummary.ToolTip = routingPlan.Summary;
-        ScopeDetail.Text = routingPlan.RequiresWebProxy
-            ? "Uygulama + web hedefleri kapsamda"
-            : "Yalnızca uygulama hedefleri kapsamda";
+        ScopeDetail.Text = snapshot.IsConnected && _targetProbeResults.Count == 0
+            ? "Hedef testi çalışınca sonuçlar burada görünür"
+            : routingPlan.RequiresWebProxy
+                ? "Uygulama + web hedefleri kapsamda"
+                : "Yalnızca uygulama hedefleri kapsamda";
         ScopeDetail.ToolTip = routingPlan.Summary;
     }
 
@@ -792,6 +829,7 @@ public partial class MainWindow : Window, IDisposable
 
         _settingsStore.SetTargetSelection(selection);
         _targetProbeResults.Clear();
+        _automaticTargetTestQueued = false;
         _lastTargetTestSummary = "Hedef testi çalıştırılmadı.";
         TargetTestSummary.Text = "Hedef testi: bağlantı açılınca seçili hedefler tek tek ölçülür.";
         _diagnostics.Info(
@@ -836,8 +874,8 @@ public partial class MainWindow : Window, IDisposable
                 {
                     var selected = toggle.IsChecked == true;
                     var state = GetTargetCardState(target, snapshot, locked, selected);
-                    ApplyTargetCardState(target, state);
-                    toggle.ToolTip = CreateTargetToolTip(target, state);
+                    ApplyTargetCardState(target, state, snapshot);
+                    toggle.ToolTip = CreateTargetToolTip(target, state, snapshot);
                     AutomationProperties.SetHelpText(
                         toggle,
                         $"{target.Label} hedefi {GetTargetCardStateText(state).ToLowerInvariant()}");
@@ -862,7 +900,14 @@ public partial class MainWindow : Window, IDisposable
             return locked ? TargetCardState.Passive : TargetCardState.Ready;
         }
 
-        if (_targetProbeResults.TryGetValue(target.Id, out var probe))
+        if (snapshot.State is TunnelState.Error
+            or TunnelState.DiscordRestartRequired)
+        {
+            return TargetCardState.Problem;
+        }
+
+        if (snapshot.IsConnected
+            && _targetProbeResults.TryGetValue(target.Id, out var probe))
         {
             return probe.Status switch
             {
@@ -876,8 +921,7 @@ public partial class MainWindow : Window, IDisposable
 
         return snapshot.State switch
         {
-            TunnelState.Error or TunnelState.DiscordRestartRequired => TargetCardState.Problem,
-            TunnelState.Connected => TargetCardState.InScope,
+            TunnelState.Connected => TargetCardState.Selected,
             TunnelState.Preparing
                 or TunnelState.Connecting
                 or TunnelState.Verifying => TargetCardState.Connecting,
@@ -887,7 +931,8 @@ public partial class MainWindow : Window, IDisposable
 
     private void ApplyTargetCardState(
         TargetDefinition target,
-        TargetCardState state)
+        TargetCardState state,
+        TunnelSnapshot snapshot)
     {
         if (_targetStatusLabels.GetValueOrDefault(target.Id) is { } label)
         {
@@ -903,7 +948,7 @@ public partial class MainWindow : Window, IDisposable
 
         if (_targetTestLabels.GetValueOrDefault(target.Id) is { } testLabel)
         {
-            testLabel.Text = GetTargetTestLabel(target.Id);
+            testLabel.Text = GetTargetTestLabel(target.Id, snapshot);
             testLabel.Foreground = _targetProbeResults.TryGetValue(target.Id, out var probe)
                 ? GetTargetProbeBrush(probe.Status)
                 : new SolidColorBrush(MediaColor.FromRgb(120, 148, 166));
@@ -955,13 +1000,16 @@ public partial class MainWindow : Window, IDisposable
 
     private WpfToolTip CreateTargetToolTip(
         TargetDefinition target,
-        TargetCardState state)
+        TargetCardState state,
+        TunnelSnapshot snapshot)
     {
         var stateText = GetTargetCardStateText(state);
         var probeText = _targetProbeResults.TryGetValue(target.Id, out var probe)
             ? $"Son test: {GetTargetProbeStatusText(probe.Status)}"
                 + (string.IsNullOrWhiteSpace(probe.Host) ? string.Empty : $" ({probe.Host})")
-            : "Son test: çalıştırılmadı";
+            : snapshot.IsConnected
+                ? "Son test: bekliyor"
+                : "Son test: çalıştırılmadı";
         return new WpfToolTip
         {
             Content = new StackPanel
@@ -1037,11 +1085,13 @@ public partial class MainWindow : Window, IDisposable
         };
     }
 
-    private string GetTargetTestLabel(string targetId)
+    private string GetTargetTestLabel(string targetId, TunnelSnapshot snapshot)
     {
         if (!_targetProbeResults.TryGetValue(targetId, out var result))
         {
-            return "Test yok";
+            return snapshot.IsConnected
+                ? "Test bekliyor"
+                : "Test yok";
         }
 
         return result.Status switch
@@ -1066,6 +1116,73 @@ public partial class MainWindow : Window, IDisposable
             TargetProbeStatus.Skipped => new SolidColorBrush(MediaColor.FromRgb(170, 211, 226)),
             _ => new SolidColorBrush(MediaColor.FromRgb(120, 148, 166))
         };
+    }
+
+    private void QueueAutomaticTargetTestIfNeeded(
+        TunnelSnapshot snapshot,
+        TunnelState previousState)
+    {
+        if (snapshot.State is not TunnelState.Connected
+            || previousState is TunnelState.Connected
+            || _automaticTargetTestQueued
+            || _isTargetTestRunning)
+        {
+            return;
+        }
+
+        var hasSelectedTarget = _controller.CurrentRoutingPlan
+            .SelectedTargets
+            .Any(target => target.HasWebScope
+                || target.HasApplicationScope);
+        if (!hasSelectedTarget)
+        {
+            return;
+        }
+
+        _automaticTargetTestQueued = true;
+        TargetTestSummary.Text =
+            "Hedef testi: bağlantı hazır, seçili hedefler sırayla ölçülecek.";
+        _diagnostics.Info(
+            "ui.targetTest.queued",
+            "Bağlantı sonrası otomatik hedef testi kuyruğa alındı.",
+            new Dictionary<string, string?>
+            {
+                ["selectedTargets"] = _controller.CurrentRoutingPlan.Summary
+            });
+
+        Dispatcher.BeginInvoke(
+            new Action(async () =>
+            {
+                try
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(450));
+                    if (_disposed
+                        || _isClosing
+                        || !_controller.Snapshot.IsConnected
+                        || _controller.Snapshot.IsBusy)
+                    {
+                        return;
+                    }
+
+                    await RunSelectedTargetsProbeAsync(automatic: true);
+                }
+                catch (OperationCanceledException)
+                {
+                }
+                catch (ObjectDisposedException)
+                {
+                }
+                finally
+                {
+                    _automaticTargetTestQueued = false;
+                    if (!_disposed)
+                    {
+                        ApplyTargetTestButtonState(_controller.Snapshot);
+                        RefreshLiveStatusCards(_controller.Snapshot);
+                    }
+                }
+            }),
+            DispatcherPriority.Background);
     }
 
     private void ApplyTargetTestButtonState(TunnelSnapshot snapshot)
@@ -1098,6 +1215,11 @@ public partial class MainWindow : Window, IDisposable
 
     private async void TestSelectedTargets_Click(object sender, RoutedEventArgs e)
     {
+        await RunSelectedTargetsProbeAsync(automatic: false);
+    }
+
+    private async Task RunSelectedTargetsProbeAsync(bool automatic)
+    {
         if (_isTargetTestRunning)
         {
             return;
@@ -1106,7 +1228,10 @@ public partial class MainWindow : Window, IDisposable
         var snapshot = _controller.Snapshot;
         if (!snapshot.IsConnected || snapshot.IsBusy)
         {
-            TargetTestSummary.Text = "Hedef testi için önce Astral bağlantısını açın.";
+            if (!automatic)
+            {
+                TargetTestSummary.Text = "Hedef testi için önce Astral bağlantısını açın.";
+            }
             ApplyTargetTestButtonState(snapshot);
             return;
         }
@@ -1118,17 +1243,26 @@ public partial class MainWindow : Window, IDisposable
             .ToArray();
         if (selectedTargets.Length == 0)
         {
-            TargetTestSummary.Text = "Test edilecek seçili hedef yok.";
+            if (!automatic)
+            {
+                TargetTestSummary.Text = "Test edilecek seçili hedef yok.";
+            }
             return;
         }
 
         _isTargetTestRunning = true;
         TargetQuickTestButton.IsEnabled = false;
-        TargetTestSummary.Text = "Hedef testi başladı; seçili hedefler sırayla ölçülüyor.";
-        _lastTargetTestSummary = "Hedef testi çalışıyor.";
+        TargetTestSummary.Text = automatic
+            ? "Otomatik hedef testi başladı; seçili hedefler sırayla ölçülüyor."
+            : "Hedef testi başladı; seçili hedefler sırayla ölçülüyor.";
+        _lastTargetTestSummary = automatic
+            ? "Otomatik hedef testi çalışıyor."
+            : "Hedef testi çalışıyor.";
         _diagnostics.Info(
-            "ui.targetTest.start",
-            "Seçili hedefler için hızlı test başlatıldı.",
+            automatic ? "ui.targetTest.autoStart" : "ui.targetTest.start",
+            automatic
+                ? "Seçili hedefler için otomatik test başlatıldı."
+                : "Seçili hedefler için hızlı test başlatıldı.",
             new Dictionary<string, string?>
             {
                 ["selectedTargets"] = string.Join(", ", selectedTargets.Select(target => target.Label))
@@ -1250,6 +1384,7 @@ public partial class MainWindow : Window, IDisposable
             ApplyTargetTestButtonState(_controller.Snapshot);
             RefreshTargetScopeView(_controller.Snapshot.IsBusy
                 || _controller.Snapshot.IsConnected);
+            RefreshLiveStatusCards(_controller.Snapshot);
         }
     }
 

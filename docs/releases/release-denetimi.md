@@ -16,23 +16,22 @@ Bu doküman, GitHub Releases yüzeyindeki sürüm kararlarını ve yayın kapıs
 
 ## Güncel Sürüm Kararı
 
-Güncel patch hedef `v2.2.15` olarak belirlendi.
+Güncel patch hedef `v2.2.16` olarak belirlendi.
 
-Neden `v2.2.15`?
+Neden `v2.2.16`?
 
-- v2.2.14 üstüne WireSock tünel başlangıç onayı zorunlu hale getirildi.
-- Web hedefleri için `Connected` öncesi PAC dosyası, state dosyası, Windows `AutoConfigURL` ve `Astral.WebProxy` süreci birlikte doğrulanır.
-- PAC/state dosyaları protected `%ProgramData%` yerine kullanıcı tarafından okunabilir `%LOCALAPPDATA%\Astral\web-proxy` altına taşındı.
-- Tanılama paketleri `webProxyScope.*` alanlarıyla routing plan ile gerçek Windows PAC durumunu ayrı raporlar.
-- Hızlı hedef testi seçili web hedeflerini tek tek ölçer ve sorunlu hedefi diğerlerinden ayrı gösterir.
-- WireSock ve WebProxy ortak log yazımı dosya bazında kilitlenir; `wireSockConnectionEstablished=False` artık Connected kabul edilmez.
-- v2.2.14 aynı tag ile yayınlandığı için yeni hotfix ayrı `v2.2.15` sürümü olarak çıkarılır; böylece 2.2.14 kullanıcıları da otomatik güncelleme görür.
+- v2.2.15 üstüne hedef kartları global `Connected` durumunu tek başına başarı kanıtı saymayacak şekilde sertleştirildi.
+- Bağlantı hazır olunca seçili hedefler otomatik test kuyruğuna alınır; manuel hızlı test aynı per-target ölçümü tekrar çalıştırır.
+- Bir hedef sorunluyken diğer hedeflerin OK kalabilmesi için kapsam özeti ve kart durumu hedef bazlı sayımla güncellendi.
+- Tanılama ve sürüm notu aksiyonları görünür etiketlerle ayrıldı; release notes butonu artık log klasörü aksiyonu gibi görünmez.
+- v2.2.15 yayınlandığı için bu UI/kanıt hotfix'i ayrı `v2.2.16` sürümü olarak çıkarılır; böylece 2.2.15 kullanıcıları da otomatik güncelleme görür.
 
 ## Public Release Yüzeyi
 
 | Release | Canlı durum | Asset durumu | Karar | Gerekçe |
 | --- | --- | --- | --- | --- |
-| `v2.2.15` | Yayın adayı | Bekliyor | Yayınla | WireSock tunnel-started kapısı, ortak log kilidi, hedef hızlı testi ve tanılama hotfixleri. |
+| `v2.2.16` | Yayın adayı | Bekliyor | Yayınla | Kanıtlı hedef kartı durumu, otomatik hedef testi ve aksiyon barı netliği hotfixleri. |
+| `v2.2.15` | Yayında | 4 asset | Koru | WireSock tunnel-started kapısı, ortak log kilidi, hedef hızlı testi ve tanılama hotfixleri. |
 | `v2.2.14` | Yayında | 4 asset | Koru | Scoped PAC doğrulama, kullanıcı alanı PAC dosyası, hedef hızlı testi ve tanılama hotfixleri. |
 | `v2.2.13` | Tarihsel aday | Yerine geçti | Koru | Plain `AllowedApps`, normal internet DIRECT smoke ve scope hardening hotfixleri. |
 | `v2.2.12` | Tarihsel aday | Yerine geçti | Koru | Live smoke sınıflandırması, WireSock transparent readiness ve `#@ws:AllowedApps` hotfixleri. |
@@ -52,13 +51,13 @@ Neden `v2.2.15`?
 
 ## Yayın Kapısı
 
-`v2.2.15` yayınından önce tamamlanması gereken koşullar:
+`v2.2.16` yayınından önce tamamlanması gereken koşullar:
 
-- Proje, updater ve web proxy sürümü `2.2.15` ile aynı.
+- Proje, updater ve web proxy sürümü `2.2.16` ile aynı.
 - `src/Astral.App/app.manifest` kimlik sürümü proje sürümüyle aynı.
-- `Astral-2.2.15-win-x64.zip` ve sabit `Astral-win-x64.zip` aynı içeriği gösterir.
+- `Astral-2.2.16-win-x64.zip` ve sabit `Astral-win-x64.zip` aynı içeriği gösterir.
 - ZIP içinde `Astral.exe`, `Astral.Updater.exe`, `Astral.WebProxy.exe`, update manifest'i ve gerekli runtime dosyaları bulunur.
-- ZIP içindeki update manifest sürümü `2.2.15`.
+- ZIP içindeki update manifest sürümü `2.2.16`.
 - Astral release içinde eski isimli uyumluluk ZIP'i yayınlanmaz.
 - Kod imzalama sertifikası yapılandırılmadıysa paket imzasız olduğu açıkça not edilir.
 - `dotnet build`, Core tests, Windows tests, `scripts/verify.ps1`, `scripts/build-release.ps1`, `git diff --check` ve Gitleaks geçer.

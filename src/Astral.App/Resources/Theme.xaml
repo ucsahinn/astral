@@ -528,10 +528,10 @@
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="CardBorder"
                                     Property="BorderBrush"
-                                    Value="{StaticResource AccentBrush}" />
+                                    Value="{StaticResource AccentCyanBrush}" />
                             <Setter TargetName="CardBorder"
                                     Property="Background"
-                                    Value="#8C183A38" />
+                                    Value="#84234D68" />
                             <Setter TargetName="CardBorder"
                                     Property="BorderThickness"
                                     Value="1.4" />
@@ -566,16 +566,16 @@
                                     Value="0.92" />
                             <Setter TargetName="CheckMark"
                                     Property="Background"
-                                    Value="{StaticResource AccentBrush}" />
+                                    Value="{StaticResource AccentCyanBrush}" />
                             <Setter TargetName="CheckMark"
                                     Property="BorderBrush"
                                     Value="#F5F7FB" />
                             <Setter TargetName="CardBorder"
                                     Property="BorderBrush"
-                                    Value="{StaticResource AccentBrush}" />
+                                    Value="{StaticResource AccentCyanBrush}" />
                             <Setter TargetName="CardBorder"
                                     Property="Background"
-                                    Value="#8C183A38" />
+                                    Value="#84234D68" />
                         </MultiTrigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
