@@ -9,6 +9,7 @@ using System.Text;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
@@ -51,7 +52,7 @@ public partial class MainWindow : Window, IDisposable
     private static readonly Uri RepositoryUri = new(
         "https://github.com/ucsahinn/astral");
     private static readonly Uri ReleaseNotesUri = new(
-        "https://github.com/ucsahinn/astral/releases/tag/v2.2.23");
+        "https://github.com/ucsahinn/astral/releases/tag/v2.2.24");
     private static readonly Uri BackgroundVideoUri = new(
         "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260606_154941_df1a96e1-a06f-450c-bd02-d863414cc1a0.mp4");
     private static readonly string LocalBackgroundVideoPath = Path.Combine(
@@ -760,17 +761,19 @@ public partial class MainWindow : Window, IDisposable
         _targetWarningBadges.Clear();
         _targetOrder.Clear();
 
+        var targets = _targetRegistry.GetBuiltInTargets();
+        var splitIndex = Math.Max(1, (targets.Count + 1) / 2);
         var index = 0;
-        foreach (var target in _targetRegistry.GetBuiltInTargets())
+        foreach (var target in targets)
         {
             var toggle = new WpfCheckBox
             {
                 Name = "TargetToggle_" + CreateSafeTargetName(target.Id),
                 Tag = target,
-                Width = 118,
-                Height = 54,
-                Margin = new Thickness(2.5),
-                Padding = new Thickness(5),
+                Width = 141,
+                Height = 42,
+                Margin = new Thickness(2),
+                Padding = new Thickness(4),
                 Style = (Style)FindResource("TargetCardCheckBoxStyle"),
                 ToolTip = $"{target.Label} hedefi hazır",
                 Content = CreateTargetCardContent(target)
@@ -778,9 +781,11 @@ public partial class MainWindow : Window, IDisposable
             AutomationProperties.SetName(toggle, $"{target.Label} hedefi");
             toggle.Checked += TargetToggle_Changed;
             toggle.Unchecked += TargetToggle_Changed;
+            toggle.PreviewMouseLeftButtonUp += TargetToggle_PreviewMouseLeftButtonUp;
+            toggle.PreviewKeyDown += TargetToggle_PreviewKeyDown;
             _targetToggles[target.Id] = toggle;
             _targetOrder[target.Id] = index;
-            if (index < 4)
+            if (index < splitIndex)
             {
                 TargetCardsTopPanel.Children.Add(toggle);
             }
@@ -854,6 +859,49 @@ public partial class MainWindow : Window, IDisposable
         RefreshLiveStatusCards(_controller.Snapshot);
     }
 
+    private void TargetToggle_PreviewMouseLeftButtonUp(
+        object sender,
+        MouseButtonEventArgs e)
+    {
+        if (HandleLockedTargetActivation(sender))
+        {
+            e.Handled = true;
+        }
+    }
+
+    private void TargetToggle_PreviewKeyDown(
+        object sender,
+        System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key is not (System.Windows.Input.Key.Enter or System.Windows.Input.Key.Space))
+        {
+            return;
+        }
+
+        if (HandleLockedTargetActivation(sender))
+        {
+            e.Handled = true;
+        }
+    }
+
+    private bool HandleLockedTargetActivation(object sender)
+    {
+        var snapshot = _controller.Snapshot;
+        if (!snapshot.IsBusy && !snapshot.IsConnected)
+        {
+            return false;
+        }
+
+        if (sender is WpfCheckBox { Tag: TargetDefinition target }
+            && snapshot.IsConnected
+            && IsTargetSelected(target.Id))
+        {
+            OpenTargetWebsite(target);
+        }
+
+        return true;
+    }
+
     private void SyncTargetTogglesFromSelection(TargetSelection selection)
     {
         _isApplyingSettings = true;
@@ -880,7 +928,7 @@ public partial class MainWindow : Window, IDisposable
         {
             foreach (var toggle in _targetToggles.Values)
             {
-                toggle.IsEnabled = !locked;
+                toggle.IsEnabled = true;
                 if (toggle.Tag is TargetDefinition target)
                 {
                     var selected = toggle.IsChecked == true;
@@ -908,7 +956,7 @@ public partial class MainWindow : Window, IDisposable
     {
         if (!selected)
         {
-            return locked ? TargetCardState.Passive : TargetCardState.Ready;
+            return TargetCardState.Passive;
         }
 
         if (snapshot.State is TunnelState.Error
@@ -979,6 +1027,7 @@ public partial class MainWindow : Window, IDisposable
 
         if (_targetIconBadges.GetValueOrDefault(target.Id) is not { } iconBadge)
         {
+            ApplyTargetToggleState(target, state);
             return;
         }
 
@@ -1012,6 +1061,31 @@ public partial class MainWindow : Window, IDisposable
             iconBadge.BeginAnimation(OpacityProperty, null);
             iconBadge.Opacity = state is TargetCardState.Passive ? 0.58 : 1;
         }
+
+        ApplyTargetToggleState(target, state);
+    }
+
+    private void ApplyTargetToggleState(TargetDefinition target, TargetCardState state)
+    {
+        if (!_targetToggles.TryGetValue(target.Id, out var toggle))
+        {
+            return;
+        }
+
+        toggle.Opacity = state switch
+        {
+            TargetCardState.Passive => 0.52,
+            TargetCardState.Problem => 0.98,
+            _ => 1
+        };
+        toggle.BorderBrush = state switch
+        {
+            TargetCardState.Problem => new SolidColorBrush(MediaColor.FromRgb(255, 122, 122)),
+            TargetCardState.InScope => new SolidColorBrush(MediaColor.FromRgb(93, 255, 146)),
+            TargetCardState.Selected => new SolidColorBrush(MediaColor.FromRgb(93, 255, 146)),
+            TargetCardState.Connecting => new SolidColorBrush(MediaColor.FromRgb(125, 235, 255)),
+            _ => new SolidColorBrush(MediaColor.FromRgb(97, 126, 151))
+        };
     }
 
     private static WpfToolTip CreateTargetToolTip(
@@ -1677,11 +1751,11 @@ public partial class MainWindow : Window, IDisposable
 
         var iconBadge = new Border
         {
-            Width = 38,
-            Height = 38,
+            Width = 30,
+            Height = 30,
             HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
             VerticalAlignment = VerticalAlignment.Center,
-            CornerRadius = new CornerRadius(11),
+            CornerRadius = new CornerRadius(9),
             BorderBrush = new SolidColorBrush(MediaColor.FromArgb(172, 245, 247, 251)),
             BorderThickness = new Thickness(1),
             Background = new SolidColorBrush(MediaColor.FromArgb(232, 245, 247, 251)),
@@ -1689,7 +1763,7 @@ public partial class MainWindow : Window, IDisposable
         };
         iconBadge.Effect = new DropShadowEffect
         {
-            BlurRadius = 14,
+            BlurRadius = 12,
             Direction = 270,
             Opacity = 0.52,
             ShadowDepth = 0,
@@ -1708,11 +1782,11 @@ public partial class MainWindow : Window, IDisposable
         textStack.Children.Add(new TextBlock
         {
             Text = target.Label,
-            FontSize = 11.2,
+            FontSize = 10.8,
             FontWeight = FontWeights.SemiBold,
             Foreground = WpfBrushes.White,
             TextTrimming = TextTrimming.CharacterEllipsis,
-            MaxWidth = 64,
+            MaxWidth = 92,
             VerticalAlignment = VerticalAlignment.Center
         });
         grid.Children.Add(textStack);
@@ -1758,14 +1832,14 @@ public partial class MainWindow : Window, IDisposable
         var foreground = new SolidColorBrush(MediaColor.FromRgb(245, 247, 251));
         return new Grid
         {
-            Width = 34,
-            Height = 34,
+            Width = 28,
+            Height = 28,
             Children =
             {
                 new TextBlock
                 {
                     Text = visual.Mark,
-                    FontSize = visual.Mark.Length > 1 ? 12 : 18,
+                    FontSize = visual.Mark.Length > 1 ? 11 : 16,
                     FontWeight = FontWeights.Black,
                     Foreground = foreground,
                     HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
@@ -1865,8 +1939,8 @@ public partial class MainWindow : Window, IDisposable
 
             icon = new Viewbox
             {
-                Width = 34,
-                Height = 34,
+                Width = 28,
+                Height = 28,
                 Stretch = Stretch.Uniform,
                 Child = canvas
             };
@@ -1914,8 +1988,8 @@ public partial class MainWindow : Window, IDisposable
         bitmap.Freeze();
         icon = new WpfImage
         {
-            Width = 34,
-            Height = 34,
+            Width = 28,
+            Height = 28,
             Source = bitmap,
             Stretch = Stretch.Uniform,
             SnapsToDevicePixels = true
@@ -2016,6 +2090,7 @@ public partial class MainWindow : Window, IDisposable
         return iconKey switch
         {
             "discord" => new("DC", TargetVisualKind.Letter, Rgb(88, 101, 242), Rgb(125, 235, 255)),
+            "roblox" => new("RB", TargetVisualKind.Letter, Rgb(20, 24, 32), Rgb(245, 247, 251)),
             "wattpad" => new("W", TargetVisualKind.Letter, Rgb(255, 103, 26), Rgb(255, 175, 72)),
             "bigo-live" => new("BG", TargetVisualKind.Letter, Rgb(27, 169, 255), Rgb(93, 255, 146)),
             "azar" => new("AZ", TargetVisualKind.Letter, Rgb(255, 89, 139), Rgb(125, 235, 255)),
@@ -2023,6 +2098,13 @@ public partial class MainWindow : Window, IDisposable
             "livu" => new("LV", TargetVisualKind.Letter, Rgb(165, 91, 255), Rgb(93, 255, 146)),
             "imvu" => new("IM", TargetVisualKind.Letter, Rgb(35, 215, 162), Rgb(125, 235, 255)),
             "blogspot" => new("BL", TargetVisualKind.Letter, Rgb(245, 132, 31), Rgb(255, 199, 89)),
+            "radio-garden" => new("RG", TargetVisualKind.Letter, Rgb(29, 185, 84), Rgb(93, 255, 146)),
+            "deutsche-welle" => new("DW", TargetVisualKind.Letter, Rgb(17, 24, 39), Rgb(245, 247, 251)),
+            "voice-of-america" => new("VOA", TargetVisualKind.Letter, Rgb(30, 90, 168), Rgb(210, 31, 60)),
+            "eksi-sozluk" => new("E", TargetVisualKind.Letter, Rgb(106, 168, 79), Rgb(245, 247, 251)),
+            "grok" => new("G", TargetVisualKind.Letter, Rgb(16, 24, 32), Rgb(125, 235, 255)),
+            "imgur" => new("I", TargetVisualKind.Letter, Rgb(27, 183, 110), Rgb(245, 247, 251)),
+            "pastebin" => new("PB", TargetVisualKind.Letter, Rgb(26, 158, 119), Rgb(125, 235, 255)),
             _ => new("A", TargetVisualKind.Letter, Rgb(125, 235, 255), Rgb(93, 255, 146))
         };
     }
@@ -2769,6 +2851,83 @@ public partial class MainWindow : Window, IDisposable
     private void OpenGitHub_Click(object sender, RoutedEventArgs e)
     {
         OpenUri(RepositoryUri);
+    }
+
+    private bool IsTargetSelected(string targetId)
+    {
+        return _controller.TargetSelection.SelectedTargetIds
+            .Any(selected => string.Equals(
+                selected,
+                targetId,
+                StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void OpenTargetWebsite(TargetDefinition target)
+    {
+        if (!TryGetTargetLaunchUri(target, out var uri))
+        {
+            _diagnostics.Warning(
+                "ui.targetOpen",
+                "Hedef web giriş URL'si bulunamadı.",
+                new Dictionary<string, string?>
+                {
+                    ["targetId"] = target.Id
+                });
+            return;
+        }
+
+        try
+        {
+            OpenUri(uri);
+            _diagnostics.Info(
+                "ui.targetOpen",
+                "Hedef web girişi açıldı.",
+                new Dictionary<string, string?>
+                {
+                    ["targetId"] = target.Id,
+                    ["host"] = uri.Host
+                });
+        }
+        catch (Exception exception)
+            when (exception is InvalidOperationException
+                or System.ComponentModel.Win32Exception)
+        {
+            _diagnostics.Failure(
+                "ui.targetOpen",
+                "Hedef web girişi açılamadı.",
+                exception);
+        }
+    }
+
+    private static bool TryGetTargetLaunchUri(
+        TargetDefinition target,
+        out Uri uri)
+    {
+        uri = RepositoryUri;
+        if (target.Metadata.TryGetValue("launchUrl", out var rawLaunchUrl)
+            && Uri.TryCreate(rawLaunchUrl, UriKind.Absolute, out var launchUri)
+            && launchUri.Scheme is "https" or "http"
+            && !string.IsNullOrWhiteSpace(launchUri.Host))
+        {
+            uri = launchUri;
+            return true;
+        }
+
+        var domain = target.Domains
+            .Select(pattern => pattern.Pattern)
+            .FirstOrDefault(pattern => !pattern.StartsWith("*.", StringComparison.Ordinal));
+        if (string.IsNullOrWhiteSpace(domain))
+        {
+            return false;
+        }
+
+        if (!Uri.TryCreate("https://" + domain, UriKind.Absolute, out var fallbackUri))
+        {
+            return false;
+        }
+
+        uri = fallbackUri;
+        return true;
     }
 
     private void OpenReleaseNotes_Click(object sender, RoutedEventArgs e)

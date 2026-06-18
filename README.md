@@ -1,4 +1,4 @@
-# Astral
+# Astral VPN
 
 <p align="center">
   <img src="src/Astral.App/Assets/astral-mark.png" alt="Astral uygulama ikonu" width="118">
@@ -23,7 +23,7 @@
   · <a href="docs/sorun-giderme.md">Sorun giderme</a>
 </p>
 
-Astral, Windows'ta yalnızca kullanıcının seçtiği uygulama veya web hedefleri için bağlantı kapsamı oluşturan portable bir masaüstü uygulamasıdır. Tüm PC'yi, tüm tarayıcıyı veya sistem genelini VPN'e almayı amaçlamaz.
+Astral VPN, Windows'ta yalnızca kullanıcının seçtiği uygulama veya web hedefleri için bağlantı kapsamı oluşturan portable bir masaüstü uygulamasıdır. Tüm PC'yi, tüm tarayıcıyı veya sistem genelini VPN'e almayı amaçlamaz.
 
 Uygulama hedefleri WireSock `AllowedApps` satırına dar kapsamla yazılır. Web hedeflerinde genel tarayıcı süreçleri profile eklenmez; seçili domainler `Astral.WebProxy.exe` ve PAC allowlist üzerinden yönlendirilir, diğer domainler DIRECT kalır.
 
@@ -98,7 +98,7 @@ Release sayfasındaki ZIP paketini manuel indirdiğinizde yanında verilen SHA-2
 | Sorun giderme | [docs/sorun-giderme.md](docs/sorun-giderme.md) |
 | Mimari | [docs/mimari.md](docs/mimari.md) |
 | Kaynak sorun denetimi | [docs/kaynak-sorun-denetimi.md](docs/kaynak-sorun-denetimi.md) |
-| v2.2.23 release notu | [docs/releases/v2.2.23.md](docs/releases/v2.2.23.md) |
+| v2.2.24 release notu | [docs/releases/v2.2.24.md](docs/releases/v2.2.24.md) |
 
 ## Geliştirme
 

@@ -7,13 +7,21 @@ public sealed class TargetRegistry
     private static readonly IReadOnlyList<string> BuiltInTargetOrder =
     [
         TargetIds.Discord,
+        TargetIds.Roblox,
         TargetIds.Wattpad,
         TargetIds.Azar,
         TargetIds.BigoLive,
         TargetIds.IMVU,
         TargetIds.LiVU,
         TargetIds.Tango,
-        TargetIds.Blogspot
+        TargetIds.Blogspot,
+        TargetIds.RadioGarden,
+        TargetIds.DeutscheWelle,
+        TargetIds.VoiceOfAmerica,
+        TargetIds.EksiSozluk,
+        TargetIds.Grok,
+        TargetIds.Imgur,
+        TargetIds.Pastebin
     ];
 
     private static readonly IReadOnlyDictionary<string, string> NeutralMetadata =
@@ -46,7 +54,32 @@ public sealed class TargetRegistry
                 [
                     "discord.com",
                     "discord.gg"
-                ]),
+                ],
+                "https://discord.com/app"),
+            Create(
+                TargetIds.Roblox,
+                "Roblox",
+                TargetCategory.Game,
+                TargetScopeKind.ApplicationAndWeb,
+                [
+                    "roblox.com",
+                    "www.roblox.com",
+                    "auth.roblox.com",
+                    "apis.roblox.com",
+                    "api.roblox.com",
+                    "games.roblox.com",
+                    "assetdelivery.roblox.com",
+                    "setup.rbxcdn.com",
+                    "rbxcdn.com",
+                    "*.rbxcdn.com"
+                ],
+                ["RobloxPlayerBeta.exe", "RobloxPlayerLauncher.exe", "RobloxStudioBeta.exe"],
+                "roblox",
+                [
+                    "roblox.com",
+                    "www.roblox.com"
+                ],
+                "https://www.roblox.com"),
             Create(
                 TargetIds.Wattpad,
                 "Wattpad",
@@ -64,7 +97,8 @@ public sealed class TargetRegistry
                 [
                     "wattpad.com",
                     "www.wattpad.com"
-                ]),
+                ],
+                "https://www.wattpad.com"),
             Create(
                 TargetIds.BigoLive,
                 "Bigo Live",
@@ -82,7 +116,8 @@ public sealed class TargetRegistry
                 [
                     "bigo.tv",
                     "www.bigo.tv"
-                ]),
+                ],
+                "https://www.bigo.tv"),
             Create(
                 TargetIds.Azar,
                 "Azar",
@@ -100,7 +135,8 @@ public sealed class TargetRegistry
                 [
                     "azarlive.com",
                     "www.azarlive.com"
-                ]),
+                ],
+                "https://azarlive.com"),
             Create(
                 TargetIds.Tango,
                 "Tango",
@@ -116,7 +152,8 @@ public sealed class TargetRegistry
                 [
                     "tango.me",
                     "www.tango.me"
-                ]),
+                ],
+                "https://www.tango.me"),
             Create(
                 TargetIds.LiVU,
                 "LiVU",
@@ -132,7 +169,8 @@ public sealed class TargetRegistry
                 [
                     "livu.me",
                     "www.livu.me"
-                ]),
+                ],
+                "https://www.livu.me"),
             Create(
                 TargetIds.IMVU,
                 "IMVU",
@@ -150,7 +188,8 @@ public sealed class TargetRegistry
                 [
                     "imvu.com",
                     "www.imvu.com"
-                ]),
+                ],
+                "https://www.imvu.com"),
             Create(
                 TargetIds.Blogspot,
                 "Blogspot",
@@ -170,7 +209,133 @@ public sealed class TargetRegistry
                     "blogger.com",
                     "www.blogger.com",
                     "blogger.googleusercontent.com"
-                ])
+                ],
+                "https://www.blogger.com"),
+            Create(
+                TargetIds.RadioGarden,
+                "Radio Garden",
+                TargetCategory.Media,
+                TargetScopeKind.Web,
+                [
+                    "radio.garden",
+                    "www.radio.garden"
+                ],
+                [],
+                "radio-garden",
+                [
+                    "radio.garden",
+                    "www.radio.garden"
+                ],
+                "https://radio.garden"),
+            Create(
+                TargetIds.DeutscheWelle,
+                "DW",
+                TargetCategory.News,
+                TargetScopeKind.Web,
+                [
+                    "dw.com",
+                    "www.dw.com",
+                    "amp.dw.com",
+                    "static.dw.com"
+                ],
+                [],
+                "deutsche-welle",
+                [
+                    "dw.com",
+                    "www.dw.com"
+                ],
+                "https://www.dw.com"),
+            Create(
+                TargetIds.VoiceOfAmerica,
+                "VOA",
+                TargetCategory.News,
+                TargetScopeKind.Web,
+                [
+                    "voanews.com",
+                    "www.voanews.com",
+                    "learningenglish.voanews.com",
+                    "gdb.voanews.com"
+                ],
+                [],
+                "voice-of-america",
+                [
+                    "www.voanews.com",
+                    "voanews.com"
+                ],
+                "https://www.voanews.com"),
+            Create(
+                TargetIds.EksiSozluk,
+                "Ekşi Sözlük",
+                TargetCategory.ReadingWriting,
+                TargetScopeKind.Web,
+                [
+                    "eksisozluk.com",
+                    "www.eksisozluk.com",
+                    "eksisozluk1923.com",
+                    "www.eksisozluk1923.com"
+                ],
+                [],
+                "eksi-sozluk",
+                [
+                    "eksisozluk.com",
+                    "www.eksisozluk.com"
+                ],
+                "https://eksisozluk.com"),
+            Create(
+                TargetIds.Grok,
+                "Grok",
+                TargetCategory.Utility,
+                TargetScopeKind.Web,
+                [
+                    "grok.com",
+                    "www.grok.com",
+                    "x.ai",
+                    "www.x.ai"
+                ],
+                [],
+                "grok",
+                [
+                    "grok.com",
+                    "x.ai"
+                ],
+                "https://grok.com"),
+            Create(
+                TargetIds.Imgur,
+                "Imgur",
+                TargetCategory.Media,
+                TargetScopeKind.Web,
+                [
+                    "imgur.com",
+                    "www.imgur.com",
+                    "i.imgur.com",
+                    "api.imgur.com",
+                    "s.imgur.com"
+                ],
+                [],
+                "imgur",
+                [
+                    "imgur.com",
+                    "www.imgur.com"
+                ],
+                "https://imgur.com"),
+            Create(
+                TargetIds.Pastebin,
+                "Pastebin",
+                TargetCategory.Utility,
+                TargetScopeKind.Web,
+                [
+                    "pastebin.com",
+                    "www.pastebin.com",
+                    "pastebin.pl",
+                    "www.pastebin.pl"
+                ],
+                [],
+                "pastebin",
+                [
+                    "pastebin.com",
+                    "www.pastebin.com"
+                ],
+                "https://pastebin.com")
         ]);
     }
 
@@ -195,7 +360,8 @@ public sealed class TargetRegistry
         IReadOnlyList<string> domains,
         IReadOnlyList<string> executableNames,
         string iconKey,
-        IReadOnlyList<string>? probeHosts = null)
+        IReadOnlyList<string>? probeHosts = null,
+        string? launchUrl = null)
     {
         var metadata = new Dictionary<string, string>(
             NeutralMetadata,
@@ -204,6 +370,11 @@ public sealed class TargetRegistry
         {
             metadata["probeHosts"] = string.Join(";", probeHosts);
         }
+
+        var targetLaunchUrl = string.IsNullOrWhiteSpace(launchUrl)
+            ? "https://" + domains.First(domain => !domain.StartsWith("*.", StringComparison.Ordinal))
+            : launchUrl.Trim();
+        metadata["launchUrl"] = targetLaunchUrl;
 
         return new TargetDefinition(
             id,

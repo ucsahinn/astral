@@ -1,7 +1,7 @@
 <Window x:Class="Astral.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Astral"
+        Title="Astral VPN"
         Width="1280"
         Height="720"
         MinWidth="1280"
@@ -233,11 +233,11 @@
                         <TextBlock FontSize="20"
                                    LineHeight="24"
                                    FontWeight="SemiBold"
-                                   Text="Astral" />
+                                   Text="Astral VPN" />
                         <TextBlock Margin="0,3,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
-                                   Text="Desteklenen hedef kapsamı hazır." />
+                                   Text="Seçili hedef VPN kapsamı hazır." />
                     </StackPanel>
 
                     <Border Grid.Column="2"
@@ -557,15 +557,15 @@
                                        FontWeight="SemiBold"
                                        Text="Desteklenen hedefler" />
                             <UniformGrid x:Name="TargetCardsTopPanel"
-                                         Width="500"
-                                         Rows="1"
+                                         Width="586"
+                                         Rows="2"
                                          Columns="4"
                                          HorizontalAlignment="Center"
                                          SnapsToDevicePixels="True" />
                             <UniformGrid x:Name="TargetCardsBottomPanel"
-                                         Width="500"
-                                         Margin="0,6,0,0"
-                                         Rows="1"
+                                         Width="586"
+                                         Margin="0,4,0,0"
+                                         Rows="2"
                                          Columns="4"
                                          HorizontalAlignment="Center"
                                          SnapsToDevicePixels="True" />
@@ -1090,7 +1090,7 @@
                                VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource SecondaryTextBrush}"
-                               Text="v2.2.23" />
+                               Text="v2.2.24" />
 
                     <Button Grid.Column="4"
                             x:Name="AutoUpdateButton"

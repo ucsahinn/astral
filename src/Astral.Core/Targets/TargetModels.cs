@@ -5,6 +5,7 @@ namespace Astral.Core.Targets;
 public static class TargetIds
 {
     public const string Discord = "discord";
+    public const string Roblox = "roblox";
     public const string Wattpad = "wattpad";
     public const string BigoLive = "bigo-live";
     public const string Azar = "azar";
@@ -12,6 +13,13 @@ public static class TargetIds
     public const string LiVU = "livu";
     public const string IMVU = "imvu";
     public const string Blogspot = "blogspot";
+    public const string RadioGarden = "radio-garden";
+    public const string DeutscheWelle = "deutsche-welle";
+    public const string VoiceOfAmerica = "voice-of-america";
+    public const string EksiSozluk = "eksi-sozluk";
+    public const string Grok = "grok";
+    public const string Imgur = "imgur";
+    public const string Pastebin = "pastebin";
 }
 
 public enum TargetCategory
@@ -21,7 +29,10 @@ public enum TargetCategory
     Game,
     ReadingWriting,
     LiveSocial,
-    Blog
+    Blog,
+    News,
+    Media,
+    Utility
 }
 
 public enum TargetScopeKind

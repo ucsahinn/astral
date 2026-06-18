@@ -13,13 +13,13 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>Astral</AssemblyName>
     <RootNamespace>Astral.App</RootNamespace>
-    <AssemblyTitle>Astral</AssemblyTitle>
-    <AssemblyDescription>Astral, Windows için seçili uygulama ve web hedeflerini dar kapsamla yöneten bağlantı yöneticisi</AssemblyDescription>
+    <AssemblyTitle>Astral VPN</AssemblyTitle>
+    <AssemblyDescription>Astral VPN, Windows için seçili uygulama ve web hedeflerini dar kapsamla yöneten bağlantı yöneticisi</AssemblyDescription>
     <AssemblyCompany>ucsahinn</AssemblyCompany>
-    <AssemblyProduct>Astral</AssemblyProduct>
+    <AssemblyProduct>Astral VPN</AssemblyProduct>
     <Copyright>Copyright (c) 2026 ucsahinn</Copyright>
-    <Version>2.2.23</Version>
-    <FileVersion>2.2.23.0</FileVersion>
+    <Version>2.2.24</Version>
+    <FileVersion>2.2.24.0</FileVersion>
     <RepositoryUrl>https://github.com/ucsahinn/astral</RepositoryUrl>
     <PublishTrimmed>false</PublishTrimmed>
     <PublishSingleFile>false</PublishSingleFile>
@@ -35,6 +35,7 @@
     <Resource Include="Assets\astral-mark.png" />
     <Resource Include="Assets\astral-v2.ico" />
     <Resource Include="Assets\targets\discord.svg" />
+    <Resource Include="Assets\targets\roblox.svg" />
     <Resource Include="Assets\targets\wattpad.svg" />
     <Resource Include="Assets\targets\azar.svg" />
     <Resource Include="Assets\targets\bigo-live.svg" />
@@ -42,6 +43,13 @@
     <Resource Include="Assets\targets\livu.svg" />
     <Resource Include="Assets\targets\tango.svg" />
     <Resource Include="Assets\targets\blogspot.svg" />
+    <Resource Include="Assets\targets\radio-garden.svg" />
+    <Resource Include="Assets\targets\deutsche-welle.svg" />
+    <Resource Include="Assets\targets\voice-of-america.svg" />
+    <Resource Include="Assets\targets\eksi-sozluk.svg" />
+    <Resource Include="Assets\targets\grok.svg" />
+    <Resource Include="Assets\targets\imgur.svg" />
+    <Resource Include="Assets\targets\pastebin.svg" />
   </ItemGroup>
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">

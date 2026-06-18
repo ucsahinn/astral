@@ -300,16 +300,22 @@ static async Task<TcpClient?> TryConnectUpstreamAsync(
     Stream clientStream,
     CancellationToken cancellationToken)
 {
+    const int UpstreamConnectTimeoutSeconds = 10;
+    using var timeout = new CancellationTokenSource(
+        TimeSpan.FromSeconds(UpstreamConnectTimeoutSeconds));
+    using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+        cancellationToken,
+        timeout.Token);
     try
     {
-        return await UpstreamConnector.ConnectAsync(host, port, cancellationToken);
+        return await UpstreamConnector.ConnectAsync(host, port, linkedCancellation.Token);
     }
     catch (Exception exception)
         when (exception is SocketException
             or IOException
             or InvalidOperationException
             or HttpRequestException
-            || exception is TaskCanceledException && !cancellationToken.IsCancellationRequested)
+            || exception is OperationCanceledException && !cancellationToken.IsCancellationRequested)
     {
         WriteUpstreamFailure(method, host, exception);
         await WriteProxyResponseAsync(clientStream, 502, cancellationToken);

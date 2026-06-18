@@ -11,6 +11,7 @@ public sealed class AppSettingsStore
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
+        PropertyNameCaseInsensitive = true,
         WriteIndented = true
     };
 
@@ -252,7 +253,7 @@ public sealed class AppSettingsStore
         try
         {
             var json = File.ReadAllText(_paths.SettingsFile);
-            return JsonSerializer.Deserialize<StoredSettings>(json)
+            return JsonSerializer.Deserialize<StoredSettings>(json, JsonOptions)
                 ?? StoredSettings.Default;
         }
         catch (JsonException)

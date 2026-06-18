@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System.IO.Compression;
 using System.Globalization;
+using System.Xml.Linq;
 using Astral.Core.Configuration;
 using Astral.Core.Connection;
 using Astral.Core.Diagnostics;
@@ -23,6 +24,7 @@ using Astral.Core.WireSock;
 
 var tests = new (string Name, Func<Task> Run)[]
 {
+    ("Release project versions stay aligned", ReleaseProjectsUseSameVersionAsync),
     ("Hedef kayıt defteri yerleşik presetleri güvenli kapsamla tanımlar", TargetRegistryDefinesBuiltInPresetsAsync),
     ("Hedef seçimi varsayılan Discord kapsamını ve eski tarayıcı ayarını güvenli taşır", TargetSelectionStoreDefaultsAndMigratesLegacyBrowserAsync),
     ("Hedef çözümleyici web hedeflerinde tarayıcıları değil web proxy sürecini kapsar", TargetScopeResolverUsesWebProxyForWebTargetsAsync),
@@ -173,22 +175,73 @@ Console.WriteLine();
 Console.WriteLine($"{tests.Length} test geçti.");
 return 0;
 
+static Task ReleaseProjectsUseSameVersionAsync()
+{
+    var root = FindRepositoryRoot();
+    var projects = new[]
+    {
+        ("Astral.App", Path.Combine(root, "src", "Astral.App", "Astral.App.csproj")),
+        ("Astral.Updater", Path.Combine(root, "src", "Astral.Updater", "Astral.Updater.csproj")),
+        ("Astral.WebProxy", Path.Combine(root, "src", "Astral.WebProxy", "Astral.WebProxy.csproj"))
+    };
+
+    var appVersion = GetProjectProperty(projects[0].Item2, "Version");
+    Assert(!string.IsNullOrWhiteSpace(appVersion));
+    var expectedFileVersion = appVersion + ".0";
+
+    foreach (var (name, path) in projects)
+    {
+        var version = GetProjectProperty(path, "Version");
+        var fileVersion = GetProjectProperty(path, "FileVersion");
+        if (!string.Equals(version, appVersion, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"{name} Version {version} != {appVersion}");
+        }
+
+        if (!string.Equals(fileVersion, expectedFileVersion, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"{name} FileVersion {fileVersion} != {expectedFileVersion}");
+        }
+    }
+
+    var manifest = File.ReadAllText(Path.Combine(
+        root,
+        "src",
+        "Astral.App",
+        "app.manifest"));
+    Assert(manifest.Contains(
+        $"<assemblyIdentity version=\"{expectedFileVersion}\" name=\"Astral\"",
+        StringComparison.Ordinal));
+
+    return Task.CompletedTask;
+}
+
 static Task TargetRegistryDefinesBuiltInPresetsAsync()
 {
     var registry = TargetRegistry.CreateDefault();
     var targets = registry.GetBuiltInTargets().ToArray();
 
-    Assert(targets.Length == 8);
+    Assert(targets.Length == 16);
     Assert(targets.Select(target => target.Id).SequenceEqual(
         [
             TargetIds.Discord,
+            TargetIds.Roblox,
             TargetIds.Wattpad,
             TargetIds.Azar,
             TargetIds.BigoLive,
             TargetIds.IMVU,
             TargetIds.LiVU,
             TargetIds.Tango,
-            TargetIds.Blogspot
+            TargetIds.Blogspot,
+            TargetIds.RadioGarden,
+            TargetIds.DeutscheWelle,
+            TargetIds.VoiceOfAmerica,
+            TargetIds.EksiSozluk,
+            TargetIds.Grok,
+            TargetIds.Imgur,
+            TargetIds.Pastebin
         ]));
     Assert(registry.TryGet(TargetIds.Discord, out var discord));
     Assert(discord.Label == "Discord");
@@ -197,7 +250,11 @@ static Task TargetRegistryDefinesBuiltInPresetsAsync()
     Assert(discord.ExecutableHints.Any(hint =>
         hint.FileName.Equals("Discord.exe", StringComparison.OrdinalIgnoreCase)));
 
-    Assert(!registry.TryGet("roblox", out _));
+    Assert(registry.TryGet(TargetIds.Roblox, out var roblox));
+    Assert(roblox.ScopeKind == TargetScopeKind.ApplicationAndWeb);
+    Assert(roblox.Domains.Any(domain => domain.Value == "roblox.com"));
+    Assert(roblox.ExecutableHints.Any(hint =>
+        hint.FileName.Equals("RobloxPlayerBeta.exe", StringComparison.OrdinalIgnoreCase)));
 
     Assert(registry.TryGet(TargetIds.Wattpad, out var wattpad));
     Assert(wattpad.ScopeKind == TargetScopeKind.Web);
@@ -213,6 +270,33 @@ static Task TargetRegistryDefinesBuiltInPresetsAsync()
 
     Assert(registry.TryGet(TargetIds.BigoLive, out var bigoLive));
     Assert(bigoLive.Domains.Any(domain => domain.Value == "www.bigo.tv"));
+
+    Assert(registry.TryGet(TargetIds.RadioGarden, out var radioGarden));
+    Assert(radioGarden.ScopeKind == TargetScopeKind.Web);
+    Assert(radioGarden.Domains.Any(domain => domain.Value == "radio.garden"));
+
+    Assert(registry.TryGet(TargetIds.DeutscheWelle, out var deutscheWelle));
+    Assert(deutscheWelle.Domains.Any(domain => domain.Value == "dw.com"));
+
+    Assert(registry.TryGet(TargetIds.VoiceOfAmerica, out var voiceOfAmerica));
+    Assert(voiceOfAmerica.Domains.Any(domain => domain.Value == "voanews.com"));
+
+    Assert(registry.TryGet(TargetIds.EksiSozluk, out var eksiSozluk));
+    Assert(eksiSozluk.Domains.Any(domain => domain.Value == "eksisozluk.com"));
+
+    Assert(registry.TryGet(TargetIds.Grok, out var grok));
+    Assert(grok.Domains.Any(domain => domain.Value == "grok.com"));
+
+    Assert(registry.TryGet(TargetIds.Imgur, out var imgur));
+    Assert(imgur.Domains.Any(domain => domain.Value == "imgur.com"));
+
+    Assert(registry.TryGet(TargetIds.Pastebin, out var pastebin));
+    Assert(pastebin.Domains.Any(domain => domain.Value == "pastebin.com"));
+
+    Assert(targets.All(target =>
+        target.Metadata.TryGetValue("launchUrl", out var launchUrl)
+        && Uri.TryCreate(launchUrl, UriKind.Absolute, out var launchUri)
+        && launchUri.Scheme == Uri.UriSchemeHttps));
 
     Assert(!targets.Any(target =>
         target.Id.Equals("custom-executable", StringComparison.OrdinalIgnoreCase)
@@ -288,6 +372,23 @@ static async Task TargetSelectionStoreDefaultsAndMigratesLegacyBrowserAsync()
         var migratedLegacyCustom = new AppSettingsStore(paths).GetTargetSelection();
         Assert(migratedLegacyCustom.SelectedTargetIds.SequenceEqual(
             [TargetIds.Discord, TargetIds.Wattpad]));
+
+        await File.WriteAllTextAsync(paths.SettingsFile, """
+            {
+              "acceptedWireSockVersion": "1.4.7.1",
+              "acceptedCloudflareWarpTerms": true,
+              "browserAccessEnabled": false,
+              "browserAccessPreferenceVersion": 1,
+              "targetSelectionPreferenceVersion": 2,
+              "targetSelection": {
+                "selectedTargetIds": [
+                  "wattpad"
+                ]
+              }
+            }
+            """);
+        var camelCaseSelection = new AppSettingsStore(paths).GetTargetSelection();
+        Assert(camelCaseSelection.SelectedTargetIds.SequenceEqual([TargetIds.Wattpad]));
     }
     finally
     {
@@ -379,6 +480,27 @@ static Task TargetScopeResolverCoversEveryPresetWithoutBrowsersAsync()
                 Assert(plan.ProxyRules.Count == 0);
             }
 
+            if (target.HasApplicationScope
+                && !target.Id.Equals(TargetIds.Discord, StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (var hint in target.ExecutableHints)
+                {
+                    Assert(plan.AllowedApplications.Contains(
+                        hint.FileName,
+                        StringComparer.OrdinalIgnoreCase));
+                }
+            }
+
+            foreach (var other in targets.Where(other => other.Id != target.Id))
+            {
+                foreach (var hint in other.ExecutableHints)
+                {
+                    Assert(!plan.AllowedApplications.Contains(
+                        hint.FileName,
+                        StringComparer.OrdinalIgnoreCase));
+                }
+            }
+
             if (!target.Id.Equals(TargetIds.Discord, StringComparison.OrdinalIgnoreCase))
             {
                 foreach (var other in targets.Where(other => other.Id != target.Id))
@@ -393,6 +515,16 @@ static Task TargetScopeResolverCoversEveryPresetWithoutBrowsersAsync()
         Assert(allPlan.SelectedTargets.Count == targets.Count);
         Assert(allPlan.AllowedApplications.Contains(webProxyPath, StringComparer.OrdinalIgnoreCase));
         Assert(allPlan.AllowedApplications.All(app => !RoutingPlan.IsBrowserExecutable(app)));
+        foreach (var hint in targets
+                     .Where(target => !target.Id.Equals(
+                         TargetIds.Discord,
+                         StringComparison.OrdinalIgnoreCase))
+                     .SelectMany(target => target.ExecutableHints))
+        {
+            Assert(allPlan.AllowedApplications.Contains(
+                hint.FileName,
+                StringComparer.OrdinalIgnoreCase));
+        }
     }
     finally
     {
@@ -5686,6 +5818,42 @@ static string CreateTemporaryDirectory()
         Guid.NewGuid().ToString("N"));
     Directory.CreateDirectory(path);
     return path;
+}
+
+static string FindRepositoryRoot()
+{
+    var directory = new DirectoryInfo(AppContext.BaseDirectory);
+    while (directory is not null)
+    {
+        if (File.Exists(Path.Combine(directory.FullName, "Astral.sln")))
+        {
+            return directory.FullName;
+        }
+
+        directory = directory.Parent;
+    }
+
+    directory = new DirectoryInfo(Directory.GetCurrentDirectory());
+    while (directory is not null)
+    {
+        if (File.Exists(Path.Combine(directory.FullName, "Astral.sln")))
+        {
+            return directory.FullName;
+        }
+
+        directory = directory.Parent;
+    }
+
+    throw new InvalidOperationException("Astral repo kökü bulunamadı.");
+}
+
+static string GetProjectProperty(string projectPath, string propertyName)
+{
+    var project = XDocument.Load(projectPath);
+    return project
+        .Descendants(propertyName)
+        .Select(element => element.Value.Trim())
+        .FirstOrDefault() ?? string.Empty;
 }
 
 static RoutingPlan CreateWebProxyRoutingPlan(string root)

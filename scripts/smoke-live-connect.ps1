@@ -2,7 +2,8 @@
 param(
     [string]$ExePath,
     [int]$TimeoutSeconds = 90,
-    [string]$OutputPath
+    [string]$OutputPath,
+    [string[]]$TargetIds = @('discord')
 )
 
 $ErrorActionPreference = 'Stop'
@@ -16,12 +17,91 @@ if ([string]::IsNullOrWhiteSpace($OutputPath)) {
     $OutputPath = Join-Path $root 'artifacts\app-live-connect-smoke.txt'
 }
 
+$normalizedTargetIds = @(
+    $TargetIds |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+        ForEach-Object {
+            $_ -split ',' |
+                Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+                ForEach-Object { $_.Trim().ToLowerInvariant() }
+        } |
+        Select-Object -Unique
+)
+if ($normalizedTargetIds.Count -eq 0) {
+    throw 'Canli smoke testi icin en az bir hedef secilmelidir.'
+}
+
 $settingsPath = Join-Path $env:LOCALAPPDATA 'Astral\settings.json'
 $profilePath = Join-Path $env:ProgramData 'Astral\profiles\discord.conf'
 $logPath = Join-Path $env:LOCALAPPDATA 'Astral\logs\tunnel.log'
 $hostsPath = Join-Path $env:SystemRoot 'System32\drivers\etc\hosts'
 $beginMarker = '# BEGIN Astral hedef kilidi'
 $ruleName = 'Astral.BlockTargetDomains'
+$targetAppPatterns = @{
+    'discord' = @(
+        'Discord(?:PTB|Canary|Development)?\.exe'
+    )
+    'roblox' = @(
+        'RobloxPlayerBeta\.exe',
+        'RobloxPlayerLauncher\.exe',
+        'RobloxStudioBeta\.exe'
+    )
+    'azar' = @(
+        'Azar\.exe'
+    )
+    'tango' = @(
+        'Tango\.exe'
+    )
+    'livu' = @(
+        'LiVU\.exe',
+        'Livu\.exe'
+    )
+    'imvu' = @(
+        'IMVUClient\.exe',
+        'IMVU\.exe'
+    )
+}
+$targetLockProbeDomains = @{
+    'discord' = @('discord.com', 'discord.gg')
+    'roblox' = @('roblox.com', 'www.roblox.com')
+    'wattpad' = @('wattpad.com', 'www.wattpad.com')
+    'azar' = @('azarlive.com', 'www.azarlive.com')
+    'bigo-live' = @('bigo.tv', 'www.bigo.tv')
+    'imvu' = @('imvu.com', 'www.imvu.com')
+    'livu' = @('livu.me', 'www.livu.me')
+    'tango' = @('tango.me', 'www.tango.me')
+    'blogspot' = @('blogspot.com', 'blogger.com')
+    'radio-garden' = @('radio.garden', 'www.radio.garden')
+    'deutsche-welle' = @('dw.com', 'www.dw.com')
+    'voice-of-america' = @('voanews.com', 'www.voanews.com')
+    'eksi-sozluk' = @('eksisozluk.com', 'www.eksisozluk.com')
+    'grok' = @('grok.com', 'x.ai')
+    'imgur' = @('imgur.com', 'www.imgur.com')
+    'pastebin' = @('pastebin.com', 'www.pastebin.com')
+}
+$webTargetIds = @(
+    'discord',
+    'roblox',
+    'wattpad',
+    'azar',
+    'bigo-live',
+    'imvu',
+    'livu',
+    'tango',
+    'blogspot',
+    'radio-garden',
+    'deutsche-welle',
+    'voice-of-america',
+    'eksi-sozluk',
+    'grok',
+    'imgur',
+    'pastebin'
+)
+$requiresWebProxy = @(
+    $normalizedTargetIds |
+        Where-Object { $webTargetIds -contains $_ }
+).Count -gt 0
+$requiresDiscord = $normalizedTargetIds -contains 'discord'
 
 function Test-IsAdministrator {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -70,9 +150,34 @@ function Test-AstralHostsLock {
     }
 
     $content = [string]$content
-    return $content.Contains($beginMarker) -and
-        $content.Contains('0.0.0.0 discord.com') -and
-        $content.Contains('::1 discord.com')
+    if (-not $content.Contains($beginMarker)) {
+        return $false
+    }
+
+    $expectedDomains = Get-ExpectedLockProbeDomains
+    foreach ($domain in $expectedDomains) {
+        if (-not $content.Contains('0.0.0.0 ' + $domain) -or
+            -not $content.Contains('::1 ' + $domain)) {
+            return $false
+        }
+    }
+
+    return $true
+}
+
+function Get-ExpectedLockProbeDomains {
+    $domains = New-Object System.Collections.Generic.List[string]
+    foreach ($targetId in $normalizedTargetIds) {
+        if (-not $targetLockProbeDomains.ContainsKey($targetId)) {
+            continue
+        }
+
+        foreach ($domain in $targetLockProbeDomains[$targetId]) {
+            [void]$domains.Add($domain)
+        }
+    }
+
+    return @($domains | Select-Object -Unique)
 }
 
 function Get-AstralRuleEnabled {
@@ -104,6 +209,45 @@ function Test-Tcp443 {
     }
 }
 
+function Test-AllowedAppsPattern {
+    param(
+        [string]$AllowedAppsText,
+        [string]$Pattern
+    )
+
+    return $AllowedAppsText -match "(?:^|[,=\s`"])(?:[^,`"]*\\)?$Pattern(?:[,`"\s]|$)"
+}
+
+function Get-ExpectedAppPatternSummary {
+    $expected = New-Object System.Collections.Generic.List[string]
+    foreach ($targetId in $normalizedTargetIds) {
+        if (-not $targetAppPatterns.ContainsKey($targetId)) {
+            continue
+        }
+
+        foreach ($pattern in $targetAppPatterns[$targetId]) {
+            [void]$expected.Add($pattern)
+        }
+    }
+
+    return @($expected)
+}
+
+function Get-UnexpectedAppPatternSummary {
+    $unexpected = New-Object System.Collections.Generic.List[string]
+    foreach ($targetId in $targetAppPatterns.Keys) {
+        if ($normalizedTargetIds -contains $targetId) {
+            continue
+        }
+
+        foreach ($pattern in $targetAppPatterns[$targetId]) {
+            [void]$unexpected.Add($targetId + ':' + $pattern)
+        }
+    }
+
+    return @($unexpected)
+}
+
 function Set-AstralTargetSelection {
     Assert-Condition `
         (Test-Path -LiteralPath $settingsPath) `
@@ -119,7 +263,7 @@ function Set-AstralTargetSelection {
         'Cloudflare WARP kosul onayi yok; canli smoke testi onay ekranini gecemez.'
 
     $targetSelection = [pscustomobject]@{
-        SelectedTargetIds = @('discord')
+        SelectedTargetIds = @($normalizedTargetIds)
     }
 
     $settings | Add-Member `
@@ -142,6 +286,20 @@ function Set-AstralTargetSelection {
     $settings |
         ConvertTo-Json -Depth 8 |
         Set-Content -LiteralPath $settingsPath -Encoding UTF8
+
+    $savedSettings = Get-Content -Raw -LiteralPath $settingsPath |
+        ConvertFrom-Json
+    $savedTargetIds = @(
+        $savedSettings.TargetSelection.SelectedTargetIds |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            ForEach-Object { $_.Trim().ToLowerInvariant() }
+    )
+    $expectedTargetIds = @($normalizedTargetIds)
+    Assert-Condition `
+        (($savedTargetIds -join ',') -eq ($expectedTargetIds -join ',')) `
+        ('Astral hedef secimi ayar dosyasina dogru yazilamadi. Beklenen={0}; Kaydedilen={1}' -f `
+            ($expectedTargetIds -join ','),
+            ($savedTargetIds -join ','))
 }
 
 function Get-NewLogText {
@@ -263,6 +421,35 @@ function Copy-HealthResult {
         [string]$Health.details.'webProxyProof.verifiedTargetCount'
     $result.HealthWebProxyProofFailedTargets =
         [string]$Health.details.'webProxyProof.failedTargets'
+    $result.HealthWebProxyProofElapsedMs =
+        [string]$Health.details.'webProxyProof.elapsedMs'
+    $result.HealthWebProxyProofVerifiedBool =
+        (-not $requiresWebProxy) -or
+        $result.HealthWebProxyProofVerified -eq 'True'
+    $requiredTargetCount = 0
+    $verifiedTargetCount = 0
+    [void][int]::TryParse(
+        $result.HealthWebProxyProofRequiredTargetCount,
+        [ref]$requiredTargetCount)
+    [void][int]::TryParse(
+        $result.HealthWebProxyProofVerifiedTargetCount,
+        [ref]$verifiedTargetCount)
+    $result.HealthWebProxyProofCountsMatch =
+        (-not $requiresWebProxy) -or
+        (
+            $requiredTargetCount -gt 0 -and
+            $requiredTargetCount -eq $verifiedTargetCount
+        )
+    $result.HealthWebProxyProofHasNoFailedTargets =
+        (-not $requiresWebProxy) -or
+        [string]::IsNullOrWhiteSpace($result.HealthWebProxyProofFailedTargets)
+    $result.HealthHasRequiredWebProxyProof =
+        (-not $requiresWebProxy) -or
+        (
+            [bool]$result.HealthWebProxyProofVerifiedBool -and
+            [bool]$result.HealthWebProxyProofCountsMatch -and
+            [bool]$result.HealthWebProxyProofHasNoFailedTargets
+        )
     $adapterReady =
         $result.HealthTunnelReadiness -eq 'ready' -and
         $result.HealthWireSockAdapterDetected -eq 'True' -and
@@ -528,6 +715,7 @@ if (Test-Path -LiteralPath $logPath) {
 $appProcess = $null
 $startedAt = Get-Date
 $result = [ordered]@{
+    TargetIds = ($normalizedTargetIds -join ',')
     WindowFound = $false
     TargetSelectionPrepared = $false
     ConnectClicked = $false
@@ -557,17 +745,32 @@ $result = [ordered]@{
     HealthWebProxyProofRequiredTargetCount = ''
     HealthWebProxyProofVerifiedTargetCount = ''
     HealthWebProxyProofFailedTargets = ''
+    HealthWebProxyProofElapsedMs = ''
+    HealthWebProxyProofVerifiedBool = -not $requiresWebProxy
+    HealthWebProxyProofCountsMatch = -not $requiresWebProxy
+    HealthWebProxyProofHasNoFailedTargets = -not $requiresWebProxy
+    HealthHasRequiredWebProxyProof = -not $requiresWebProxy
     HealthTunnelReady = $false
     HostsLockRemovedWhileConnected = $false
     FirewallRuleDisabledWhileConnected = $false
     DirectDiscordTcp443WhileConnected = $false
     DirectNonTargetTcp443WhileConnected = $false
+    ProfileRequiresDiscord = $requiresDiscord
+    ProfileRequiresWebProxy = $requiresWebProxy
     ProfileHasPlainAllowedApps = $false
     ProfileHasPrefixedAllowedApps = $false
     ProfileUsesDirectAllowedApps = $false
     ProfileHasDiscord = $false
     ProfileHasDiscordFullPath = $false
+    ProfileHasRequiredDiscord = -not $requiresDiscord
+    ProfileHasRequiredDiscordFullPath = -not $requiresDiscord
     ProfileHasWebProxy = $false
+    ProfileHasRequiredWebProxy = -not $requiresWebProxy
+    ProfileExpectedTargetApps = ''
+    ProfileMissingExpectedApps = ''
+    ProfileHasExpectedTargetApps = $false
+    ProfileUnexpectedTargetApps = ''
+    ProfileHasOnlySelectedTargetApps = $false
     ProfileHasBrowserProcess = $false
     ProfileHasBrowserFullPath = $false
     ProfileExcludesBrowserProcess = $false
@@ -576,6 +779,7 @@ $result = [ordered]@{
     WireSockProcessStoppedAfterDisconnect = $false
     FinalHostsLock = $false
     FinalFirewallRuleEnabled = $false
+    FinalTargetLockRestored = $false
     SettingsRestored = $false
     WindowTitle = ''
     WindowBounds = ''
@@ -633,6 +837,9 @@ try {
         Start-Sleep -Seconds 8
         $result.WireSockStayedRunningAfterGrace =
             @(Get-WireSockProcess -StartedAfter $startedAt).Count -gt 0
+        if ([bool]$result.WireSockStayedRunningAfterGrace) {
+            $result.WireSockProcessSeen = $true
+        }
 
         $result.HostsLockRemovedWhileConnected = -not (Test-AstralHostsLock)
         $result.FirewallRuleDisabledWhileConnected =
@@ -657,8 +864,49 @@ try {
                 $allowedAppsText -match 'Discord\.exe'
             $result.ProfileHasDiscordFullPath =
                 $allowedAppsText -match '\\Discord(?:PTB|Canary|Development)?\\app-[^,\\]+\\Discord(?:PTB|Canary|Development)?\.exe'
+            $result.ProfileHasRequiredDiscord =
+                (-not $requiresDiscord) -or [bool]$result.ProfileHasDiscord
+            $result.ProfileHasRequiredDiscordFullPath =
+                (-not $requiresDiscord) -or [bool]$result.ProfileHasDiscordFullPath
             $result.ProfileHasWebProxy =
                 $allowedAppsText -match 'Astral\.WebProxy\.exe'
+            $result.ProfileHasRequiredWebProxy =
+                (-not $requiresWebProxy) -or [bool]$result.ProfileHasWebProxy
+            $expectedAppPatterns = @(Get-ExpectedAppPatternSummary)
+            $result.ProfileExpectedTargetApps =
+                ($expectedAppPatterns -join ',')
+            $missingAppPatterns = @(
+                $expectedAppPatterns |
+                    Where-Object {
+                        -not (Test-AllowedAppsPattern `
+                            -AllowedAppsText $allowedAppsText `
+                            -Pattern $_)
+                    }
+            )
+            $result.ProfileMissingExpectedApps =
+                ($missingAppPatterns -join ',')
+            $result.ProfileHasExpectedTargetApps =
+                $missingAppPatterns.Count -eq 0
+            $unexpectedAppPatterns = @(
+                Get-UnexpectedAppPatternSummary |
+                    Where-Object {
+                        $targetAndPattern = [string]$_
+                        $separatorIndex = $targetAndPattern.IndexOf(':')
+                        if ($separatorIndex -lt 0) {
+                            $false
+                        }
+                        else {
+                            $pattern = $targetAndPattern.Substring($separatorIndex + 1)
+                            Test-AllowedAppsPattern `
+                                -AllowedAppsText $allowedAppsText `
+                                -Pattern $pattern
+                        }
+                    }
+            )
+            $result.ProfileUnexpectedTargetApps =
+                ($unexpectedAppPatterns -join ',')
+            $result.ProfileHasOnlySelectedTargetApps =
+                $unexpectedAppPatterns.Count -eq 0
             $result.ProfileHasBrowserProcess =
                 $allowedAppsText -match '(?:^|[,=\s"])(?:chrome|msedge|firefox|brave|opera|vivaldi)\.exe(?:[,="\s]|$)'
             $result.ProfileHasBrowserFullPath =
@@ -685,9 +933,12 @@ try {
             }
 
             Copy-HealthResult -Health $script:currentHealth
-            return $result.HealthTunnelReady -or
+            return (
+                    [bool]$result.HealthTunnelReady -and
+                    [bool]$result.HealthHasRequiredWebProxyProof
+                ) -or
                 [string]$script:currentHealth.status -eq 'hata'
-        } 75
+        } $TimeoutSeconds
         $health = $script:currentHealth
         if ($result.HealthFresh -and $null -ne $health) {
             Copy-HealthResult -Health $health
@@ -707,8 +958,9 @@ try {
 
         Stop-AstralProcess -Process $appProcess
 
-        $result.FinalHostsLock = Test-AstralHostsLock
+        $result.FinalHostsLock = Wait-Until { Test-AstralHostsLock } 20
         $result.FinalFirewallRuleEnabled = (Get-AstralRuleEnabled) -eq 'True'
+        $result.FinalTargetLockRestored = [bool]$result.FinalHostsLock
     }
     finally {
         if ($null -ne $originalSettings) {
@@ -722,8 +974,11 @@ try {
 
         Stop-AstralProcess -Process $appProcess
 
-        $result.FinalHostsLock = Test-AstralHostsLock
+        if (-not [bool]$result.FinalHostsLock) {
+            $result.FinalHostsLock = Wait-Until { Test-AstralHostsLock } 20
+        }
         $result.FinalFirewallRuleEnabled = (Get-AstralRuleEnabled) -eq 'True'
+        $result.FinalTargetLockRestored = [bool]$result.FinalHostsLock
     }
 }
 catch {
@@ -741,19 +996,24 @@ $criticalChecks = @(
     'HealthFresh',
     'HealthStatus',
     'HealthTunnelReady',
+    'HealthWebProxyProofVerifiedBool',
+    'HealthWebProxyProofCountsMatch',
+    'HealthWebProxyProofHasNoFailedTargets',
+    'HealthHasRequiredWebProxyProof',
     'HostsLockRemovedWhileConnected',
     'FirewallRuleDisabledWhileConnected',
     'DirectNonTargetTcp443WhileConnected',
     'ProfileUsesDirectAllowedApps',
-    'ProfileHasDiscord',
-    'ProfileHasDiscordFullPath',
-    'ProfileHasWebProxy',
+    'ProfileHasRequiredDiscord',
+    'ProfileHasRequiredDiscordFullPath',
+    'ProfileHasRequiredWebProxy',
+    'ProfileHasExpectedTargetApps',
+    'ProfileHasOnlySelectedTargetApps',
     'ProfileExcludesBrowserProcess',
     'ProfileExcludesBrowserFullPath',
     'DisconnectClicked',
     'WireSockProcessStoppedAfterDisconnect',
-    'FinalHostsLock',
-    'FinalFirewallRuleEnabled',
+    'FinalTargetLockRestored',
     'SettingsRestored'
 )
 

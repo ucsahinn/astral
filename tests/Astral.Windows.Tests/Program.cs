@@ -150,7 +150,7 @@ static void RenderMainWindow()
         SaveWindowPng(window, Path.Combine(
             FindRepositoryRoot(),
             "artifacts",
-            "ui-main-window-v2.2.23.png"));
+            "ui-main-window-v2.2.24.png"));
 
         Assert(window.ResizeMode == ResizeMode.NoResize);
         Assert(window.Width == 1280);
@@ -170,8 +170,8 @@ static void RenderMainWindow()
             FindVisualChildren<TextBlock>(window)
                 .Where(block => block.IsVisible)
                 .Select(block => block.Text));
-        Assert(text.Contains("Astral", StringComparison.Ordinal));
-        Assert(text.Contains("Desteklenen hedef kapsamı hazır", StringComparison.Ordinal));
+        Assert(text.Contains("Astral VPN", StringComparison.Ordinal));
+        Assert(text.Contains("Seçili hedef VPN kapsamı hazır", StringComparison.Ordinal));
         Assert(text.Contains("Hedef kapsamı", StringComparison.Ordinal));
         Assert(text.Contains("Desteklenen hedefler", StringComparison.Ordinal));
         Assert(!text.Contains("TÜNEL KAPSAMI", StringComparison.Ordinal));
@@ -268,25 +268,33 @@ static void RenderMainWindow()
                 "TargetToggle_",
                 StringComparison.Ordinal))
             .ToArray();
-        Assert(targetToggles.Length == 8);
+        Assert(targetToggles.Length == 16);
         var targetRows = FindVisualChildren<UniformGrid>(window)
             .Where(grid => grid.Name is "TargetCardsTopPanel" or "TargetCardsBottomPanel")
             .ToDictionary(grid => grid.Name, grid => grid);
-        Assert(targetRows["TargetCardsTopPanel"].Children.Count == 4);
-        Assert(targetRows["TargetCardsBottomPanel"].Children.Count == 4);
+        Assert(targetRows["TargetCardsTopPanel"].Children.Count == 8);
+        Assert(targetRows["TargetCardsBottomPanel"].Children.Count == 8);
         var targetNames = targetToggles
             .Select(AutomationProperties.GetName)
             .ToArray();
         var expectedTargets = new[]
                  {
                      "Discord hedefi",
+                     "Roblox hedefi",
                      "Wattpad hedefi",
                      "Bigo Live hedefi",
                      "Azar hedefi",
                      "Tango hedefi",
                      "LiVU hedefi",
                      "IMVU hedefi",
-                     "Blogspot hedefi"
+                     "Blogspot hedefi",
+                     "Radio Garden hedefi",
+                     "DW hedefi",
+                     "VOA hedefi",
+                     "Ekşi Sözlük hedefi",
+                     "Grok hedefi",
+                     "Imgur hedefi",
+                     "Pastebin hedefi"
                  };
         foreach (var expectedTarget in expectedTargets)
         {
@@ -295,13 +303,21 @@ static void RenderMainWindow()
         foreach (var iconKey in new[]
                  {
                      "discord",
+                     "roblox",
                      "wattpad",
                      "bigo-live",
                      "azar",
                      "tango",
                      "livu",
                      "imvu",
-                     "blogspot"
+                     "blogspot",
+                     "radio-garden",
+                     "deutsche-welle",
+                     "voice-of-america",
+                     "eksi-sozluk",
+                     "grok",
+                     "imgur",
+                     "pastebin"
                  })
         {
             Assert(MainWindow.TryLoadTargetIconForTesting(iconKey));
@@ -341,13 +357,21 @@ static void RenderMainWindow()
         foreach (var expectedTarget in new[]
                  {
                      "Discord",
+                     "Roblox",
                      "Wattpad",
                      "Bigo Live",
                      "Azar",
                      "Tango",
                      "LiVU",
                      "IMVU",
-                     "Blogspot"
+                     "Blogspot",
+                     "Radio Garden",
+                     "DW",
+                     "VOA",
+                     "Ekşi Sözlük",
+                     "Grok",
+                     "Imgur",
+                     "Pastebin"
                  })
         {
             Assert(visibleTargetCardTexts.Contains(expectedTarget));
@@ -369,7 +393,9 @@ static void RenderMainWindow()
         Assert(targetToggles.Any(toggle =>
             toggle.Name == "TargetToggle_discord"
             && toggle.IsChecked == true));
-        Assert(!targetToggles.Any(toggle => toggle.Name == "TargetToggle_roblox"));
+        Assert(targetToggles.Any(toggle =>
+            toggle.Name == "TargetToggle_roblox"
+            && toggle.IsChecked != true));
         Assert(targetToggles.Any(toggle => toggle.Name == "TargetToggle_wattpad"));
         Assert(targetToggles.All(toggle =>
             !toggle.Name.Contains("custom", StringComparison.OrdinalIgnoreCase)));

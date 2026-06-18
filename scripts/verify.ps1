@@ -104,10 +104,45 @@ try {
         throw "Astral WireSock VPN Client surecini yonetmek icin yonetici manifest'iyle derlenmelidir"
     }
 
-    $project = [xml](Get-Content -Raw -LiteralPath 'src\Astral.App\Astral.App.csproj')
-    $projectVersion = $project.Project.PropertyGroup.Version
+    function Get-ProjectProperty {
+        param(
+            [string]$ProjectPath,
+            [string]$PropertyName
+        )
+
+        $projectXml = [xml](Get-Content -Raw -LiteralPath $ProjectPath)
+        $value = $projectXml.Project.PropertyGroup.$PropertyName |
+            Select-Object -First 1
+        return [string]$value
+    }
+
+    $projectVersion = Get-ProjectProperty `
+        -ProjectPath 'src\Astral.App\Astral.App.csproj' `
+        -PropertyName 'Version'
     if ([string]::IsNullOrWhiteSpace($projectVersion)) {
         throw "Astral uygulama surumu proje dosyasindan okunamadi"
+    }
+
+    $versionedProjects = @(
+        @{ Path = 'src\Astral.App\Astral.App.csproj'; Name = 'Astral.App' },
+        @{ Path = 'src\Astral.Updater\Astral.Updater.csproj'; Name = 'Astral.Updater' },
+        @{ Path = 'src\Astral.WebProxy\Astral.WebProxy.csproj'; Name = 'Astral.WebProxy' }
+    )
+    foreach ($versionedProject in $versionedProjects) {
+        $version = Get-ProjectProperty `
+            -ProjectPath $versionedProject.Path `
+            -PropertyName 'Version'
+        if ($version -ne $projectVersion) {
+            throw "$($versionedProject.Name) surumu Astral.App surumuyle eslesmiyor: $version != $projectVersion"
+        }
+
+        $fileVersion = Get-ProjectProperty `
+            -ProjectPath $versionedProject.Path `
+            -PropertyName 'FileVersion'
+        $expectedFileVersion = "$projectVersion.0"
+        if ($fileVersion -ne $expectedFileVersion) {
+            throw "$($versionedProject.Name) FileVersion degeri beklenen surumle eslesmiyor: $fileVersion != $expectedFileVersion"
+        }
     }
 
     $expectedManifestVersion = "$projectVersion.0"
