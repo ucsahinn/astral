@@ -87,10 +87,11 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Denetleyici bağlantı kapanınca hedef uygulamaları kapatmaz", ControllerDoesNotCloseTargetProcessesOnDisconnectAsync),
     ("Denetleyici hedef kapsamını bağlıyken kilitler", ControllerLocksTargetScopeWhileConnectedAsync),
     ("Denetleyici varsayılan kapsamda hedef uygulama başlatmadan doğrular", ControllerConnectsDefaultScopeWithoutLaunchingTargetProcessAsync),
-    ("Denetleyici transparent modda WireSock adaptörü pasifken süreç sağlıklıysa bağlanır", ControllerAcceptsInactiveWireSockAdapterInTransparentModeAsync),
-    ("Denetleyici transparent modda WireSock adaptörü yokken süreç sağlıklıysa bağlanır", ControllerAcceptsMissingWireSockAdapterInTransparentModeAsync),
-    ("Denetleyici transparent modda WireSock probe yokken süreç sağlıklıysa bağlanır", ControllerAcceptsUnavailableWireSockProbeInTransparentModeAsync),
-    ("Denetleyici transparent modda handshake logu yokken süreç sağlıklıysa bağlanır", ControllerAcceptsMissingWireSockHandshakeInTransparentModeAsync),
+    ("Denetleyici transparent modda pasif adaptörü tunnel-started loguyla kabul eder", ControllerAcceptsInactiveWireSockAdapterInTransparentModeAsync),
+    ("Denetleyici transparent modda eksik adaptörü tunnel-started loguyla kabul eder", ControllerAcceptsMissingWireSockAdapterInTransparentModeAsync),
+    ("Denetleyici transparent modda eksik probe'u tunnel-started loguyla kabul eder", ControllerAcceptsUnavailableWireSockProbeInTransparentModeAsync),
+    ("Denetleyici transparent modda handshake logu yokken bağlı raporlamaz", ControllerRejectsMissingWireSockHandshakeInTransparentModeAsync),
+    ("Denetleyici WireSock tunnel-started loguyla bağlı raporlar", ControllerAcceptsWireSockTunnelStartedLogAsync),
     ("Denetleyici WireSock adaptörü gecikirse yeniden dener", ControllerRetriesDelayedWireSockAdapterAsync),
     ("Denetleyici WireSock doğrulamasını hedef uygulama yenilemeden yapar", ControllerChecksWireSockWithoutTargetProcessRestartAsync),
     ("Denetleyici tüm yerleşik presetleri hedef uygulama başlatmadan bağlar", ControllerConnectsEveryBuiltInPresetWithoutLaunchingTargetsAsync),
@@ -3139,15 +3140,17 @@ static async Task ControllerAcceptsInactiveWireSockAdapterInTransparentModeAsync
             0,
             0,
             "WireSock Virtual Adapter is Down with no traffic."),
-        "wiresock-adapter-inactive",
-        "Down");
+        "transparent-process-running",
+        "Down",
+        "Wireguard tunnel has been started.");
 }
 
 static async Task ControllerAcceptsMissingWireSockAdapterInTransparentModeAsync()
 {
     await ControllerAcceptsTransparentTunnelReadinessAsync(
         TunnelReadinessSnapshot.WireSockAdapterNotDetected(),
-        "wiresock-adapter-not-detected");
+        "transparent-process-running",
+        wireSockLogLines: "Wireguard tunnel has been started.");
 }
 
 static async Task ControllerAcceptsUnavailableWireSockProbeInTransparentModeAsync()
@@ -3155,10 +3158,11 @@ static async Task ControllerAcceptsUnavailableWireSockProbeInTransparentModeAsyn
     await ControllerAcceptsTransparentTunnelReadinessAsync(
         TunnelReadinessSnapshot.ProbeUnavailable(
             "WireSock adapter inventory is unavailable."),
-        "probe-unavailable");
+        "transparent-process-running",
+        wireSockLogLines: "Wireguard tunnel has been started.");
 }
 
-static async Task ControllerAcceptsMissingWireSockHandshakeInTransparentModeAsync()
+static async Task ControllerRejectsMissingWireSockHandshakeInTransparentModeAsync()
 {
     var root = CreateTemporaryDirectory();
     var process = new FakeManagedProcess();
@@ -3198,28 +3202,42 @@ static async Task ControllerAcceptsMissingWireSockHandshakeInTransparentModeAsyn
     {
         await controller.ConnectAsync();
 
-        Assert(controller.Snapshot.State == TunnelState.Connected);
-        Assert(!process.HasExited);
+        Assert(controller.Snapshot.State == TunnelState.Error);
+        Assert(process.HasExited);
 
         var details = controller.CreateDiagnosticDetails();
-        Assert(details["tunnelReadiness"] == "transparent-process-running");
         Assert(details["wireSockMode"] == "transparent");
         Assert(details["wireSockConnectionEstablished"] == "False");
 
         var health = await File.ReadAllTextAsync(paths.HealthReport);
-        Assert(health.Contains("\"status\":\"bağlantı hazır\"", StringComparison.Ordinal));
+        Assert(health.Contains("\"status\":\"hata\"", StringComparison.Ordinal));
         Assert(health.Contains(
-            "\"tunnelReadiness\":\"transparent-process-running\"",
+            "WireSock bağlantı onayı alınamadı",
             StringComparison.Ordinal));
         Assert(health.Contains(
             "\"wireSockConnectionEstablished\":\"False\"",
             StringComparison.Ordinal));
+        Assert(health.Contains(
+            "tunnel-started",
+            StringComparison.OrdinalIgnoreCase));
     }
     finally
     {
         await controller.DisposeAsync();
         Directory.Delete(root, recursive: true);
     }
+}
+
+static async Task ControllerAcceptsWireSockTunnelStartedLogAsync()
+{
+    await ControllerAcceptsTransparentTunnelReadinessAsync(
+        TunnelReadinessSnapshot.Ready(
+            "Up",
+            128,
+            256),
+        "ready",
+        "Up",
+        "Wireguard tunnel has been started.");
 }
 
 static async Task ControllerRetriesDelayedWireSockAdapterAsync()
@@ -3337,7 +3355,8 @@ static async Task ControllerChecksWireSockAfterDiscordRestartAsync()
 static async Task ControllerAcceptsTransparentTunnelReadinessAsync(
     TunnelReadinessSnapshot readinessSnapshot,
     string expectedStatus,
-    string? expectedAdapterStatus = null)
+    string? expectedAdapterStatus = null,
+    params string[] wireSockLogLines)
 {
     var root = CreateTemporaryDirectory();
     var process = new FakeManagedProcess();
@@ -3362,7 +3381,9 @@ static async Task ControllerAcceptsTransparentTunnelReadinessAsync(
             "bin",
             WireSockPackage.CliExecutableFileName)),
         new FakeProfileProvisioner(Path.Combine(root, "discord.conf")),
-        new FakeProcessLauncher(process),
+        wireSockLogLines.Length == 0
+            ? new FakeProcessLauncher(process)
+            : new FakeProcessLauncher(process, wireSockLogLines),
         TimeSpan.Zero,
         accessLock,
         diagnostics,
@@ -3380,7 +3401,7 @@ static async Task ControllerAcceptsTransparentTunnelReadinessAsync(
         Assert(accessLock.EnableCount == 0);
 
         var details = controller.CreateDiagnosticDetails();
-        Assert(details["tunnelReadiness"] == "transparent-process-running");
+        Assert(details["tunnelReadiness"] == expectedStatus);
         Assert(details["wireSockMode"] == "transparent");
         Assert(details["wireSockConnectionEstablished"] == "True");
         Assert(!string.IsNullOrWhiteSpace(details["wireSockProcessId"]));
@@ -3393,7 +3414,7 @@ static async Task ControllerAcceptsTransparentTunnelReadinessAsync(
         var health = await File.ReadAllTextAsync(paths.HealthReport);
         Assert(health.Contains("\"status\":\"bağlantı hazır\"", StringComparison.Ordinal));
         Assert(health.Contains(
-            "\"tunnelReadiness\":\"transparent-process-running\"",
+            $"\"tunnelReadiness\":\"{expectedStatus}\"",
             StringComparison.Ordinal));
         Assert(health.Contains(
             "\"wireSockProcessExited\":\"False\"",

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text;
 using Astral.Core.Diagnostics;
@@ -7,6 +8,9 @@ namespace Astral.Core.Infrastructure;
 
 public sealed class ProcessLauncher : IProcessLauncher
 {
+    private static readonly ConcurrentDictionary<string, object> LogLocks =
+        new(StringComparer.OrdinalIgnoreCase);
+
     public IManagedProcess Start(
         string executable,
         IReadOnlyList<string> arguments,
@@ -56,6 +60,7 @@ public sealed class ProcessLauncher : IProcessLauncher
     {
         private readonly Process _process;
         private readonly string _processName;
+        private readonly object _logLock;
         private readonly StreamWriter _log;
         private readonly Task _stdoutPump;
         private readonly Task _stderrPump;
@@ -72,6 +77,9 @@ public sealed class ProcessLauncher : IProcessLauncher
                 ? "Hedef"
                 : processName;
             Directory.CreateDirectory(Path.GetDirectoryName(logPath)!);
+            _logLock = LogLocks.GetOrAdd(
+                Path.GetFullPath(logPath),
+                static _ => new object());
             _log = new StreamWriter(
                 new FileStream(
                     logPath,
@@ -294,7 +302,7 @@ public sealed class ProcessLauncher : IProcessLauncher
         {
             var redactedMessage = AstralDiagnostics.RedactForLog(message)
                 ?? string.Empty;
-            lock (_log)
+            lock (_logLock)
             {
                 try
                 {

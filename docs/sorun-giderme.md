@@ -31,7 +31,7 @@ Kontrol edin:
 
 ## WireSock Hazırlığı Doğrulanamadı
 
-Astral WireSock'u varsayılan transparent mode ile başlatır. Bu modda sanal adaptörün `Up` görünmesi zorunlu değildir; bu yüzden `tunnelReadiness=wiresock-adapter-inactive` tek başına hata kanıtı değildir.
+Astral WireSock'u varsayılan transparent mode ile başlatır. Bu modda sanal adaptörün `Up` görünmesi tek başına yeterli kanıt değildir; bağlantı başarılı sayılmadan önce WireSock logunda tünelin başladığını gösteren onay aranır.
 
 Tanılama paketinde şu imzalar birlikte görünüyorsa bağlantı motoru gerçekten hazır olmadan kapanmıştır:
 
@@ -40,7 +40,7 @@ Tanılama paketinde şu imzalar birlikte görünüyorsa bağlantı motoru gerçe
 - `wireSockMode=transparent`
 - `tunnelReadiness` değerinin `transparent-process-running` olmaması
 
-Bu durumda Astral bağlantıyı başarılı saymaz. Önce **Onar** akışını çalıştırın, ardından tekrar deneyin. Devam ederse WireSock kurulumu, güvenlik yazılımı, profil üretimi veya Windows ağ yığını ayrıca incelenmelidir.
+Bu durumda Astral bağlantıyı başarılı saymaz ve proxy/PAC kapsamını geri temizler. Önce **Onar** akışını çalıştırın, ardından tekrar deneyin. Devam ederse WireSock kurulumu, güvenlik yazılımı, profil üretimi veya Windows ağ yığını ayrıca incelenmelidir.
 
 Güncel tanılama paketinde `wireSockMode=transparent`, `tunnelReadiness=transparent-process-running`, `allowedBareBrowserNameCount=0`, `allowedBrowserApplicationCount=0` ve `webProxy=included` görünüyorsa seçili web hedefleri için kapsam planı dar ve beklenen biçimde kurulmuştur.
 

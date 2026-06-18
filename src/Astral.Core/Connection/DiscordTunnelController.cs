@@ -24,8 +24,20 @@ public sealed class DiscordTunnelController : IAsyncDisposable
     private const int MaxWireSockLogReadBytes = 64 * 1024;
     private const string WireSockTransparentMode = "transparent";
     private const string WireSockVirtualAdapterMode = "virtual-adapter";
-    private const string WireSockConnectionEstablishedMessage =
-        "Connection established";
+    private static readonly string[] WireSockConnectionEstablishedMessages =
+    [
+        "Connection established",
+        "Wireguard tunnel has been started.",
+        "WireGuard tunnel has been started."
+    ];
+
+    private static readonly string[] WireSockConnectionFailureMessages =
+    [
+        "WireGuard tunnel has failed to start.",
+        "Failed to initialize Wireguard tunnel.",
+        "WireSock virtual adapter is not available",
+        "WireGuard Server is unreachable"
+    ];
     private static readonly TimeSpan TunnelReadinessRetryDelay =
         TimeSpan.FromMilliseconds(500);
 
@@ -648,6 +660,12 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 $"{_lastWireSockProcessExitCode ?? "bilinmiyor"}.");
         }
 
+        if (!IsWireSockHandshakeReady())
+        {
+            throw new InvalidOperationException(
+                "WireSock bağlantı onayı alınamadı. Astral bağlantı motoru çalışıyor görünüyor ancak tünel bağlantısı tamamlandığını doğrulamadı; farklı ağ, DNS veya ISP engeli olabilir.");
+        }
+
         if (!_lastTunnelReadiness.BlocksConnection)
         {
             throw new InvalidOperationException(
@@ -710,6 +728,11 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             return false;
         }
 
+        if (!IsWireSockHandshakeReady())
+        {
+            return false;
+        }
+
         if (attempt < MinTransparentReadinessChecks)
         {
             return false;
@@ -719,15 +742,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             _lastTunnelReadiness,
             "WireSock transparent mode is running; virtual adapter status is not required.");
 
-        if (_lastWireSockConnectionEstablished)
-        {
-            _lastWireSockHandshakeDiagnostic = null;
-        }
-        else
-        {
-            _lastWireSockHandshakeDiagnostic =
-                "WireSock transparent mode does not expose virtual-adapter readiness; process stayed running past startup validation.";
-        }
+        _lastWireSockHandshakeDiagnostic = null;
 
         return true;
     }
@@ -756,12 +771,6 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
     private bool IsWireSockHandshakeReady()
     {
-        if (_lastTunnelReadiness.Status
-            == TunnelReadinessSnapshot.ProbeNotConfiguredStatus)
-        {
-            return true;
-        }
-
         return _lastWireSockConnectionEstablished;
     }
 
@@ -804,16 +813,18 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 detectEncodingFromByteOrderMarks: true,
                 leaveOpen: false);
             var recentLog = reader.ReadToEnd();
-            if (recentLog.Contains(
-                WireSockConnectionEstablishedMessage,
-                StringComparison.OrdinalIgnoreCase))
+            if (WireSockConnectionEstablishedMessages.Any(message =>
+                    recentLog.Contains(message, StringComparison.OrdinalIgnoreCase)))
             {
                 _lastWireSockHandshakeDiagnostic = null;
                 return true;
             }
 
-            _lastWireSockHandshakeDiagnostic =
-                "WireSock log does not include a connection-established entry for this attempt.";
+            var failureMessage = WireSockConnectionFailureMessages.FirstOrDefault(message =>
+                recentLog.Contains(message, StringComparison.OrdinalIgnoreCase));
+            _lastWireSockHandshakeDiagnostic = failureMessage is null
+                ? "WireSock log does not include a tunnel-started entry for this attempt."
+                : "WireSock log indicates startup failure: " + failureMessage;
             return false;
         }
         catch (Exception exception)

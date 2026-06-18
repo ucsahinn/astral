@@ -219,6 +219,7 @@ function Copy-HealthResult {
     }
 
     $result.HealthGeneratedAt = [string]$Health.generatedAt
+    $result.HealthStatus = [string]$Health.status
     $result.HealthProcessId = [string]$Health.processId
     if ($null -eq $Health.details) {
         return
@@ -254,6 +255,7 @@ function Copy-HealthResult {
     $transparentReady =
         $result.HealthTunnelReadiness -eq 'transparent-process-running' -and
         $result.HealthWireSockMode -eq 'transparent' -and
+        $result.HealthWireSockConnectionEstablished -eq 'True' -and
         $result.HealthWireSockProcessExited -ne 'True'
     $result.HealthTunnelReady = $adapterReady -or $transparentReady
 }
@@ -301,12 +303,23 @@ function Find-AstralWindow {
 function Find-AstralToggle {
     param([System.Windows.Automation.AutomationElement]$Window)
 
-    $condition = [System.Windows.Automation.PropertyCondition]::new(
+    $automationIdCondition = [System.Windows.Automation.PropertyCondition]::new(
         [System.Windows.Automation.AutomationElement]::AutomationIdProperty,
         'TunnelToggleButton')
     $button = $Window.FindFirst(
         [System.Windows.Automation.TreeScope]::Descendants,
-        $condition)
+        $automationIdCondition)
+
+    if ($null -ne $button) {
+        return $button
+    }
+
+    $nameCondition = [System.Windows.Automation.PropertyCondition]::new(
+        [System.Windows.Automation.AutomationElement]::NameProperty,
+        'Seçili hedef bağlantısını aç veya kapat')
+    $button = $Window.FindFirst(
+        [System.Windows.Automation.TreeScope]::Descendants,
+        $nameCondition)
 
     if ($null -ne $button) {
         return $button
@@ -335,6 +348,37 @@ function Invoke-PrimaryWindowClick {
     [NativeWindow]::mouse_event(0x0004, 0, 0, 0, [UIntPtr]::Zero)
 }
 
+function Invoke-AutomationElementClick {
+    param([System.Windows.Automation.AutomationElement]$Element)
+
+    try {
+        $pattern = $Element.GetCurrentPattern(
+            [System.Windows.Automation.InvokePattern]::Pattern)
+        if ($null -ne $pattern) {
+            $pattern.Invoke()
+            return
+        }
+    }
+    catch {
+    }
+
+    $rect = $Element.Current.BoundingRectangle
+    Assert-Condition `
+        ($rect.Width -gt 10 -and $rect.Height -gt 10) `
+        'Ana buton boyutu tiklama icin gecersiz.'
+
+    [void][NativeWindow]::SetForegroundWindow($Element.Current.NativeWindowHandle)
+    Start-Sleep -Milliseconds 250
+
+    $x = [int]($rect.Left + ($rect.Width / 2))
+    $y = [int]($rect.Top + ($rect.Height / 2))
+    [void][NativeWindow]::SetCursorPos($x, $y)
+    Start-Sleep -Milliseconds 100
+    [NativeWindow]::mouse_event(0x0002, 0, 0, 0, [UIntPtr]::Zero)
+    Start-Sleep -Milliseconds 80
+    [NativeWindow]::mouse_event(0x0004, 0, 0, 0, [UIntPtr]::Zero)
+}
+
 function Invoke-AstralToggle {
     param([System.Windows.Automation.AutomationElement]$Window)
 
@@ -350,9 +394,7 @@ function Invoke-AstralToggle {
         return
     }
 
-    $pattern = $button.GetCurrentPattern(
-        [System.Windows.Automation.InvokePattern]::Pattern)
-    $pattern.Invoke()
+    Invoke-AutomationElementClick -Element $button
 }
 
 if (-not (Test-IsAdministrator)) {
@@ -404,6 +446,7 @@ $result = [ordered]@{
     WireSockStayedRunningAfterGrace = $false
     ConnectionEstablishedLog = $false
     HealthFresh = $false
+    HealthStatus = ''
     HealthGeneratedAt = ''
     HealthProcessId = ''
     HealthTunnelReadiness = ''
@@ -507,8 +550,11 @@ try {
                 -not [bool]$result.ProfileHasBrowserFullPath
         }
 
+        $newLogText = Get-NewLogText -Offset $logOffset
         $result.ConnectionEstablishedLog =
-            (Get-NewLogText -Offset $logOffset) -match 'Connection established'
+            $result.HealthWireSockConnectionEstablished -eq 'True' -or
+            $newLogText -match 'Connection established' -or
+            $newLogText -match 'Wire[Gg]uard tunnel has been started\.'
 
         $currentHealth = $null
         $result.HealthFresh = Wait-Until {
@@ -574,6 +620,7 @@ $criticalChecks = @(
     'WireSockProcessSeen',
     'WireSockStayedRunningAfterGrace',
     'HealthFresh',
+    'HealthStatus',
     'HealthTunnelReady',
     'HostsLockRemovedWhileConnected',
     'FirewallRuleDisabledWhileConnected',

@@ -82,11 +82,11 @@
                                 VerticalAlignment="Center">
                         <TextBlock FontSize="22"
                                    FontWeight="SemiBold"
-                                   Text="Astral v2.2.14" />
+                                   Text="Astral v2.2.15" />
                         <TextBlock Margin="0,5,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
-                                   Text="Scoped PAC doğrulama, hedef hızlı testi ve bağlantı hotfix'i" />
+                                   Text="Scoped PAC, WireSock tünel onayı ve hedef hızlı testi hotfix'i" />
                     </StackPanel>
                 </Grid>
 
@@ -109,7 +109,7 @@
                                            FontSize="14"
                                            LineHeight="21"
                                            TextWrapping="Wrap"
-                                           Text="Bu sürüm Astral bağlı görünürken web hedeflerinin scoped PAC ayarı eksik kalması riskini kapatır. Seçili web hedefleri için PAC dosyası kullanıcı veri alanında tutulur, bağlantı Connected durumuna geçmeden önce canlı olarak doğrulanır ve hızlı hedef testi gerekirse kapsamı yeniler." />
+                                           Text="Bu sürüm Astral bağlı görünürken web hedeflerinin scoped PAC ayarı eksik kalması veya WireSock tünel başlangıç onayı oluşmadan bağlantının hazır görünmesi riskini kapatır. PAC dosyası kullanıcı veri alanında tutulur, bağlantı Connected durumuna geçmeden önce canlı doğrulama yapılır ve hızlı hedef testi gerekirse kapsamı yeniler." />
                             </StackPanel>
                         </Border>
 
@@ -132,6 +132,10 @@
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
+                                           Text="&#x2022; WireSock tünel başlangıç onayı oluşmadan Astral artık Connected durumuna geçmez; başarısız denemede PAC/proxy kapsamı geri temizlenir." />
+                                <TextBlock FontSize="13"
+                                           LineHeight="22"
+                                           TextWrapping="Wrap"
                                            Text="&#x2022; PAC/state dosyaları tarayıcıların okuyabileceği kullanıcı veri alanına taşındı; protected ProgramData PAC yolu yeni oturumlarda kullanılmaz." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
@@ -141,6 +145,10 @@
                                            LineHeight="22"
                                            TextWrapping="Wrap"
                                            Text="&#x2022; Tanılama paketlerine webProxyScope.* alanları eklendi; planlanan kapsam ile gerçek PAC durumu ayrı raporlanır." />
+                                <TextBlock FontSize="13"
+                                           LineHeight="22"
+                                           TextWrapping="Wrap"
+                                           Text="&#x2022; WireSock ve Astral.WebProxy aynı tunnel.log dosyasına yazarken satır bozulmasını önlemek için log yazımı dosya bazında kilitlendi." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
@@ -194,7 +202,7 @@
                     <TextBlock VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource MutedTextBrush}"
-                               Text="Bu not, v2.2.14 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
+                               Text="Bu not, v2.2.15 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
                     <Button Grid.Column="1"
                             Margin="0,0,10,0"
                             Height="40"

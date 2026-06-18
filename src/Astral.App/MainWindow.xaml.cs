@@ -49,7 +49,7 @@ public partial class MainWindow : Window, IDisposable
     private static readonly Uri RepositoryUri = new(
         "https://github.com/ucsahinn/astral");
     private static readonly Uri ReleaseNotesUri = new(
-        "https://github.com/ucsahinn/astral/releases/tag/v2.2.14");
+        "https://github.com/ucsahinn/astral/releases/tag/v2.2.15");
     private static readonly Uri BackgroundVideoUri = new(
         "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260606_154941_df1a96e1-a06f-450c-bd02-d863414cc1a0.mp4");
     private static readonly string LocalBackgroundVideoPath = Path.Combine(
@@ -721,7 +721,7 @@ public partial class MainWindow : Window, IDisposable
                 Name = "TargetToggle_" + CreateSafeTargetName(target.Id),
                 Tag = target,
                 Width = 116,
-                Height = 66,
+                Height = 70,
                 Margin = new Thickness(2),
                 Padding = new Thickness(6),
                 Style = (Style)FindResource("TargetCardCheckBoxStyle"),
@@ -867,7 +867,7 @@ public partial class MainWindow : Window, IDisposable
             return probe.Status switch
             {
                 TargetProbeStatus.Running => TargetCardState.Connecting,
-                TargetProbeStatus.Success => TargetCardState.InScope,
+                TargetProbeStatus.Success or TargetProbeStatus.ProfileScope => TargetCardState.InScope,
                 TargetProbeStatus.Failed => TargetCardState.Problem,
                 TargetProbeStatus.Skipped => TargetCardState.Selected,
                 _ => TargetCardState.Selected
@@ -988,7 +988,7 @@ public partial class MainWindow : Window, IDisposable
                     },
                     new TextBlock
                     {
-                        Text = "Hızlı test, seçili web hedefleri için yerel proxy üzerinden CONNECT 443 dener.",
+                        Text = "Hızlı test, web hedeflerinde yerel proxy üzerinden CONNECT 443 dener; uygulama hedeflerinde profil kapsamını doğrular.",
                         Margin = new Thickness(0, 3, 0, 0),
                         TextWrapping = TextWrapping.Wrap,
                         Foreground = new SolidColorBrush(MediaColor.FromRgb(170, 211, 226))
@@ -1005,6 +1005,7 @@ public partial class MainWindow : Window, IDisposable
             TargetProbeStatus.Running => "test ediliyor",
             TargetProbeStatus.Success => "başarılı",
             TargetProbeStatus.Failed => "sorunlu",
+            TargetProbeStatus.ProfileScope => "profil kapsamında",
             TargetProbeStatus.Skipped => "atlandı",
             _ => "çalıştırılmadı"
         };
@@ -1040,16 +1041,17 @@ public partial class MainWindow : Window, IDisposable
     {
         if (!_targetProbeResults.TryGetValue(targetId, out var result))
         {
-            return "Test edilmedi";
+            return "Test yok";
         }
 
         return result.Status switch
         {
             TargetProbeStatus.Running => "Test ediliyor",
             TargetProbeStatus.Success => "Başarılı",
+            TargetProbeStatus.ProfileScope => "Profil OK",
             TargetProbeStatus.Failed => "Sorunlu",
             TargetProbeStatus.Skipped => "Atlandı",
-            _ => "Test edilmedi"
+            _ => "Test yok"
         };
     }
 
@@ -1058,7 +1060,8 @@ public partial class MainWindow : Window, IDisposable
         return status switch
         {
             TargetProbeStatus.Running => new SolidColorBrush(MediaColor.FromRgb(255, 217, 85)),
-            TargetProbeStatus.Success => new SolidColorBrush(MediaColor.FromRgb(93, 255, 146)),
+            TargetProbeStatus.Success or TargetProbeStatus.ProfileScope
+                => new SolidColorBrush(MediaColor.FromRgb(93, 255, 146)),
             TargetProbeStatus.Failed => new SolidColorBrush(MediaColor.FromRgb(255, 122, 122)),
             TargetProbeStatus.Skipped => new SolidColorBrush(MediaColor.FromRgb(170, 211, 226)),
             _ => new SolidColorBrush(MediaColor.FromRgb(120, 148, 166))
@@ -1070,17 +1073,24 @@ public partial class MainWindow : Window, IDisposable
         if (_isTargetTestRunning)
         {
             TargetQuickTestButton.IsEnabled = false;
+            TargetQuickTestLabel.Text = "Testte";
             TargetQuickTestButton.ToolTip = "Hedef testi çalışıyor.";
             return;
         }
 
-        var hasSelectedWebTarget = _controller.CurrentRoutingPlan
+        var hasSelectedTarget = _controller.CurrentRoutingPlan
             .SelectedTargets
-            .Any(target => target.HasWebScope && target.Domains.Count > 0);
+            .Any(target => target.HasWebScope
+                || target.HasApplicationScope);
         var enabled = snapshot.IsConnected
             && !snapshot.IsBusy
-            && hasSelectedWebTarget;
+            && hasSelectedTarget;
         TargetQuickTestButton.IsEnabled = enabled;
+        TargetQuickTestLabel.Text = _isTargetTestRunning
+            ? "Testte"
+            : enabled
+                ? "Hızlı test"
+                : "Bağlanınca test";
         TargetQuickTestButton.ToolTip = enabled
             ? "Seçili hedefleri sırayla hızlı test et"
             : "Hızlı test için önce bağlantıyı açın.";
@@ -1142,13 +1152,13 @@ public partial class MainWindow : Window, IDisposable
                     var host = GetTargetTestHost(target);
                     if (host is null)
                     {
-                        var skipped = new TargetProbeResult(
-                            TargetProbeStatus.Skipped,
+                        var scoped = new TargetProbeResult(
+                            TargetProbeStatus.ProfileScope,
                             null,
-                            "Web domaini yok; uygulama kapsamı profil üzerinden doğrulanır.",
+                            "Uygulama kapsamı WireSock profilinde doğrulandı.",
                             DateTimeOffset.Now);
-                        _targetProbeResults[target.Id] = skipped;
-                        results.Add(skipped);
+                        _targetProbeResults[target.Id] = scoped;
+                        results.Add(scoped);
                         continue;
                     }
 
@@ -1179,13 +1189,13 @@ public partial class MainWindow : Window, IDisposable
                 var host = GetTargetTestHost(target);
                 if (host is null)
                 {
-                    var skipped = new TargetProbeResult(
-                        TargetProbeStatus.Skipped,
+                    var scoped = new TargetProbeResult(
+                        TargetProbeStatus.ProfileScope,
                         null,
-                        "Web domaini yok; uygulama kapsamı profil üzerinden doğrulanır.",
+                        "Uygulama kapsamı WireSock profilinde doğrulandı.",
                         DateTimeOffset.Now);
-                    _targetProbeResults[target.Id] = skipped;
-                    results.Add(skipped);
+                    _targetProbeResults[target.Id] = scoped;
+                    results.Add(scoped);
                     RefreshTargetScopeView(_controller.Snapshot.IsBusy
                         || _controller.Snapshot.IsConnected);
                     continue;
@@ -1209,7 +1219,8 @@ public partial class MainWindow : Window, IDisposable
             }
 
             var successCount = results.Count(result =>
-                result.Status is TargetProbeStatus.Success);
+                result.Status is TargetProbeStatus.Success
+                    or TargetProbeStatus.ProfileScope);
             var failedCount = results.Count(result =>
                 result.Status is TargetProbeStatus.Failed);
             var skippedCount = results.Count(result =>
@@ -1446,6 +1457,7 @@ public partial class MainWindow : Window, IDisposable
         NotTested,
         Running,
         Success,
+        ProfileScope,
         Failed,
         Skipped
     }
@@ -1539,11 +1551,11 @@ public partial class MainWindow : Window, IDisposable
         var statusLabel = new TextBlock
         {
             Text = "Hazır",
-            FontSize = 9.8,
+            FontSize = 10.2,
             FontWeight = FontWeights.SemiBold,
             Foreground = new SolidColorBrush(MediaColor.FromRgb(170, 211, 226)),
             TextTrimming = TextTrimming.CharacterEllipsis,
-            MaxWidth = 60
+            MaxWidth = 66
         };
         statusRow.Children.Add(statusLabel);
         textStack.Children.Add(statusRow);
@@ -1552,13 +1564,13 @@ public partial class MainWindow : Window, IDisposable
 
         var testLabel = new TextBlock
         {
-            Text = "Test edilmedi",
+            Text = "Test yok",
             Margin = new Thickness(0, 1, 0, 0),
-            FontSize = 8.7,
+            FontSize = 9.5,
             FontWeight = FontWeights.SemiBold,
             Foreground = new SolidColorBrush(MediaColor.FromRgb(120, 148, 166)),
             TextTrimming = TextTrimming.CharacterEllipsis,
-            MaxWidth = 68
+            MaxWidth = 74
         };
         textStack.Children.Add(testLabel);
         _targetTestLabels[target.Id] = testLabel;

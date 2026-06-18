@@ -170,7 +170,7 @@ static void RenderMainWindow()
         Assert(text.Contains("Debug tanılama", StringComparison.Ordinal));
         Assert(text.Contains("Kapalı. Normal rapor hafif kalır.", StringComparison.Ordinal));
         Assert(text.Contains("Rapor hazırla", StringComparison.Ordinal));
-        Assert(text.Contains("Hızlı test", StringComparison.Ordinal));
+        Assert(text.Contains("Bağlanınca test", StringComparison.Ordinal));
         Assert(text.Contains("Hedef testi:", StringComparison.Ordinal));
         Assert(text.Contains("Hazır", StringComparison.Ordinal));
         Assert(text.Contains("Astral Bağlı Değil", StringComparison.Ordinal));
@@ -185,7 +185,8 @@ static void RenderMainWindow()
         Assert(buttonNames.Contains("Astral onar"));
         Assert(buttonNames.Contains("Profil temizle"));
         Assert(buttonNames.Contains("Tanı raporu oluştur"));
-        Assert(buttonNames.Contains("Seçili hedefleri test et"));
+        Assert(buttonNames.Contains("Tanılama raporu hazırla"));
+        Assert(buttonNames.Contains("Seçili hedefleri hızlı test et"));
         Assert(buttonNames.Contains("Sürüm notlarını aç"));
         Assert(!buttonNames.Any(button => button.Contains("WireSock", StringComparison.OrdinalIgnoreCase)));
         Assert(!buttonNames.Any(button =>
@@ -200,6 +201,24 @@ static void RenderMainWindow()
         var targetQuickTestButton = FindVisualChildren<Button>(window)
             .Single(button => button.Name == "TargetQuickTestButton");
         Assert(!targetQuickTestButton.IsEnabled);
+        var releaseNotesButton = FindVisualChildren<Button>(window)
+            .Single(button => button.Name == "ReleaseNotesButton");
+        var releaseNotesWindowOpened = false;
+        window.Dispatcher.BeginInvoke(new Action(() =>
+        {
+            var releaseWindow = Application.Current.Windows
+                .OfType<ReleaseNotesWindow>()
+                .SingleOrDefault();
+            if (releaseWindow is not null)
+            {
+                releaseNotesWindowOpened = true;
+                releaseWindow.Close();
+            }
+        }), DispatcherPriority.ApplicationIdle);
+        releaseNotesButton.RaiseEvent(new RoutedEventArgs(
+            ButtonBase.ClickEvent,
+            releaseNotesButton));
+        Assert(releaseNotesWindowOpened);
         var switches = FindVisualChildren<CheckBox>(window).ToArray();
         var targetToggles = switches
             .Where(toggle => toggle.Name.StartsWith(
@@ -279,7 +298,7 @@ static void RenderMainWindow()
         }
         Assert(visibleTargetCardTexts.Any(value => value is "Seçili"));
         Assert(visibleTargetCardTexts.Any(value => value is "Hazır"));
-        Assert(visibleTargetCardTexts.Any(value => value is "Test edilmedi"));
+        Assert(visibleTargetCardTexts.Any(value => value is "Test yok"));
 
         foreach (var targetToggle in targetToggles)
         {
@@ -384,7 +403,9 @@ static void VerifyTrayExitDoesNotHangWhenControllerCleanupIsSlow()
 {
     MainWindow? window = null;
     var root = CreateTemporaryDirectory();
-    var launcher = new FakeProcessLauncher(TimeSpan.FromSeconds(5));
+    var launcher = new FakeProcessLauncher(
+        TimeSpan.FromSeconds(5),
+        ["Wireguard tunnel has been started."]);
     var previousTimeout = MainWindow.ShutdownCleanupTimeout;
 
     try
@@ -403,11 +424,13 @@ static void VerifyTrayExitDoesNotHangWhenControllerCleanupIsSlow()
         var closed = false;
         window.Closed += (_, _) => closed = true;
 
+        var exitStartedAt = DateTimeOffset.UtcNow;
         InvokeTrayExit(window);
         PumpDispatcherUntil(() => closed, TimeSpan.FromSeconds(2));
+        var exitElapsed = DateTimeOffset.UtcNow - exitStartedAt;
 
         Assert(closed);
-        Assert(launcher.LastProcess is { HasExited: false });
+        Assert(exitElapsed < TimeSpan.FromSeconds(1));
         window = null;
     }
     finally
@@ -468,7 +491,8 @@ static void VerifyTrayExitDisposesActiveConnectionWhenRunInBackgroundIsEnabled()
 {
     MainWindow? window = null;
     var root = CreateTemporaryDirectory();
-    var launcher = new FakeProcessLauncher();
+    var launcher = new FakeProcessLauncher(
+        wireSockLogLines: ["Wireguard tunnel has been started."]);
 
     try
     {
@@ -793,7 +817,9 @@ file sealed class FakeCommandRunner : ICommandRunner
     }
 }
 
-file sealed class FakeProcessLauncher(TimeSpan? stopDelay = null) : IProcessLauncher
+file sealed class FakeProcessLauncher(
+    TimeSpan? stopDelay = null,
+    string[]? wireSockLogLines = null) : IProcessLauncher
 {
     public FakeManagedProcess? LastProcess { get; private set; }
 
@@ -803,6 +829,12 @@ file sealed class FakeProcessLauncher(TimeSpan? stopDelay = null) : IProcessLaun
         string workingDirectory,
         string logPath)
     {
+        if (wireSockLogLines is { Length: > 0 })
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(logPath)!);
+            File.AppendAllLines(logPath, wireSockLogLines);
+        }
+
         LastProcess = new FakeManagedProcess(stopDelay);
         return LastProcess;
     }

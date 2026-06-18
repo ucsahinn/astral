@@ -104,6 +104,17 @@ try {
         throw "Astral WireSock VPN Client surecini yonetmek icin yonetici manifest'iyle derlenmelidir"
     }
 
+    $project = [xml](Get-Content -Raw -LiteralPath 'src\Astral.App\Astral.App.csproj')
+    $projectVersion = $project.Project.PropertyGroup.Version
+    if ([string]::IsNullOrWhiteSpace($projectVersion)) {
+        throw "Astral uygulama surumu proje dosyasindan okunamadi"
+    }
+
+    $expectedManifestVersion = "$projectVersion.0"
+    if ($manifest -notmatch "<assemblyIdentity\s+version=`"$([regex]::Escape($expectedManifestVersion))`"\s+name=`"Astral`"") {
+        throw "Astral manifest surumu proje surumuyle eslesmiyor: beklenen $expectedManifestVersion"
+    }
+
     $gitleaks = Get-Command gitleaks -ErrorAction SilentlyContinue
     if ($null -ne $gitleaks) {
         & $gitleaks.Source dir . --redact --no-banner --exit-code 1
