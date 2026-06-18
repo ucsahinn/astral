@@ -41,7 +41,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Profil üretici geniş AllowedApps değerlerini değiştirir", ProfileBuilderIsStrictAsync),
     ("Profil üretici boşluklu uygulama yollarını tırnaklar", ProfileBuilderQuotesApplicationsWithSpacesAsync),
     ("Profil üretici yapılandırma enjeksiyonunu reddeder", ProfileBuilderRejectsInjectionAsync),
-    ("wgcf seçili hedefler için Astral scoped profil üretir", WgcfProvisionerBuildsDiscordAccessProfileAsync),
+    ("wgcf seçili hedefler için WireSock uyumlu Astral scoped profil üretir", WgcfProvisionerBuildsDiscordAccessProfileAsync),
     ("wgcf yenileme hatasında mevcut profili kullanır", WgcfProvisionerUsesCachedProfileWhenRefreshFailsAsync),
     ("wgcf boş hata çıktısını tanısız bırakmaz", WgcfProvisionerEmptyFailureIsDiagnosticAsync),
     ("SHA-256 doğrulayıcı yalnızca sabit özeti kabul eder", HashVerifierIsStrictAsync),
@@ -939,11 +939,9 @@ static async Task WgcfProvisionerBuildsDiscordAccessProfileAsync()
         var profile = await File.ReadAllTextAsync(profilePath);
         Assert(profilePath == paths.ScopedProfile);
         Assert(profilePath.EndsWith(
-            "astral-scoped.conf",
-            StringComparison.OrdinalIgnoreCase));
-        Assert(!profilePath.EndsWith(
             "discord.conf",
             StringComparison.OrdinalIgnoreCase));
+        Assert(paths.LegacyDiscordProfile == paths.ScopedProfile);
         Assert(File.Exists(paths.WgcfExecutable));
         var allowedAppsLine = profile
             .Split(["\r\n", "\n"], StringSplitOptions.None)

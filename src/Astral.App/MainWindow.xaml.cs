@@ -49,7 +49,7 @@ public partial class MainWindow : Window, IDisposable
     private static readonly Uri RepositoryUri = new(
         "https://github.com/ucsahinn/astral");
     private static readonly Uri ReleaseNotesUri = new(
-        "https://github.com/ucsahinn/astral/releases/tag/v2.2.19");
+        "https://github.com/ucsahinn/astral/releases/tag/v2.2.20");
     private static readonly Uri BackgroundVideoUri = new(
         "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260606_154941_df1a96e1-a06f-450c-bd02-d863414cc1a0.mp4");
     private static readonly string LocalBackgroundVideoPath = Path.Combine(
@@ -765,9 +765,9 @@ public partial class MainWindow : Window, IDisposable
             {
                 Name = "TargetToggle_" + CreateSafeTargetName(target.Id),
                 Tag = target,
-                Width = 112,
-                Height = 62,
-                Margin = new Thickness(1.5),
+                Width = 118,
+                Height = 54,
+                Margin = new Thickness(2.5),
                 Padding = new Thickness(5),
                 Style = (Style)FindResource("TargetCardCheckBoxStyle"),
                 ToolTip = $"{target.Label} hedefi hazır",
@@ -1014,8 +1014,8 @@ public partial class MainWindow : Window, IDisposable
     {
         var stateText = GetTargetCardStateText(state);
         var scopeText = snapshot.IsConnected && state is not TargetCardState.Passive
-            ? "Kapsam aktif"
-            : "Kapsam hazır";
+            ? "Bağlantı açık; bu hedef kapsamda."
+            : "Bağlantı açıldığında bu hedef kapsama alınır.";
         return new WpfToolTip
         {
             Content = new StackPanel
@@ -1670,21 +1670,21 @@ public partial class MainWindow : Window, IDisposable
 
         var iconBadge = new Border
         {
-            Width = 32,
-            Height = 32,
+            Width = 38,
+            Height = 38,
             HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
             VerticalAlignment = VerticalAlignment.Center,
-            CornerRadius = new CornerRadius(9),
+            CornerRadius = new CornerRadius(11),
             BorderBrush = new SolidColorBrush(MediaColor.FromArgb(172, 245, 247, 251)),
             BorderThickness = new Thickness(1),
-            Background = new SolidColorBrush(MediaColor.FromArgb(210, 245, 247, 251)),
+            Background = new SolidColorBrush(MediaColor.FromArgb(232, 245, 247, 251)),
             Child = CreateTargetMark(target.IconKey, visual)
         };
         iconBadge.Effect = new DropShadowEffect
         {
-            BlurRadius = 10,
+            BlurRadius = 14,
             Direction = 270,
-            Opacity = 0.46,
+            Opacity = 0.52,
             ShadowDepth = 0,
             Color = visual.EndColor
         };
@@ -1694,60 +1694,21 @@ public partial class MainWindow : Window, IDisposable
 
         var textStack = new StackPanel
         {
-            Margin = new Thickness(7, 0, 0, 0),
+            Margin = new Thickness(8, 0, 2, 0),
             VerticalAlignment = VerticalAlignment.Center
         };
         Grid.SetColumn(textStack, 1);
         textStack.Children.Add(new TextBlock
         {
             Text = target.Label,
-            FontSize = 10.8,
+            FontSize = 11.2,
             FontWeight = FontWeights.SemiBold,
             Foreground = WpfBrushes.White,
             TextTrimming = TextTrimming.CharacterEllipsis,
-            MaxWidth = 66
+            MaxWidth = 64,
+            VerticalAlignment = VerticalAlignment.Center
         });
-        var statusRow = new StackPanel
-        {
-            Orientation = System.Windows.Controls.Orientation.Horizontal,
-            Margin = new Thickness(0, 1, 0, 0)
-        };
-        var statusDot = new Border
-        {
-            Width = 6,
-            Height = 6,
-            CornerRadius = new CornerRadius(3),
-            Margin = new Thickness(0, 3, 4, 0),
-            Background = new SolidColorBrush(MediaColor.FromRgb(170, 211, 226))
-        };
-        statusRow.Children.Add(statusDot);
-        _targetStatusDots[target.Id] = statusDot;
-        var statusLabel = new TextBlock
-        {
-            Text = "Hazır",
-            FontSize = 9.6,
-            FontWeight = FontWeights.SemiBold,
-            Foreground = new SolidColorBrush(MediaColor.FromRgb(170, 211, 226)),
-            TextTrimming = TextTrimming.CharacterEllipsis,
-            MaxWidth = 66
-        };
-        statusRow.Children.Add(statusLabel);
-        textStack.Children.Add(statusRow);
         grid.Children.Add(textStack);
-        _targetStatusLabels[target.Id] = statusLabel;
-
-        var testLabel = new TextBlock
-        {
-            Text = "Kapsam hazır",
-            Margin = new Thickness(0, 1, 0, 0),
-            FontSize = 9,
-            FontWeight = FontWeights.SemiBold,
-            Foreground = new SolidColorBrush(MediaColor.FromRgb(120, 148, 166)),
-            TextTrimming = TextTrimming.CharacterEllipsis,
-            MaxWidth = 74
-        };
-        textStack.Children.Add(testLabel);
-        _targetTestLabels[target.Id] = testLabel;
 
         var warningBadge = new Border
         {
@@ -1790,14 +1751,14 @@ public partial class MainWindow : Window, IDisposable
         var foreground = new SolidColorBrush(MediaColor.FromRgb(245, 247, 251));
         return new Grid
         {
-            Width = 30,
-            Height = 30,
+            Width = 34,
+            Height = 34,
             Children =
             {
                 new TextBlock
                 {
-                    Text = "!",
-                    FontSize = 20,
+                    Text = visual.Mark,
+                    FontSize = visual.Mark.Length > 1 ? 12 : 18,
                     FontWeight = FontWeights.Black,
                     Foreground = foreground,
                     HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
@@ -1897,8 +1858,8 @@ public partial class MainWindow : Window, IDisposable
 
             icon = new Viewbox
             {
-                Width = 30,
-                Height = 30,
+                Width = 34,
+                Height = 34,
                 Stretch = Stretch.Uniform,
                 Child = canvas
             };
@@ -1946,8 +1907,8 @@ public partial class MainWindow : Window, IDisposable
         bitmap.Freeze();
         icon = new WpfImage
         {
-            Width = 30,
-            Height = 30,
+            Width = 34,
+            Height = 34,
             Source = bitmap,
             Stretch = Stretch.Uniform,
             SnapsToDevicePixels = true
@@ -2108,8 +2069,8 @@ public partial class MainWindow : Window, IDisposable
         {
             DebugDiagnosticsToggle.IsChecked = enabled;
             DebugDiagnosticsStatus.Text = enabled
-                ? "Açık. Rapor ağ ve performans debug verisi ekler."
-                : "Kapalı. Normal rapor hafif kalır.";
+                ? "Debug ayrıntısı açık."
+                : "Ayrıntılı tanı kapalı.";
         }
         finally
         {
@@ -2142,8 +2103,8 @@ public partial class MainWindow : Window, IDisposable
             _isRunInBackgroundEnabled = enabled;
             RunInBackgroundToggle.IsChecked = enabled;
             RunInBackgroundStatus.Text = enabled
-                ? "Pencere kapanınca bildirim alanında kalır."
-                : "Pencere kapanınca bildirim alanında kalmaz.";
+                ? "Kapanınca arka planda."
+                : "Kapanınca kapanır.";
 
             if (enabled)
             {
@@ -2206,8 +2167,8 @@ public partial class MainWindow : Window, IDisposable
         {
             StartupToggle.IsChecked = enabled;
             StartupStatus.Text = enabled
-                ? "Windows açılışında çalışır."
-                : "Windows açılışında çalıştır";
+                ? "Windows ile başlar."
+                : "Elle başlatılır.";
         }
         finally
         {

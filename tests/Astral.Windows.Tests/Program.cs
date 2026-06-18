@@ -150,7 +150,7 @@ static void RenderMainWindow()
         SaveWindowPng(window, Path.Combine(
             FindRepositoryRoot(),
             "artifacts",
-            "ui-main-window-v2.2.19.png"));
+            "ui-main-window-v2.2.20.png"));
 
         Assert(window.ResizeMode == ResizeMode.NoResize);
         Assert(window.Width == 1280);
@@ -167,12 +167,13 @@ static void RenderMainWindow()
 
         var text = string.Join(
             "\n",
-            FindVisualChildren<TextBlock>(window).Select(block => block.Text));
+            FindVisualChildren<TextBlock>(window)
+                .Where(block => block.IsVisible)
+                .Select(block => block.Text));
         Assert(text.Contains("Astral", StringComparison.Ordinal));
         Assert(text.Contains("Desteklenen hedef kapsamı hazır", StringComparison.Ordinal));
         Assert(text.Contains("Hedef kapsamı", StringComparison.Ordinal));
-        Assert(text.Contains("8 hedef hazır", StringComparison.Ordinal));
-        Assert(text.Contains("8 hedef hazır · seçili kapsam bağlantıya dahil edilir.", StringComparison.Ordinal));
+        Assert(text.Contains("Desteklenen hedefler", StringComparison.Ordinal));
         Assert(!text.Contains("TÜNEL KAPSAMI", StringComparison.Ordinal));
         Assert(!text.Contains("Hedefleri Seç", StringComparison.Ordinal));
         Assert(!text.Contains("Hedef Merkezi", StringComparison.Ordinal));
@@ -180,20 +181,20 @@ static void RenderMainWindow()
         Assert(!text.Contains("Özel Domain", StringComparison.Ordinal));
         Assert(!text.Contains("Tarayıcı modu", StringComparison.Ordinal));
         Assert(text.Contains("İŞLETİM MERKEZİ", StringComparison.Ordinal));
-        Assert(text.Contains("Arka planda çalıştır", StringComparison.Ordinal));
-        Assert(text.Contains("Windows açılışında çalıştır", StringComparison.Ordinal));
+        Assert(text.Contains("Arka plan", StringComparison.Ordinal));
+        Assert(text.Contains("Başlangıç", StringComparison.Ordinal));
         Assert(text.Contains("Tanılama", StringComparison.Ordinal));
-        Assert(text.Contains("Debug tanılama", StringComparison.Ordinal));
-        Assert(text.Contains("Kapalı. Normal rapor hafif kalır.", StringComparison.Ordinal));
+        Assert(text.Contains("Debug", StringComparison.Ordinal));
+        Assert(text.Contains("Ayrıntılı tanı kapalı.", StringComparison.Ordinal));
         Assert(!text.Contains("Rapor hazırla", StringComparison.Ordinal));
         Assert(!text.Contains("Bağlanınca test", StringComparison.Ordinal));
         Assert(!text.Contains("Hızlı Test", StringComparison.Ordinal));
         Assert(!text.Contains("Hedef testi:", StringComparison.Ordinal));
-        Assert(text.Contains("Kapsam durumu:", StringComparison.Ordinal));
+        Assert(!text.Contains("Kapsam durumu:", StringComparison.Ordinal));
         Assert(text.Contains("Hazır", StringComparison.Ordinal));
         Assert(text.Contains("Astral Bağlı Değil", StringComparison.Ordinal));
         Assert(text.Contains(
-            "Tanı paketi alt bardan oluşturulur.",
+            "Rapor alt bardan.",
             StringComparison.Ordinal));
         var buttonNames = FindVisualChildren<Button>(window)
             .Where(button => button.Visibility == Visibility.Visible)
@@ -351,9 +352,9 @@ static void RenderMainWindow()
         {
             Assert(visibleTargetCardTexts.Contains(expectedTarget));
         }
-        Assert(visibleTargetCardTexts.Any(value => value is "Seçili"));
-        Assert(visibleTargetCardTexts.Any(value => value is "Hazır"));
-        Assert(visibleTargetCardTexts.Any(value => value is "Kapsam hazır"));
+        Assert(!visibleTargetCardTexts.Any(value => value is "Seçili"));
+        Assert(!visibleTargetCardTexts.Any(value => value is "Hazır"));
+        Assert(!visibleTargetCardTexts.Any(value => value is "Kapsam hazır" or "Kapsam aktif"));
 
         foreach (var targetToggle in targetToggles)
         {
@@ -473,7 +474,8 @@ static void VerifyConnectedTargetCardsRequireProbeEvidence()
             .ToArray();
 
         Assert(!cardTexts.Contains("Kapsamda", StringComparer.Ordinal));
-        Assert(cardTexts.Contains("Kapsam aktif", StringComparer.Ordinal));
+        Assert(!cardTexts.Contains("Kapsam aktif", StringComparer.Ordinal));
+        Assert(cardTexts.Contains("Discord", StringComparer.Ordinal));
         Assert(!FindVisualChildren<Button>(window)
             .Any(button => button.Name == "TargetQuickTestButton"));
 

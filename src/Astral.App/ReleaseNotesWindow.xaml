@@ -82,11 +82,11 @@
                                 VerticalAlignment="Center">
                         <TextBlock FontSize="22"
                                    FontWeight="SemiBold"
-                                   Text="Astral v2.2.19" />
+                                   Text="Astral v2.2.20" />
                         <TextBlock Margin="0,5,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
-                                   Text="Çoklu host rota testi ve hedef kapsam hotfix'i" />
+                                   Text="WireSock profil uyumluluğu ve premium hedef yüzeyi hotfix'i" />
                     </StackPanel>
                 </Grid>
 
@@ -109,7 +109,7 @@
                                            FontSize="14"
                                            LineHeight="21"
                                            TextWrapping="Wrap"
-                                           Text="Bu sürüm hedef kapsamı görünümünü sadeleştirir, API probe timeout'larını kullanıcıya hedef hatası gibi göstermeyi bırakır, WebProxy DNS fallback davranışını güçlendirir ve restart akışının kapanış temizliğinde takılı kalmasını önler." />
+                                           Text="Bu sürüm v2.2.19 tanı paketlerinde görülen WireSock adaptörünün ayağa kalkmama regresyonunu düzeltir, hedef probe hostlarını daha stabil ana giriş hostlarıyla sınırlar ve sağ hedef paneli ile işletim merkezini daha sade/premium hale getirir." />
                             </StackPanel>
                         </Border>
 
@@ -128,27 +128,27 @@
                                            FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Ana pencere 1280x720 sabit viewport ile açılır; kullanıcı resize grip veya pencere kenarından boyut değiştiremez." />
+                                           Text="&#x2022; WireSock runtime profili, tanı paketlerinde çalışan son uyumlu profil adıyla üretilir; Astral kapsam modeli ve cleanup sahipliği korunur." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Sağ hedef panelindeki manuel Hızlı Test aksiyonu kaldırıldı; kullanıcıya yalnız seçili kapsamın bağlantıya dahil edildiği gösterilir." />
+                                           Text="&#x2022; Hedef probe hostları route domainlerinden ayrıldı; rota kapsamı korunurken tanı doğrulaması stabil ana hostları kullanır." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Hedef kartları API probe timeout'larını kırmızı ürün hatasına çevirmeden Kapsam hazır veya Kapsam aktif durumunu gösterir." />
+                                           Text="&#x2022; Hedef kartlarında görünen Seçili/Hazır/Kapsam hazır metinleri kaldırıldı; gerçek ürün logoları, ürün adı, check ve border state'i öne çıkarıldı." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; WebProxy hosts-lock altında upstream'e çıkamazsa DoH ve UDP DNS fallback ile seçili hostları yeniden çözer." />
+                                           Text="&#x2022; İşletim merkezi dört eşit mini kontrole alındı; arka plan, başlangıç, tanılama ve debug tanılama hizası sadeleşti." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Yeniden başlatma, kapanış temizliği zaman aşımına uğrasa bile tanılamaya uyarı yazıp best-effort devam eder." />
+                                           Text="&#x2022; Astral marka işareti mevcut A ikonunu koruyarak daha astral/orbit hissi veren header katmanıyla güçlendirildi." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Uygulama Loaded olur olmaz arka plan güncelleme denetimi başlar; bağlantı kilidi hazırlığı bu denetimi geciktirmez." />
+                                           Text="&#x2022; Video arka plan korunur; sağ panellerdeki scrim ve kart yoğunluğu azaltılarak arka plan daha görünür bırakılır." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
@@ -156,7 +156,7 @@
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Windows UI testi pencere boyutu kilidini, release notu butonunun klasör açmadığını ve açılış güncelleme denetiminin butonu gösterdiğini doğrular." />
+                                           Text="&#x2022; Windows UI testi kartlarda state metni kalmadığını, Roblox'un görünmediğini ve sabit viewport davranışını doğrular." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
@@ -164,7 +164,7 @@
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Sürüm metadata'sı, updater, web proxy ve uygulama içi release bağlantısı v2.2.19 ile hizalandı." />
+                                           Text="&#x2022; Sürüm metadata'sı, updater, web proxy ve uygulama içi release bağlantısı v2.2.20 ile hizalandı." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
@@ -214,7 +214,7 @@
                     <TextBlock VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource MutedTextBrush}"
-                                   Text="Bu not, v2.2.19 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
+                                   Text="Bu not, v2.2.20 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
                     <Button Grid.Column="1"
                             Margin="0,0,10,0"
                             Height="40"

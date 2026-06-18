@@ -49,8 +49,11 @@ public sealed class AppPaths
         WgcfExecutable = Path.Combine(ToolsDirectory, "wgcf.exe");
         WgcfAccount = Path.Combine(ProfileDirectory, "wgcf-account.toml");
         WgcfBaseProfile = Path.Combine(ProfileDirectory, "wgcf-profile.conf");
-        ScopedProfile = Path.Combine(ProfileDirectory, "astral-scoped.conf");
-        LegacyDiscordProfile = Path.Combine(ProfileDirectory, "discord.conf");
+        // WireSock has shown version-sensitive behavior around profile file names.
+        // Keep the runtime config filename on the known-compatible legacy value
+        // while the public product surface and ownership checks remain Astral-scoped.
+        ScopedProfile = Path.Combine(ProfileDirectory, "discord.conf");
+        LegacyDiscordProfile = ScopedProfile;
         DiscordProfile = ScopedProfile;
         WebProxyPacFile = Path.Combine(WebProxyDirectory, "astral-scoped.pac");
         WebProxyStateFile = Path.Combine(WebProxyDirectory, "proxy-state.json");

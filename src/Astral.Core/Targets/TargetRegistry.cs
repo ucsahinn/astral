@@ -45,17 +45,7 @@ public sealed class TargetRegistry
                 "discord",
                 [
                     "discord.com",
-                    "discordapp.com",
-                    "discord.gg",
-                    "discord.gift",
-                    "discord.media",
-                    "discordstatus.com",
-                    "discordcdn.com",
-                    "cdn.discordapp.com",
-                    "dl.discordapp.net",
-                    "updates.discord.com",
-                    "gateway.discord.gg",
-                    "media.discordapp.net"
+                    "discord.gg"
                 ]),
             Create(
                 TargetIds.Wattpad,
@@ -73,10 +63,7 @@ public sealed class TargetRegistry
                 "wattpad",
                 [
                     "wattpad.com",
-                    "www.wattpad.com",
-                    "api.wattpad.com",
-                    "img.wattpad.com",
-                    "static.wattpad.com"
+                    "www.wattpad.com"
                 ]),
             Create(
                 TargetIds.BigoLive,
@@ -94,10 +81,7 @@ public sealed class TargetRegistry
                 "bigo-live",
                 [
                     "bigo.tv",
-                    "www.bigo.tv",
-                    "mobile.bigo.tv",
-                    "bigolive.tv",
-                    "www.bigolive.tv"
+                    "www.bigo.tv"
                 ]),
             Create(
                 TargetIds.Azar,
@@ -115,8 +99,7 @@ public sealed class TargetRegistry
                 "azar",
                 [
                     "azarlive.com",
-                    "www.azarlive.com",
-                    "api.azarlive.com"
+                    "www.azarlive.com"
                 ]),
             Create(
                 TargetIds.Tango,
@@ -166,10 +149,7 @@ public sealed class TargetRegistry
                 "imvu",
                 [
                     "imvu.com",
-                    "www.imvu.com",
-                    "secure.imvu.com",
-                    "api.imvu.com",
-                    "userimages-akm.imvu.com"
+                    "www.imvu.com"
                 ]),
             Create(
                 TargetIds.Blogspot,
