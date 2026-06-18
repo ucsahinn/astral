@@ -49,7 +49,9 @@ public sealed class AppPaths
         WgcfExecutable = Path.Combine(ToolsDirectory, "wgcf.exe");
         WgcfAccount = Path.Combine(ProfileDirectory, "wgcf-account.toml");
         WgcfBaseProfile = Path.Combine(ProfileDirectory, "wgcf-profile.conf");
-        DiscordProfile = Path.Combine(ProfileDirectory, "discord.conf");
+        ScopedProfile = Path.Combine(ProfileDirectory, "astral-scoped.conf");
+        LegacyDiscordProfile = Path.Combine(ProfileDirectory, "discord.conf");
+        DiscordProfile = ScopedProfile;
         WebProxyPacFile = Path.Combine(WebProxyDirectory, "astral-scoped.pac");
         WebProxyStateFile = Path.Combine(WebProxyDirectory, "proxy-state.json");
         TunnelLog = Path.Combine(LogDirectory, "tunnel.log");
@@ -100,6 +102,10 @@ public sealed class AppPaths
     public string WgcfAccount { get; }
 
     public string WgcfBaseProfile { get; }
+
+    public string ScopedProfile { get; }
+
+    public string LegacyDiscordProfile { get; }
 
     public string DiscordProfile { get; }
 

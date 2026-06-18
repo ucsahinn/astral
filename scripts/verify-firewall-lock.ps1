@@ -18,11 +18,11 @@ $Domains = @(
     'images-ext-1.discordapp.net',
     'images-ext-2.discordapp.net'
 )
-$RuleName = 'Astral.BlockDiscordDomains'
-$DisplayName = 'Astral VPN kilidi - Discord alan adlari'
+$RuleName = 'Astral.BlockTargetDomains'
+$DisplayName = 'Astral hedef kilidi - secili alan adlari'
 $HostsPath = Join-Path $env:SystemRoot 'System32\drivers\etc\hosts'
-$BeginMarker = '# BEGIN Astral Discord kilidi'
-$EndMarker = '# END Astral Discord kilidi'
+$BeginMarker = '# BEGIN Astral hedef kilidi'
+$EndMarker = '# END Astral hedef kilidi'
 
 function Test-IsAdministrator {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()

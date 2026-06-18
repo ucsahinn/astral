@@ -6,22 +6,27 @@ namespace Astral.Core.Firewall;
 
 public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
 {
-    public const string RuleName = "Astral.BlockDiscordDomains";
+    public const string RuleName = "Astral.BlockTargetDomains";
     public const string BrowserScopeGroup = "Astral.TunnelScope.Browsers";
 
     private static readonly string LegacyProductName = string.Concat("Dis", "corder");
+    private const string PreviousAstralRuleName = "Astral.BlockDiscordDomains";
     private static readonly string LegacyRuleName =
         LegacyProductName + ".BlockDiscordDomains";
     private static readonly string LegacyBrowserScopeGroup =
         LegacyProductName + ".TunnelScope.Browsers";
+    private const string PreviousAstralBeginMarker =
+        "# BEGIN Astral Discord kilidi";
+    private const string PreviousAstralEndMarker =
+        "# END Astral Discord kilidi";
     private static readonly string LegacyBeginMarker =
         "# BEGIN " + LegacyProductName + " Discord kilidi";
     private static readonly string LegacyEndMarker =
         "# END " + LegacyProductName + " Discord kilidi";
 
-    private const string DisplayName = "Astral VPN kilidi - Discord alan adları";
+    private const string DisplayName = "Astral hedef kilidi - secili alan adlari";
     private const string BrowserScopeDisplayName =
-        "Astral tünel kapsamı - tarayıcı Discord engeli";
+        "Astral hedef kapsami - tarayici duz baglanti korumasi";
     private static readonly TimeSpan ScriptTimeout = TimeSpan.FromSeconds(60);
     private static readonly string[] DefaultLockDomains =
     [
@@ -93,7 +98,22 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
     {
         return RunScriptAsync(
             "ApplyTunnelScope",
-            BuildApplyTunnelScopeScript(includeBrowserAccess),
+            BuildApplyTunnelScopeScript(
+                includeBrowserAccess,
+                DefaultLockDomains),
+            cancellationToken);
+    }
+
+    public Task ApplyTunnelScopeAsync(
+        RoutingPlan routingPlan,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(routingPlan);
+        return RunScriptAsync(
+            "ApplyTunnelScope",
+            BuildApplyTunnelScopeScript(
+                !routingPlan.RequiresWebProxy,
+                CreateLockDomains(routingPlan)),
             cancellationToken);
     }
 
@@ -204,11 +224,13 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
             "function Set-AstralPhase([string]$phase) { $script:astralPhase = $phase; Write-Output ('astral-phase=' + $phase) }",
             $"$domains = @({FormatPowerShellStringArray(domains)})",
             $"$ruleName = '{RuleName}'",
-            $"$legacyRuleName = '{LegacyRuleName}'",
+            $"$legacyRuleNames = @('{PreviousAstralRuleName}', '{LegacyRuleName}')",
             $"$displayName = '{DisplayName}'",
             "$hostsPath = Join-Path $env:SystemRoot 'System32\\drivers\\etc\\hosts'",
-            "$beginMarker = '# BEGIN Astral Discord kilidi'",
-            "$endMarker = '# END Astral Discord kilidi'",
+            "$beginMarker = '# BEGIN Astral hedef kilidi'",
+            "$endMarker = '# END Astral hedef kilidi'",
+            $"$previousBeginMarker = '{PreviousAstralBeginMarker}'",
+            $"$previousEndMarker = '{PreviousAstralEndMarker}'",
             $"$legacyBeginMarker = '{LegacyBeginMarker}'",
             $"$legacyEndMarker = '{LegacyEndMarker}'",
             $"$browserScopeGroup = '{BrowserScopeGroup}'",
@@ -236,7 +258,7 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
             "$addressList = @($resolvedAddresses | Sort-Object -Unique)",
             "if ($addressList.Count -gt 0) {",
             "    Set-AstralPhase 'Enable:replace-firewall-rule'",
-            "    foreach ($name in @($ruleName, $legacyRuleName)) {",
+            "    foreach ($name in @($ruleName) + $legacyRuleNames) {",
             "        $rule = Get-NetFirewallRule -Name $name -ErrorAction SilentlyContinue",
             "        if ($null -ne $rule) {",
             "            Remove-NetFirewallRule -Name $name -ErrorAction Stop | Out-Null",
@@ -257,10 +279,12 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
             "trap { Write-Error ('Astral access-lock failed; phase=' + $script:astralPhase + '; error=' + $_.Exception.Message); exit 1 }",
             "function Set-AstralPhase([string]$phase) { $script:astralPhase = $phase; Write-Output ('astral-phase=' + $phase) }",
             $"$ruleName = '{RuleName}'",
-            $"$legacyRuleName = '{LegacyRuleName}'",
+            $"$legacyRuleNames = @('{PreviousAstralRuleName}', '{LegacyRuleName}')",
             "$hostsPath = Join-Path $env:SystemRoot 'System32\\drivers\\etc\\hosts'",
-            "$beginMarker = '# BEGIN Astral Discord kilidi'",
-            "$endMarker = '# END Astral Discord kilidi'",
+            "$beginMarker = '# BEGIN Astral hedef kilidi'",
+            "$endMarker = '# END Astral hedef kilidi'",
+            $"$previousBeginMarker = '{PreviousAstralBeginMarker}'",
+            $"$previousEndMarker = '{PreviousAstralEndMarker}'",
             $"$legacyBeginMarker = '{LegacyBeginMarker}'",
             $"$legacyEndMarker = '{LegacyEndMarker}'",
             .. BuildHostsFileFunctions(),
@@ -272,19 +296,21 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
             "    Set-AstralPhase 'Disable:flush-dns'",
             "    Invoke-AstralFlushDns",
             "}",
-            "foreach ($name in @($ruleName, $legacyRuleName)) {",
+            "foreach ($name in @($ruleName) + $legacyRuleNames) {",
             "    Disable-AstralFirewallRule $name",
             "}"
         ]);
     }
 
-    private static string BuildApplyTunnelScopeScript(bool includeBrowserAccess)
+    private static string BuildApplyTunnelScopeScript(
+        bool includeBrowserAccess,
+        IEnumerable<string> domains)
     {
         var includeBrowserAccessLiteral = includeBrowserAccess ? "$true" : "$false";
         return string.Join(Environment.NewLine, [
             "$ErrorActionPreference = 'Stop'",
             $"$includeBrowserAccess = {includeBrowserAccessLiteral}",
-            $"$domains = @({FormatPowerShellStringArray(DefaultLockDomains)})",
+            $"$domains = @({FormatPowerShellStringArray(domains)})",
             $"$browserScopeGroup = '{BrowserScopeGroup}'",
             $"$legacyBrowserScopeGroup = '{LegacyBrowserScopeGroup}'",
             $"$browserScopeDisplayName = '{BrowserScopeDisplayName}'",
@@ -404,19 +430,21 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
         return string.Join(Environment.NewLine, [
             "$ErrorActionPreference = 'Stop'",
             $"$ruleName = '{RuleName}'",
-            $"$legacyRuleName = '{LegacyRuleName}'",
+            $"$legacyRuleNames = @('{PreviousAstralRuleName}', '{LegacyRuleName}')",
             $"$browserScopeGroup = '{BrowserScopeGroup}'",
             $"$legacyBrowserScopeGroup = '{LegacyBrowserScopeGroup}'",
             "$hostsPath = Join-Path $env:SystemRoot 'System32\\drivers\\etc\\hosts'",
-            "$beginMarker = '# BEGIN Astral Discord kilidi'",
-            "$endMarker = '# END Astral Discord kilidi'",
+            "$beginMarker = '# BEGIN Astral hedef kilidi'",
+            "$endMarker = '# END Astral hedef kilidi'",
+            $"$previousBeginMarker = '{PreviousAstralBeginMarker}'",
+            $"$previousEndMarker = '{PreviousAstralEndMarker}'",
             $"$legacyBeginMarker = '{LegacyBeginMarker}'",
             $"$legacyEndMarker = '{LegacyEndMarker}'",
             .. BuildHostsFileFunctions(),
             .. BuildFirewallGroupFunctions(),
             "$script:astralHostsChanged = $false",
             "Remove-AstralHostsLock",
-            "foreach ($name in @($ruleName, $legacyRuleName)) {",
+            "foreach ($name in @($ruleName) + $legacyRuleNames) {",
             "    $rule = Get-NetFirewallRule -Name $name -ErrorAction SilentlyContinue",
             "    if ($null -ne $rule) {",
             "        Remove-NetFirewallRule -Name $name | Out-Null",
@@ -522,6 +550,7 @@ public sealed class WindowsFirewallDiscordAccessLock : IDiscordAccessLock
             "}",
             "function Remove-AstralHostsLock {",
             "    Remove-AstralHostsBlock $beginMarker $endMarker",
+            "    Remove-AstralHostsBlock $previousBeginMarker $previousEndMarker",
             "    Remove-AstralHostsBlock $legacyBeginMarker $legacyEndMarker",
             "}",
             "function Enable-AstralHostsLock {",

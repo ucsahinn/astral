@@ -1181,10 +1181,15 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
         try
         {
+            var fullPath = Path.GetFullPath(profilePath);
             return string.Equals(
-                Path.GetFullPath(profilePath),
-                Path.GetFullPath(_paths.DiscordProfile),
-                StringComparison.OrdinalIgnoreCase);
+                    fullPath,
+                    Path.GetFullPath(_paths.ScopedProfile),
+                    StringComparison.OrdinalIgnoreCase)
+                || string.Equals(
+                    fullPath,
+                    Path.GetFullPath(_paths.LegacyDiscordProfile),
+                    StringComparison.OrdinalIgnoreCase);
         }
         catch (Exception exception)
             when (exception is ArgumentException

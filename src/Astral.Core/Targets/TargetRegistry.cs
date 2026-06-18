@@ -42,7 +42,21 @@ public sealed class TargetRegistry
                 TargetScopeKind.ApplicationAndWeb,
                 ["discord.com", "discordapp.com", "discordapp.net", "discord.gg", "discord.gift", "discord.media", "discordstatus.com", "discordcdn.com", "cdn.discordapp.com", "dl.discordapp.net", "updates.discord.com", "gateway.discord.gg", "media.discordapp.net"],
                 ["Discord.exe", "DiscordPTB.exe", "DiscordCanary.exe", "DiscordDevelopment.exe"],
-                "discord"),
+                "discord",
+                [
+                    "discord.com",
+                    "discordapp.com",
+                    "discord.gg",
+                    "discord.gift",
+                    "discord.media",
+                    "discordstatus.com",
+                    "discordcdn.com",
+                    "cdn.discordapp.com",
+                    "dl.discordapp.net",
+                    "updates.discord.com",
+                    "gateway.discord.gg",
+                    "media.discordapp.net"
+                ]),
             Create(
                 TargetIds.Wattpad,
                 "Wattpad",
@@ -56,7 +70,14 @@ public sealed class TargetRegistry
                     "static.wattpad.com"
                 ],
                 [],
-                "wattpad"),
+                "wattpad",
+                [
+                    "wattpad.com",
+                    "www.wattpad.com",
+                    "api.wattpad.com",
+                    "img.wattpad.com",
+                    "static.wattpad.com"
+                ]),
             Create(
                 TargetIds.BigoLive,
                 "Bigo Live",
@@ -70,7 +91,14 @@ public sealed class TargetRegistry
                     "www.bigolive.tv"
                 ],
                 [],
-                "bigo-live"),
+                "bigo-live",
+                [
+                    "bigo.tv",
+                    "www.bigo.tv",
+                    "mobile.bigo.tv",
+                    "bigolive.tv",
+                    "www.bigolive.tv"
+                ]),
             Create(
                 TargetIds.Azar,
                 "Azar",
@@ -84,7 +112,12 @@ public sealed class TargetRegistry
                     "api.azarlive.io"
                 ],
                 ["Azar.exe"],
-                "azar"),
+                "azar",
+                [
+                    "azarlive.com",
+                    "www.azarlive.com",
+                    "api.azarlive.com"
+                ]),
             Create(
                 TargetIds.Tango,
                 "Tango",
@@ -96,7 +129,11 @@ public sealed class TargetRegistry
                     "api.tango.me"
                 ],
                 ["Tango.exe"],
-                "tango"),
+                "tango",
+                [
+                    "tango.me",
+                    "www.tango.me"
+                ]),
             Create(
                 TargetIds.LiVU,
                 "LiVU",
@@ -108,7 +145,11 @@ public sealed class TargetRegistry
                     "api.livu.me"
                 ],
                 ["LiVU.exe", "Livu.exe"],
-                "livu"),
+                "livu",
+                [
+                    "livu.me",
+                    "www.livu.me"
+                ]),
             Create(
                 TargetIds.IMVU,
                 "IMVU",
@@ -122,7 +163,14 @@ public sealed class TargetRegistry
                     "userimages-akm.imvu.com"
                 ],
                 ["IMVUClient.exe", "IMVU.exe"],
-                "imvu"),
+                "imvu",
+                [
+                    "imvu.com",
+                    "www.imvu.com",
+                    "secure.imvu.com",
+                    "api.imvu.com",
+                    "userimages-akm.imvu.com"
+                ]),
             Create(
                 TargetIds.Blogspot,
                 "Blogspot",
@@ -136,7 +184,13 @@ public sealed class TargetRegistry
                     "blogger.googleusercontent.com"
                 ],
                 [],
-                "blogspot")
+                "blogspot",
+                [
+                    "blogspot.com",
+                    "blogger.com",
+                    "www.blogger.com",
+                    "blogger.googleusercontent.com"
+                ])
         ]);
     }
 
@@ -160,8 +214,17 @@ public sealed class TargetRegistry
         TargetScopeKind scopeKind,
         IReadOnlyList<string> domains,
         IReadOnlyList<string> executableNames,
-        string iconKey)
+        string iconKey,
+        IReadOnlyList<string>? probeHosts = null)
     {
+        var metadata = new Dictionary<string, string>(
+            NeutralMetadata,
+            StringComparer.OrdinalIgnoreCase);
+        if (probeHosts is { Count: > 0 })
+        {
+            metadata["probeHosts"] = string.Join(";", probeHosts);
+        }
+
         return new TargetDefinition(
             id,
             label,
@@ -170,6 +233,6 @@ public sealed class TargetRegistry
             domains.Select(DomainPattern.Parse).ToArray(),
             executableNames.Select(name => new ExecutableHint(name)).ToArray(),
             iconKey,
-            NeutralMetadata);
+            metadata);
     }
 }

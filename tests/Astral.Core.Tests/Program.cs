@@ -27,6 +27,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Hedef seçimi varsayılan Discord kapsamını ve eski tarayıcı ayarını güvenli taşır", TargetSelectionStoreDefaultsAndMigratesLegacyBrowserAsync),
     ("Hedef çözümleyici web hedeflerinde tarayıcıları değil web proxy sürecini kapsar", TargetScopeResolverUsesWebProxyForWebTargetsAsync),
     ("Hedef çözümleyici tüm presetleri tek tek ve toplu güvenli kapsar", TargetScopeResolverCoversEveryPresetWithoutBrowsersAsync),
+    ("Hedef kaydı rota domainlerini korur ama probe hostlarını ayırır", TargetRegistryKeepsRouteOnlyDomainsOutOfProbeHostsAsync),
     ("Hedef çözümleyici eski özel hedef girdilerini kapsama almaz", TargetScopeResolverIgnoresLegacyCustomTargetsAsync),
     ("Web proxy politikası yalnızca seçili domainleri kabul eder", WebProxyPolicyAllowsOnlySelectedDomainsAsync),
     ("PAC üretici yalnızca seçili domainleri proxyye yönlendirir", ProxyPacRoutesOnlySelectedDomainsAsync),
@@ -40,7 +41,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Profil üretici geniş AllowedApps değerlerini değiştirir", ProfileBuilderIsStrictAsync),
     ("Profil üretici boşluklu uygulama yollarını tırnaklar", ProfileBuilderQuotesApplicationsWithSpacesAsync),
     ("Profil üretici yapılandırma enjeksiyonunu reddeder", ProfileBuilderRejectsInjectionAsync),
-    ("wgcf Discord uygulama ve web profili üretir", WgcfProvisionerBuildsDiscordAccessProfileAsync),
+    ("wgcf seçili hedefler için Astral scoped profil üretir", WgcfProvisionerBuildsDiscordAccessProfileAsync),
     ("wgcf yenileme hatasında mevcut profili kullanır", WgcfProvisionerUsesCachedProfileWhenRefreshFailsAsync),
     ("wgcf boş hata çıktısını tanısız bırakmaz", WgcfProvisionerEmptyFailureIsDiagnosticAsync),
     ("SHA-256 doğrulayıcı yalnızca sabit özeti kabul eder", HashVerifierIsStrictAsync),
@@ -103,7 +104,8 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Denetleyici bağlantı koruması hatasını Türkçe açıklar", ControllerAccessLockFailureIsUserFriendlyAsync),
     ("Windows Firewall koruması sessiz PowerShell hatasını operasyonla açıklar", WindowsFirewallAccessLockLabelsSilentPowerShellFailureAsync),
     ("Windows Firewall koruması seçili hedef domainleriyle kilit üretir", WindowsFirewallAccessLockUsesSelectedTargetDomainsAsync),
-    ("Windows Firewall koruması Discord alan adı kuralını yönetir", WindowsFirewallAccessLockBuildsExpectedCommandsAsync),
+    ("Windows Firewall tünel kapsamı seçili hedef domainleriyle tarayıcı kaçağını kilitler", WindowsFirewallTunnelScopeUsesSelectedTargetDomainsAsync),
+    ("Windows Firewall koruması hedef alan adı kuralını yönetir", WindowsFirewallAccessLockBuildsExpectedCommandsAsync),
     ("Windows Firewall koruması DNS temizleme hatasını kritik çıkış kodu yapmaz", WindowsFirewallAccessLockIgnoresDnsFlushExitCodeAsync),
     ("WireSock hazırlık denetimi wt WireGuard adaptörünü tanır", TunnelReadinessRecognizesWireSockWireGuardAdapterAsync),
     ("Onarım ayarları ve logları koruyup üretilen veriyi yeniler", CleanupServiceRepairsGeneratedStateAsync),
@@ -388,6 +390,59 @@ static Task TargetScopeResolverCoversEveryPresetWithoutBrowsersAsync()
         Assert(allPlan.SelectedTargets.Count == targets.Count);
         Assert(allPlan.AllowedApplications.Contains(webProxyPath, StringComparer.OrdinalIgnoreCase));
         Assert(allPlan.AllowedApplications.All(app => !RoutingPlan.IsBrowserExecutable(app)));
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+
+    return Task.CompletedTask;
+}
+
+static Task TargetRegistryKeepsRouteOnlyDomainsOutOfProbeHostsAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var webProxyPath = Path.Combine(root, "Astral.WebProxy.exe");
+    Directory.CreateDirectory(Path.GetDirectoryName(webProxyPath)!);
+    File.WriteAllText(webProxyPath, "proxy");
+
+    try
+    {
+        var registry = TargetRegistry.CreateDefault();
+        var resolver = new TargetScopeResolver(
+            registry,
+            new DiscordAppScope(root, root, root),
+            webProxyPath);
+        var targets = registry.GetBuiltInTargets();
+        var plan = resolver.Resolve(new TargetSelection(targets.Select(target => target.Id).ToArray()));
+        var routeRules = plan.ProxyRules
+            .Select(rule => rule.Pattern)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        Assert(routeRules.Contains("discordapp.net"));
+        Assert(routeRules.Contains("api.azarlive.io"));
+        Assert(routeRules.Contains("api.livu.me"));
+        Assert(routeRules.Contains("api.tango.me"));
+
+        Assert(registry.TryGet(TargetIds.Discord, out var discord));
+        var discordProbes = GetProbeHosts(discord);
+        Assert(discordProbes.Contains("discord.com"));
+        Assert(!discordProbes.Contains("discordapp.net"));
+
+        Assert(registry.TryGet(TargetIds.Azar, out var azar));
+        var azarProbes = GetProbeHosts(azar);
+        Assert(azarProbes.Contains("azarlive.com"));
+        Assert(!azarProbes.Contains("api.azarlive.io"));
+
+        Assert(registry.TryGet(TargetIds.LiVU, out var livu));
+        var livuProbes = GetProbeHosts(livu);
+        Assert(livuProbes.Contains("livu.me"));
+        Assert(!livuProbes.Contains("api.livu.me"));
+
+        Assert(registry.TryGet(TargetIds.Tango, out var tango));
+        var tangoProbes = GetProbeHosts(tango);
+        Assert(tangoProbes.Contains("tango.me"));
+        Assert(!tangoProbes.Contains("api.tango.me"));
     }
     finally
     {
@@ -882,7 +937,13 @@ static async Task WgcfProvisionerBuildsDiscordAccessProfileAsync()
             CancellationToken.None);
 
         var profile = await File.ReadAllTextAsync(profilePath);
-        Assert(profilePath == paths.DiscordProfile);
+        Assert(profilePath == paths.ScopedProfile);
+        Assert(profilePath.EndsWith(
+            "astral-scoped.conf",
+            StringComparison.OrdinalIgnoreCase));
+        Assert(!profilePath.EndsWith(
+            "discord.conf",
+            StringComparison.OrdinalIgnoreCase));
         Assert(File.Exists(paths.WgcfExecutable));
         var allowedAppsLine = profile
             .Split(["\r\n", "\n"], StringSplitOptions.None)
@@ -2399,7 +2460,7 @@ static async Task ControllerLifecycleAsync()
         Assert(controller.Snapshot.State == TunnelState.Connected);
         Assert(accessLock.DisableCount == 1);
         Assert(accessLock.ApplyTunnelScopeCount == 1);
-        Assert(accessLock.LastIncludeBrowserAccess == true);
+        Assert(accessLock.LastIncludeBrowserAccess == false);
         Assert(webProxyService.ApplyCount == 1);
         Assert(webProxyService.LastPlan?.RequiresWebProxy == true);
         Assert(profileProvisioner.LastAllowedApplications.Any(app =>
@@ -3055,7 +3116,7 @@ static async Task ControllerLocksTargetScopeWhileConnectedAsync()
     {
         await controller.ConnectAsync();
         Assert(controller.Snapshot.State == TunnelState.Connected);
-        Assert(accessLock.LastIncludeBrowserAccess == true);
+        Assert(accessLock.LastIncludeBrowserAccess == false);
         Assert(profileProvisioner.LastAllowedApplications.Any(app =>
             app.Equals("Discord.exe", StringComparison.OrdinalIgnoreCase)));
         Assert(profileProvisioner.LastAllowedApplications.Any(app =>
@@ -4407,7 +4468,7 @@ static async Task WindowsFirewallAccessLockLabelsSilentPowerShellFailureAsync()
     var runner = new RecordingCommandRunner(
         new CommandResult(
             1,
-            "astral-phase=FirewallRule:Astral.BlockDiscordDomains",
+            "astral-phase=FirewallRule:Astral.BlockTargetDomains",
             string.Empty));
     var accessLock = new WindowsFirewallDiscordAccessLock(
         new AppPaths(root),
@@ -4428,7 +4489,7 @@ static async Task WindowsFirewallAccessLockLabelsSilentPowerShellFailureAsync()
             "PowerShell exit code 1",
             StringComparison.Ordinal));
         Assert(exception.Message.Contains(
-            "FirewallRule:Astral.BlockDiscordDomains",
+            "FirewallRule:Astral.BlockTargetDomains",
             StringComparison.Ordinal));
     }
     finally
@@ -4477,6 +4538,55 @@ static async Task WindowsFirewallAccessLockUsesSelectedTargetDomainsAsync()
     }
 }
 
+static async Task WindowsFirewallTunnelScopeUsesSelectedTargetDomainsAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var runner = new RecordingCommandRunner();
+    var accessLock = new WindowsFirewallDiscordAccessLock(
+        new AppPaths(root),
+        runner,
+        "powershell.exe");
+    var registry = TargetRegistry.CreateDefault();
+    var resolver = new TargetScopeResolver(
+        registry,
+        new DiscordAppScope(root, root, root),
+        Path.Combine(root, "Astral.WebProxy.exe"));
+    var plan = resolver.Resolve(new TargetSelection(
+        [TargetIds.Wattpad, TargetIds.Blogspot]));
+
+    try
+    {
+        await accessLock.ApplyTunnelScopeAsync(plan, CancellationToken.None);
+
+        Assert(runner.Commands.Count == 1);
+        Assert(runner.Commands[0].Contains(
+            "$includeBrowserAccess = $false",
+            StringComparison.Ordinal));
+        Assert(runner.Commands[0].Contains(
+            "'wattpad.com'",
+            StringComparison.Ordinal));
+        Assert(runner.Commands[0].Contains(
+            "'blogspot.com'",
+            StringComparison.Ordinal));
+        Assert(!runner.Commands[0].Contains(
+            "'*.blogspot.com'",
+            StringComparison.Ordinal));
+        Assert(!runner.Commands[0].Contains(
+            "'discord.com'",
+            StringComparison.Ordinal));
+        Assert(runner.Commands[0].Contains(
+            "-Program $program",
+            StringComparison.Ordinal));
+        Assert(runner.Commands[0].Contains(
+            "-RemoteAddress $addressList",
+            StringComparison.Ordinal));
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
 static async Task WindowsFirewallAccessLockBuildsExpectedCommandsAsync()
 {
     var root = CreateTemporaryDirectory();
@@ -4486,8 +4596,11 @@ static async Task WindowsFirewallAccessLockBuildsExpectedCommandsAsync()
         runner,
         "powershell.exe");
     var legacyProductName = string.Concat("Dis", "corder");
+    var previousAstralRuleName = "Astral.BlockDiscordDomains";
     var legacyRuleName = legacyProductName + ".BlockDiscordDomains";
     var legacyBrowserScopeGroup = legacyProductName + ".TunnelScope.Browsers";
+    var previousBeginMarker = "# BEGIN Astral Discord kilidi";
+    var previousEndMarker = "# END Astral Discord kilidi";
     var legacyBeginMarker = "# BEGIN " + legacyProductName + " Discord kilidi";
     var legacyEndMarker = "# END " + legacyProductName + " Discord kilidi";
 
@@ -4510,13 +4623,19 @@ static async Task WindowsFirewallAccessLockBuildsExpectedCommandsAsync()
             "System32\\drivers\\etc\\hosts",
             StringComparison.Ordinal));
         Assert(runner.Commands[0].Contains(
-            "# BEGIN Astral Discord kilidi",
+            "# BEGIN Astral hedef kilidi",
+            StringComparison.Ordinal));
+        Assert(runner.Commands[0].Contains(
+            previousAstralRuleName,
             StringComparison.Ordinal));
         Assert(runner.Commands[0].Contains(
             legacyRuleName,
             StringComparison.Ordinal));
         Assert(runner.Commands[0].Contains(
             legacyBrowserScopeGroup,
+            StringComparison.Ordinal));
+        Assert(runner.Commands[0].Contains(
+            previousBeginMarker,
             StringComparison.Ordinal));
         Assert(runner.Commands[0].Contains(
             legacyBeginMarker,
@@ -4561,7 +4680,10 @@ static async Task WindowsFirewallAccessLockBuildsExpectedCommandsAsync()
             WindowsFirewallDiscordAccessLock.RuleName,
             StringComparison.Ordinal));
         Assert(runner.Commands[1].Contains(
-            "# END Astral Discord kilidi",
+            "# END Astral hedef kilidi",
+            StringComparison.Ordinal));
+        Assert(runner.Commands[1].Contains(
+            previousEndMarker,
             StringComparison.Ordinal));
         Assert(runner.Commands[1].Contains(
             legacyRuleName,
@@ -4627,7 +4749,10 @@ static async Task WindowsFirewallAccessLockBuildsExpectedCommandsAsync()
             legacyRuleName,
             StringComparison.Ordinal));
         Assert(runner.Commands[5].Contains(
-            "# END Astral Discord kilidi",
+            "# END Astral hedef kilidi",
+            StringComparison.Ordinal));
+        Assert(runner.Commands[5].Contains(
+            previousEndMarker,
             StringComparison.Ordinal));
         Assert(runner.Commands[5].Contains(
             "Remove-NetFirewallRule",
@@ -5357,6 +5482,19 @@ static RoutingPlan CreateWebProxyRoutingPlan(string root)
         Path.Combine(root, "Astral.WebProxy.exe"));
 
     return resolver.Resolve(new TargetSelection([TargetIds.Wattpad]));
+}
+
+static HashSet<string> GetProbeHosts(TargetDefinition target)
+{
+    if (!target.Metadata.TryGetValue("probeHosts", out var probeHosts)
+        || string.IsNullOrWhiteSpace(probeHosts))
+    {
+        throw new InvalidOperationException("Target probe host metadata is missing.");
+    }
+
+    return probeHosts
+        .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .ToHashSet(StringComparer.OrdinalIgnoreCase);
 }
 
 static int ReserveTcpPort()

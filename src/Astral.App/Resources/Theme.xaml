@@ -68,6 +68,7 @@
         <Setter Property="FontSize" Value="13" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
         <Setter Property="ToolTipService.ShowsToolTipOnKeyboardFocus" Value="True" />
         <Setter Property="Template">
             <Setter.Value>
@@ -133,6 +134,7 @@
         <Setter Property="FontSize" Value="13" />
         <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
         <Setter Property="ToolTipService.ShowsToolTipOnKeyboardFocus" Value="True" />
         <Setter Property="Template">
             <Setter.Value>
@@ -195,6 +197,7 @@
         <Setter Property="FontSize" Value="13" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
         <Setter Property="ToolTipService.ShowsToolTipOnKeyboardFocus" Value="True" />
         <Setter Property="Template">
             <Setter.Value>
@@ -246,6 +249,7 @@
         <Setter Property="FontSize" Value="13" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
         <Setter Property="ToolTipService.ShowsToolTipOnKeyboardFocus" Value="True" />
         <Setter Property="Template">
             <Setter.Value>
@@ -308,6 +312,7 @@
         <Setter Property="FontSize" Value="13" />
         <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
         <Setter Property="ToolTipService.ShowsToolTipOnKeyboardFocus" Value="True" />
         <Setter Property="Template">
             <Setter.Value>

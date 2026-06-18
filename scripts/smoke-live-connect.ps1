@@ -17,11 +17,11 @@ if ([string]::IsNullOrWhiteSpace($OutputPath)) {
 }
 
 $settingsPath = Join-Path $env:LOCALAPPDATA 'Astral\settings.json'
-$profilePath = Join-Path $env:ProgramData 'Astral\profiles\discord.conf'
+$profilePath = Join-Path $env:ProgramData 'Astral\profiles\astral-scoped.conf'
 $logPath = Join-Path $env:LOCALAPPDATA 'Astral\logs\tunnel.log'
 $hostsPath = Join-Path $env:SystemRoot 'System32\drivers\etc\hosts'
-$beginMarker = '# BEGIN Astral Discord kilidi'
-$ruleName = 'Astral.BlockDiscordDomains'
+$beginMarker = '# BEGIN Astral hedef kilidi'
+$ruleName = 'Astral.BlockTargetDomains'
 
 function Test-IsAdministrator {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()

@@ -117,12 +117,12 @@ public sealed class WgcfProvisioner : IProfileProvisioner
             allowedApplications);
 
         await File.WriteAllTextAsync(
-            _paths.DiscordProfile,
+            _paths.ScopedProfile,
             scopedProfile,
             cancellationToken);
 
         progress?.Report("Hedef bağlantı profili hazır");
-        return _paths.DiscordProfile;
+        return _paths.ScopedProfile;
     }
 
     private static void EnsureSucceeded(string operation, CommandResult result)

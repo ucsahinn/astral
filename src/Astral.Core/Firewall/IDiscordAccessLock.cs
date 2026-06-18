@@ -26,7 +26,7 @@ public interface IDiscordAccessLock
     {
         ArgumentNullException.ThrowIfNull(routingPlan);
         return ApplyTunnelScopeAsync(
-            routingPlan.RequiresWebProxy,
+            !routingPlan.RequiresWebProxy,
             cancellationToken);
     }
 

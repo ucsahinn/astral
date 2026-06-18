@@ -49,7 +49,7 @@ public partial class MainWindow : Window, IDisposable
     private static readonly Uri RepositoryUri = new(
         "https://github.com/ucsahinn/astral");
     private static readonly Uri ReleaseNotesUri = new(
-        "https://github.com/ucsahinn/astral/releases/tag/v2.2.18");
+        "https://github.com/ucsahinn/astral/releases/tag/v2.2.19");
     private static readonly Uri BackgroundVideoUri = new(
         "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260606_154941_df1a96e1-a06f-450c-bd02-d863414cc1a0.mp4");
     private static readonly string LocalBackgroundVideoPath = Path.Combine(
@@ -91,7 +91,7 @@ public partial class MainWindow : Window, IDisposable
     private bool _isUpdateProgressPinned;
     private string? _lastLoggedUpdateProgressKey;
     private int _lastLoggedUpdateProgressPercent = -1;
-    private string _lastTargetTestSummary = "Rota testi çalıştırılmadı.";
+    private string _lastTargetTestSummary = "Kapsam doğrulaması UI'da gösterilmez.";
     private readonly Dictionary<string, TargetProbeResult> _targetProbeResults =
         new(StringComparer.OrdinalIgnoreCase);
     private AppUpdateCheckResult? _pendingUpdate;
@@ -200,6 +200,8 @@ public partial class MainWindow : Window, IDisposable
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
     {
+        _ = CheckForUpdatesOnStartupAsync();
+
         try
         {
             await _controller.EnsureDisconnectedLockAsync();
@@ -207,8 +209,6 @@ public partial class MainWindow : Window, IDisposable
         catch (OperationCanceledException)
         {
         }
-
-        _ = CheckForUpdatesOnStartupAsync();
     }
 
     private void Window_StateChanged(object? sender, EventArgs e)
@@ -235,7 +235,6 @@ public partial class MainWindow : Window, IDisposable
 
     private void ApplySnapshot(TunnelSnapshot snapshot)
     {
-        var previousState = _lastObservedTunnelState;
         _lastObservedTunnelState = snapshot.State;
 
         if (!_isUpdateOperationRunning && snapshot.IsBusy)
@@ -247,19 +246,16 @@ public partial class MainWindow : Window, IDisposable
         {
             _automaticTargetTestQueued = false;
             _targetProbeResults.Clear();
-            _lastTargetTestSummary = "Otomatik rota testi çalıştırılmadı.";
+            _lastTargetTestSummary = "Kapsam doğrulaması çalıştırılmadı.";
             if (!_isTargetTestRunning)
             {
                 TargetTestSummary.Text =
-                    "Otomatik rota testi: bağlantı açılınca seçili hedef hostları ölçülür.";
+                    "Kapsam durumu: seçili hedefler bağlantıya dahil edilir; Astral uygulamaları otomatik açmaz.";
             }
         }
 
         ToggleButton.IsEnabled = !_isToggleOperationRunning && !snapshot.IsBusy;
-        RepairButton.IsEnabled = !snapshot.IsBusy;
-        RepairButton.ToolTip = snapshot.IsBusy
-            ? "Devam eden işlem bitince onarım kullanılabilir."
-            : "Bağlantı dosyalarını güvenle yenile";
+        ApplyRepairButtonState(snapshot);
         ApplyUpdateControls(snapshot.IsBusy);
         ApplyTargetTestSummaryState(snapshot);
         StatusMessage.Text = GetStatusMessage(snapshot);
@@ -267,7 +263,6 @@ public partial class MainWindow : Window, IDisposable
         RefreshTargetScopeView(snapshot.IsBusy || snapshot.IsConnected);
         RefreshLiveStatusCards(snapshot);
         UpdateBackgroundVideoForSnapshot(snapshot);
-        QueueAutomaticTargetTestIfNeeded(snapshot, previousState);
 
         var templateLabel = ToggleButton.Template.FindName(
             "ToggleButtonLabel",
@@ -325,6 +320,33 @@ public partial class MainWindow : Window, IDisposable
         }
     }
 
+    private void ApplyRepairButtonState(TunnelSnapshot snapshot)
+    {
+        var enabled = ShouldEnableRepair(snapshot);
+        RepairButton.IsEnabled = enabled;
+        RepairButton.ToolTip = snapshot.IsBusy
+            ? "Devam eden işlem bitince onarım kullanılabilir."
+            : enabled
+                ? "Algılanan bağlantı sorunlarını onarmayı dene."
+                : "Sorun algılanmadığı için onarım gerekmiyor.";
+    }
+
+    private static bool ShouldEnableRepair(TunnelSnapshot snapshot)
+    {
+        if (snapshot.IsBusy)
+        {
+            return false;
+        }
+
+        if (snapshot.State is TunnelState.Error
+            or TunnelState.DiscordRestartRequired)
+        {
+            return true;
+        }
+
+        return false;
+    }
+
     private void RefreshLiveStatusCards(TunnelSnapshot snapshot)
     {
         var dns = GetCachedDnsStatus();
@@ -336,31 +358,18 @@ public partial class MainWindow : Window, IDisposable
 
         var routingPlan = _controller.CurrentRoutingPlan;
         var selectedTargetCount = _controller.TargetSelection.SelectedTargetIds.Count;
-        if (snapshot.IsConnected && _targetProbeResults.Count > 0)
+        if (snapshot.IsConnected)
         {
-            var successful = _targetProbeResults.Values.Count(result =>
-                result.Status is TargetProbeStatus.Success
-                    or TargetProbeStatus.ProfileScope);
-            var failed = _targetProbeResults.Values.Count(result =>
-                result.Status is TargetProbeStatus.Failed);
-            ScopeSummary.Text = failed > 0
-                ? $"{failed} sorunlu · {successful} OK"
-                : $"{successful} hedef OK";
-        }
-        else if (snapshot.IsConnected)
-        {
-            ScopeSummary.Text = $"{selectedTargetCount} hedef test bekliyor";
+            ScopeSummary.Text = $"{selectedTargetCount} hedef aktif";
         }
         else
         {
             ScopeSummary.Text = $"{selectedTargetCount} hedef seçili";
         }
         ScopeSummary.ToolTip = routingPlan.Summary;
-        ScopeDetail.Text = snapshot.IsConnected && _targetProbeResults.Count == 0
-            ? "Rota testi çalışınca sonuçlar burada görünür"
-            : routingPlan.RequiresWebProxy
-                ? "Uygulama + web hedefleri kapsamda"
-                : "Yalnızca uygulama hedefleri kapsamda";
+        ScopeDetail.Text = routingPlan.RequiresWebProxy
+            ? "Uygulama + web hedefleri kapsamda"
+            : "Yalnızca uygulama hedefleri kapsamda";
         ScopeDetail.ToolTip = routingPlan.Summary;
     }
 
@@ -756,10 +765,10 @@ public partial class MainWindow : Window, IDisposable
             {
                 Name = "TargetToggle_" + CreateSafeTargetName(target.Id),
                 Tag = target,
-                Width = 116,
-                Height = 70,
-                Margin = new Thickness(2),
-                Padding = new Thickness(6),
+                Width = 112,
+                Height = 62,
+                Margin = new Thickness(1.5),
+                Padding = new Thickness(5),
                 Style = (Style)FindResource("TargetCardCheckBoxStyle"),
                 ToolTip = $"{target.Label} hedefi hazır",
                 Content = CreateTargetCardContent(target)
@@ -829,8 +838,9 @@ public partial class MainWindow : Window, IDisposable
         _settingsStore.SetTargetSelection(selection);
         _targetProbeResults.Clear();
         _automaticTargetTestQueued = false;
-        _lastTargetTestSummary = "Otomatik rota testi çalıştırılmadı.";
-        TargetTestSummary.Text = "Otomatik rota testi: bağlantı açılınca seçili hedef hostları ölçülür.";
+        _lastTargetTestSummary = "Kapsam doğrulaması çalıştırılmadı.";
+        TargetTestSummary.Text =
+            "Kapsam durumu: seçili hedefler bağlantıya dahil edilir; Astral uygulamaları otomatik açmaz.";
         _diagnostics.Info(
             "ui.targetSelection",
             "Hedef seçimi güncellendi.",
@@ -912,7 +922,7 @@ public partial class MainWindow : Window, IDisposable
             {
                 TargetProbeStatus.Running => TargetCardState.Connecting,
                 TargetProbeStatus.Success or TargetProbeStatus.ProfileScope => TargetCardState.InScope,
-                TargetProbeStatus.Failed => TargetCardState.Problem,
+                TargetProbeStatus.Failed => TargetCardState.Selected,
                 TargetProbeStatus.Skipped => TargetCardState.Selected,
                 _ => TargetCardState.Selected
             };
@@ -997,18 +1007,15 @@ public partial class MainWindow : Window, IDisposable
         }
     }
 
-    private WpfToolTip CreateTargetToolTip(
+    private static WpfToolTip CreateTargetToolTip(
         TargetDefinition target,
         TargetCardState state,
         TunnelSnapshot snapshot)
     {
         var stateText = GetTargetCardStateText(state);
-        var probeText = _targetProbeResults.TryGetValue(target.Id, out var probe)
-            ? $"Son test: {GetTargetProbeStatusText(probe.Status)}"
-                + (string.IsNullOrWhiteSpace(probe.Host) ? string.Empty : $" ({probe.Host})")
-            : snapshot.IsConnected
-                ? "Son test: bekliyor"
-                : "Son test: çalıştırılmadı";
+        var scopeText = snapshot.IsConnected && state is not TargetCardState.Passive
+            ? "Kapsam aktif"
+            : "Kapsam hazır";
         return new WpfToolTip
         {
             Content = new StackPanel
@@ -1028,14 +1035,14 @@ public partial class MainWindow : Window, IDisposable
                     },
                     new TextBlock
                     {
-                        Text = probeText,
+                        Text = scopeText,
                         Margin = new Thickness(0, 3, 0, 0),
                         TextWrapping = TextWrapping.Wrap,
                         Foreground = new SolidColorBrush(MediaColor.FromRgb(170, 211, 226))
                     },
                     new TextBlock
                     {
-                        Text = "Otomatik test, bağlantı açılınca web hedeflerinde yerel proxy üzerinden CONNECT 443 dener; uygulama hedeflerinde profil kapsamını doğrular.",
+                        Text = "Astral hedef uygulamayı otomatik açmaz; seçili uygulama ve web trafiğini kapsam içine alır.",
                         Margin = new Thickness(0, 3, 0, 0),
                         TextWrapping = TextWrapping.Wrap,
                         Foreground = new SolidColorBrush(MediaColor.FromRgb(170, 211, 226))
@@ -1089,18 +1096,17 @@ public partial class MainWindow : Window, IDisposable
         if (!_targetProbeResults.TryGetValue(targetId, out var result))
         {
             return snapshot.IsConnected
-                ? "Test bekliyor"
-                : "Test yok";
+                ? "Kapsam aktif"
+                : "Kapsam hazır";
         }
 
         return result.Status switch
         {
-            TargetProbeStatus.Running => "Test ediliyor",
-            TargetProbeStatus.Success => "Başarılı",
-            TargetProbeStatus.ProfileScope => "Profil OK",
-            TargetProbeStatus.Failed => "Sorunlu",
-            TargetProbeStatus.Skipped => "Atlandı",
-            _ => "Test yok"
+            TargetProbeStatus.Running => "Doğrulanıyor",
+            TargetProbeStatus.Success or TargetProbeStatus.ProfileScope => "Kapsam aktif",
+            TargetProbeStatus.Failed => snapshot.IsConnected ? "Kapsam aktif" : "Kontrol",
+            TargetProbeStatus.Skipped => "Kapsam hazır",
+            _ => snapshot.IsConnected ? "Kapsam aktif" : "Kapsam hazır"
         };
     }
 
@@ -1111,7 +1117,7 @@ public partial class MainWindow : Window, IDisposable
             TargetProbeStatus.Running => new SolidColorBrush(MediaColor.FromRgb(255, 217, 85)),
             TargetProbeStatus.Success or TargetProbeStatus.ProfileScope
                 => new SolidColorBrush(MediaColor.FromRgb(93, 255, 146)),
-            TargetProbeStatus.Failed => new SolidColorBrush(MediaColor.FromRgb(255, 122, 122)),
+            TargetProbeStatus.Failed => new SolidColorBrush(MediaColor.FromRgb(125, 235, 255)),
             TargetProbeStatus.Skipped => new SolidColorBrush(MediaColor.FromRgb(170, 211, 226)),
             _ => new SolidColorBrush(MediaColor.FromRgb(120, 148, 166))
         };
@@ -1140,10 +1146,10 @@ public partial class MainWindow : Window, IDisposable
 
         _automaticTargetTestQueued = true;
         TargetTestSummary.Text =
-            "Rota testi: bağlantı hazır, seçili hedef hostları sırayla ölçülecek.";
+            "Kapsam doğrulaması: seçili hedefler sırayla ölçülecek.";
         _diagnostics.Info(
             "ui.targetTest.queued",
-            "Bağlantı sonrası otomatik rota testi kuyruğa alındı.",
+            "Bağlantı sonrası kapsam doğrulaması kuyruğa alındı.",
             new Dictionary<string, string?>
             {
                 ["selectedTargets"] = _controller.CurrentRoutingPlan.Summary
@@ -1189,7 +1195,7 @@ public partial class MainWindow : Window, IDisposable
         if (_isTargetTestRunning)
         {
             TargetTestSummary.Text =
-                "Otomatik rota testi başladı; seçili hedef hostları sırayla ölçülüyor.";
+                "Kapsam doğrulaması çalışıyor; seçili hedefler sırayla ölçülüyor.";
             return;
         }
 
@@ -1199,21 +1205,19 @@ public partial class MainWindow : Window, IDisposable
                 || target.HasApplicationScope);
         if (!hasSelectedTarget)
         {
-            TargetTestSummary.Text = "Otomatik rota testi: seçili hedef yok.";
+            TargetTestSummary.Text = "Kapsam durumu: seçili hedef yok.";
             return;
         }
 
         if (!snapshot.IsConnected)
         {
             TargetTestSummary.Text =
-                "Otomatik rota testi: bağlantı açılınca seçili hedef hostları ölçülür.";
+                "Kapsam durumu: seçili hedefler bağlantıya dahil edilir; Astral uygulamaları otomatik açmaz.";
             return;
         }
 
-        if (!string.IsNullOrWhiteSpace(_lastTargetTestSummary))
-        {
-            TargetTestSummary.Text = "Rota testi: " + _lastTargetTestSummary;
-        }
+        TargetTestSummary.Text =
+            "Kapsam durumu: seçili hedefler bağlantıya dahil edildi; hedef uygulamaları siz açarsınız.";
     }
 
     private async Task RunSelectedTargetsProbeAsync()
@@ -1226,7 +1230,7 @@ public partial class MainWindow : Window, IDisposable
         var snapshot = _controller.Snapshot;
         if (!snapshot.IsConnected || snapshot.IsBusy)
         {
-            TargetTestSummary.Text = "Otomatik rota testi için önce Astral bağlantısını açın.";
+            TargetTestSummary.Text = "Kapsam doğrulaması için önce Astral bağlantısını açın.";
             ApplyTargetTestSummaryState(snapshot);
             return;
         }
@@ -1238,17 +1242,17 @@ public partial class MainWindow : Window, IDisposable
             .ToArray();
         if (selectedTargets.Length == 0)
         {
-            TargetTestSummary.Text = "Rota testi yapılacak seçili hedef yok.";
+            TargetTestSummary.Text = "Kapsam doğrulaması yapılacak seçili hedef yok.";
             return;
         }
 
         _isTargetTestRunning = true;
         TargetTestSummary.Text =
-            "Otomatik rota testi başladı; seçili hedef hostları sırayla ölçülüyor.";
-        _lastTargetTestSummary = "Otomatik rota testi çalışıyor.";
+            "Kapsam doğrulaması başladı; seçili hedefler sırayla ölçülüyor.";
+        _lastTargetTestSummary = "Kapsam doğrulaması çalışıyor.";
         _diagnostics.Info(
             "ui.targetTest.autoStart",
-            "Seçili hedefler için otomatik test başlatıldı.",
+            "Seçili hedefler için kapsam doğrulaması başlatıldı.",
             new Dictionary<string, string?>
             {
                 ["selectedTargets"] = string.Join(", ", selectedTargets.Select(target => target.Label))
@@ -1295,7 +1299,7 @@ public partial class MainWindow : Window, IDisposable
                     "Scoped web kapsamı doğrulanamadı: " + scopeStatus.Message;
                 TargetTestSummary.Text = _lastTargetTestSummary;
                 _diagnostics.WriteHealth(
-                    "rota testi scoped proxy doğrulamasında durdu",
+                    "kapsam doğrulaması scoped proxy kontrolünde durdu",
                     CreateTargetTestDiagnosticDetails(results)
                         .Concat(scopeStatus.ToDiagnosticDetails())
                         .ToDictionary(pair => pair.Key, pair => pair.Value));
@@ -1324,7 +1328,7 @@ public partial class MainWindow : Window, IDisposable
                 var running = new TargetProbeResult(
                     TargetProbeStatus.Running,
                     string.Join(", ", hosts),
-                    "Rota testi çalışıyor",
+                    "Kapsam doğrulaması çalışıyor",
                     DateTimeOffset.Now);
                 _targetProbeResults[target.Id] = running;
                 RefreshTargetScopeView(locked: true);
@@ -1346,23 +1350,23 @@ public partial class MainWindow : Window, IDisposable
             var skippedCount = results.Count(result =>
                 result.Status is TargetProbeStatus.Skipped);
             _lastTargetTestSummary =
-                $"{successCount} rota OK, {failedCount} sorunlu, {skippedCount} atlandı.";
-            TargetTestSummary.Text = "Rota testi: " + _lastTargetTestSummary;
+                $"{successCount} rota OK, {failedCount} kontrol gerekli, {skippedCount} atlandı.";
+            TargetTestSummary.Text = "Kapsam doğrulaması: " + _lastTargetTestSummary;
             _diagnostics.Info(
                 "ui.targetTest.complete",
-                "Otomatik rota testi tamamlandı.",
+                "Kapsam doğrulaması tamamlandı.",
                 CreateTargetTestDiagnosticDetails(results));
             _diagnostics.WriteHealth(
-                "rota testi tamamlandı",
+                "kapsam doğrulaması tamamlandı",
                 CreateTargetTestDiagnosticDetails(results));
         }
         catch (OperationCanceledException)
         {
-            _lastTargetTestSummary = "Otomatik rota testi iptal edildi veya zaman aşımına uğradı.";
+            _lastTargetTestSummary = "Kapsam doğrulaması iptal edildi veya zaman aşımına uğradı.";
             TargetTestSummary.Text = _lastTargetTestSummary;
             _diagnostics.Warning(
                 "ui.targetTest.cancelled",
-                "Otomatik rota testi iptal edildi veya zaman aşımına uğradı.");
+                "Kapsam doğrulaması iptal edildi veya zaman aşımına uğradı.");
         }
         finally
         {
@@ -1371,6 +1375,7 @@ public partial class MainWindow : Window, IDisposable
             RefreshTargetScopeView(_controller.Snapshot.IsBusy
                 || _controller.Snapshot.IsConnected);
             RefreshLiveStatusCards(_controller.Snapshot);
+            ApplyRepairButtonState(_controller.Snapshot);
         }
     }
 
@@ -1416,7 +1421,7 @@ public partial class MainWindow : Window, IDisposable
             return new TargetProbeResult(
                 TargetProbeStatus.Failed,
                 string.Join(", ", hosts),
-                $"Rota testi zaman aşımına uğradı: {tested.ToString(CultureInfo.InvariantCulture)}/{hosts.Length.ToString(CultureInfo.InvariantCulture)} host denendi.",
+                $"Kapsam doğrulaması zaman aşımına uğradı: {tested.ToString(CultureInfo.InvariantCulture)}/{hosts.Length.ToString(CultureInfo.InvariantCulture)} host denendi.",
                 startedAt);
         }
     }
@@ -1509,7 +1514,7 @@ public partial class MainWindow : Window, IDisposable
         {
             _diagnostics.Warning(
                 "ui.targetTest",
-                "PAC dosyası otomatik rota testi için okunamadı.",
+                "PAC dosyası kapsam doğrulaması için okunamadı.",
                 new Dictionary<string, string?>
                 {
                     ["diagnostic"] = exception.Message
@@ -1560,6 +1565,17 @@ public partial class MainWindow : Window, IDisposable
 
     private static string[] GetTargetTestHosts(TargetDefinition target)
     {
+        if (target.Metadata.TryGetValue("probeHosts", out var probeHosts)
+            && !string.IsNullOrWhiteSpace(probeHosts))
+        {
+            return probeHosts
+                .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+
         return target.Domains
             .Where(pattern => !pattern.IsWildcard)
             .Select(pattern => pattern.Value)
@@ -1654,11 +1670,11 @@ public partial class MainWindow : Window, IDisposable
 
         var iconBadge = new Border
         {
-            Width = 36,
-            Height = 36,
+            Width = 32,
+            Height = 32,
             HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
             VerticalAlignment = VerticalAlignment.Center,
-            CornerRadius = new CornerRadius(10),
+            CornerRadius = new CornerRadius(9),
             BorderBrush = new SolidColorBrush(MediaColor.FromArgb(172, 245, 247, 251)),
             BorderThickness = new Thickness(1),
             Background = new SolidColorBrush(MediaColor.FromArgb(210, 245, 247, 251)),
@@ -1666,7 +1682,7 @@ public partial class MainWindow : Window, IDisposable
         };
         iconBadge.Effect = new DropShadowEffect
         {
-            BlurRadius = 12,
+            BlurRadius = 10,
             Direction = 270,
             Opacity = 0.46,
             ShadowDepth = 0,
@@ -1678,23 +1694,23 @@ public partial class MainWindow : Window, IDisposable
 
         var textStack = new StackPanel
         {
-            Margin = new Thickness(8, 0, 0, 0),
+            Margin = new Thickness(7, 0, 0, 0),
             VerticalAlignment = VerticalAlignment.Center
         };
         Grid.SetColumn(textStack, 1);
         textStack.Children.Add(new TextBlock
         {
             Text = target.Label,
-            FontSize = 11.4,
+            FontSize = 10.8,
             FontWeight = FontWeights.SemiBold,
             Foreground = WpfBrushes.White,
             TextTrimming = TextTrimming.CharacterEllipsis,
-            MaxWidth = 68
+            MaxWidth = 66
         });
         var statusRow = new StackPanel
         {
             Orientation = System.Windows.Controls.Orientation.Horizontal,
-            Margin = new Thickness(0, 2, 0, 0)
+            Margin = new Thickness(0, 1, 0, 0)
         };
         var statusDot = new Border
         {
@@ -1709,7 +1725,7 @@ public partial class MainWindow : Window, IDisposable
         var statusLabel = new TextBlock
         {
             Text = "Hazır",
-            FontSize = 10.2,
+            FontSize = 9.6,
             FontWeight = FontWeights.SemiBold,
             Foreground = new SolidColorBrush(MediaColor.FromRgb(170, 211, 226)),
             TextTrimming = TextTrimming.CharacterEllipsis,
@@ -1722,9 +1738,9 @@ public partial class MainWindow : Window, IDisposable
 
         var testLabel = new TextBlock
         {
-            Text = "Test yok",
+            Text = "Kapsam hazır",
             Margin = new Thickness(0, 1, 0, 0),
-            FontSize = 9.5,
+            FontSize = 9,
             FontWeight = FontWeights.SemiBold,
             Foreground = new SolidColorBrush(MediaColor.FromRgb(120, 148, 166)),
             TextTrimming = TextTrimming.CharacterEllipsis,
@@ -2302,8 +2318,9 @@ public partial class MainWindow : Window, IDisposable
 
     private async void Repair_Click(object sender, RoutedEventArgs e)
     {
-        if (_controller.Snapshot.IsBusy)
+        if (!ShouldEnableRepair(_controller.Snapshot))
         {
+            ApplyRepairButtonState(_controller.Snapshot);
             return;
         }
 
@@ -2368,7 +2385,7 @@ public partial class MainWindow : Window, IDisposable
         finally
         {
             ToggleButton.IsEnabled = !_controller.Snapshot.IsBusy;
-            RepairButton.IsEnabled = !_controller.Snapshot.IsBusy;
+            ApplyRepairButtonState(_controller.Snapshot);
             ApplyUpdateControls(_controller.Snapshot.IsBusy);
             RefreshTargetScopeView(_controller.Snapshot.IsBusy
                 || _controller.Snapshot.IsConnected);
@@ -2767,8 +2784,11 @@ public partial class MainWindow : Window, IDisposable
                     "restart",
                     ShutdownCleanupTimeout))
             {
-                throw new TimeoutException(
-                    "Astral kapanış temizliği süresinde tamamlanamadı. Yeniden başlatma başlatılmadı.");
+                StatusDetail.Text =
+                    "Kapanış temizliği zaman aşımına uğradı; Astral yeniden başlatma yine de başlatılıyor.";
+                _diagnostics.Warning(
+                    "ui.restart",
+                    "Kapanış temizliği zaman aşımına uğradı; yeniden başlatma best-effort devam ediyor.");
             }
             StartRestartHelper(executablePath);
             _diagnostics.Info("ui.restart", "Kullanıcı Astral yeniden başlatma istedi.");

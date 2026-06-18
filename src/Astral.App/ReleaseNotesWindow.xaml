@@ -82,7 +82,7 @@
                                 VerticalAlignment="Center">
                         <TextBlock FontSize="22"
                                    FontWeight="SemiBold"
-                                   Text="Astral v2.2.18" />
+                                   Text="Astral v2.2.19" />
                         <TextBlock Margin="0,5,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
@@ -109,7 +109,7 @@
                                            FontSize="14"
                                            LineHeight="21"
                                            TextWrapping="Wrap"
-                                           Text="Bu sürüm seçili hedeflerin rota testini tek ana hostla sınırlamaz; hedefin tanımlı hostlarını sırayla ölçer, kapsam dışı proxy isteklerini tanılamaya güvenli biçimde yazar ve alt bardaki ayrı Geçmiş aksiyonunu kaldırır." />
+                                           Text="Bu sürüm hedef kapsamı görünümünü sadeleştirir, API probe timeout'larını kullanıcıya hedef hatası gibi göstermeyi bırakır, WebProxy DNS fallback davranışını güçlendirir ve restart akışının kapanış temizliğinde takılı kalmasını önler." />
                             </StackPanel>
                         </Border>
 
@@ -128,31 +128,47 @@
                                            FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Wattpad, Bigo Live, Azar, Tango, LiVU, IMVU ve Blogspot presetleri giriş/bootstrap akışlarında kullanılan ek birinci taraf hostlarla genişletildi." />
+                                           Text="&#x2022; Ana pencere 1280x720 sabit viewport ile açılır; kullanıcı resize grip veya pencere kenarından boyut değiştiremez." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Otomatik kontrol artık her hedefte tek host yerine tüm somut hedef hostlarını Astral.WebProxy üzerinden CONNECT 443 ile ölçer." />
+                                           Text="&#x2022; Sağ hedef panelindeki manuel Hızlı Test aksiyonu kaldırıldı; kullanıcıya yalnız seçili kapsamın bağlantıya dahil edildiği gösterilir." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Sonuç dili Hedef testi yerine Rota testi olarak netleştirildi; bu kontrol login garantisi değil, proxy/tünel yolunun çalıştığını gösterir." />
+                                           Text="&#x2022; Hedef kartları API probe timeout'larını kırmızı ürün hatasına çevirmeden Kapsam hazır veya Kapsam aktif durumunu gösterir." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Astral.WebProxy allowlist dışı gelen proxy isteklerinde yalnız güvenli host adını loglar; URL path, cookie, token veya içerik yazılmaz." />
+                                           Text="&#x2022; WebProxy hosts-lock altında upstream'e çıkamazsa DoH ve UDP DNS fallback ile seçili hostları yeniden çözer." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Alt aksiyon barındaki ayrı Geçmiş butonu kaldırıldı; Tanı Paketi tanılama paketini oluşturup klasörü açmaya devam eder." />
+                                           Text="&#x2022; Yeniden başlatma, kapanış temizliği zaman aşımına uğrasa bile tanılamaya uyarı yazıp best-effort devam eder." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Sürüm metadata'sı, updater, web proxy ve uygulama içi release bağlantısı v2.2.18 ile hizalandı." />
+                                           Text="&#x2022; Uygulama Loaded olur olmaz arka plan güncelleme denetimi başlar; bağlantı kilidi hazırlığı bu denetimi geciktirmez." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Windows UI testi Geçmiş butonunun kaldırıldığını ve Blogspot rota testinin `blogger.com` hostunu da kapsadığını doğrular." />
+                                           Text="&#x2022; Güncelleme varsa alt bardaki güncelleme düğmesi görünür ve sürüm numarasını erişilebilir adında taşır." />
+                                <TextBlock FontSize="13"
+                                           LineHeight="22"
+                                           TextWrapping="Wrap"
+                                           Text="&#x2022; Windows UI testi pencere boyutu kilidini, release notu butonunun klasör açmadığını ve açılış güncelleme denetiminin butonu gösterdiğini doğrular." />
+                                <TextBlock FontSize="13"
+                                           LineHeight="22"
+                                           TextWrapping="Wrap"
+                                           Text="&#x2022; Alt bardaki Rapor Oluştur, Onar, Profil Temizle, Sürüm Notları ve GitHub aksiyonları aynı sabit layout içinde kalır." />
+                                <TextBlock FontSize="13"
+                                           LineHeight="22"
+                                           TextWrapping="Wrap"
+                                           Text="&#x2022; Sürüm metadata'sı, updater, web proxy ve uygulama içi release bağlantısı v2.2.19 ile hizalandı." />
+                                <TextBlock FontSize="13"
+                                           LineHeight="22"
+                                           TextWrapping="Wrap"
+                                           Text="&#x2022; v2.2.18 ek hedef host kapsamı korunur; düşük seviyeli rota kanıtı tanılama içinde kalır." />
                             </StackPanel>
                         </Border>
 
@@ -198,7 +214,7 @@
                     <TextBlock VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource MutedTextBrush}"
-                               Text="Bu not, v2.2.18 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
+                                   Text="Bu not, v2.2.19 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
                     <Button Grid.Column="1"
                             Margin="0,0,10,0"
                             Height="40"

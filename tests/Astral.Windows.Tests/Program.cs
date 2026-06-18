@@ -2,6 +2,7 @@ using System.IO;
 using System.Net.Http;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
+using System.Text;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -92,6 +93,7 @@ static void RenderWindows()
                 {
                     RenderMainWindow();
                     VerifyConnectedTargetCardsRequireProbeEvidence();
+                    VerifyStartupUpdateCheckShowsAvailableUpdate();
                     VerifyWindowLifetimeBehavior();
                     VerifyPortableInstallDiagnosticsSanitizesLegacyBrand();
                     RenderConsentWindow();
@@ -145,6 +147,19 @@ static void RenderMainWindow()
         window = CreateMainWindow(root);
         window.Show();
         window.UpdateLayout();
+        SaveWindowPng(window, Path.Combine(
+            FindRepositoryRoot(),
+            "artifacts",
+            "ui-main-window-v2.2.19.png"));
+
+        Assert(window.ResizeMode == ResizeMode.NoResize);
+        Assert(window.Width == 1280);
+        Assert(window.Height == 720);
+        Assert(window.MinWidth == 1280);
+        Assert(window.MinHeight == 720);
+        Assert(window.MaxWidth == 1280);
+        Assert(window.MaxHeight == 720);
+        Assert(window.WindowState == WindowState.Normal);
 
         var backgroundVideo = FindVisualChildren<MediaElement>(window).Single();
         Assert(backgroundVideo.Visibility == Visibility.Collapsed);
@@ -172,7 +187,9 @@ static void RenderMainWindow()
         Assert(text.Contains("Kapalı. Normal rapor hafif kalır.", StringComparison.Ordinal));
         Assert(!text.Contains("Rapor hazırla", StringComparison.Ordinal));
         Assert(!text.Contains("Bağlanınca test", StringComparison.Ordinal));
-        Assert(text.Contains("Otomatik rota testi:", StringComparison.Ordinal));
+        Assert(!text.Contains("Hızlı Test", StringComparison.Ordinal));
+        Assert(!text.Contains("Hedef testi:", StringComparison.Ordinal));
+        Assert(text.Contains("Kapsam durumu:", StringComparison.Ordinal));
         Assert(text.Contains("Hazır", StringComparison.Ordinal));
         Assert(text.Contains("Astral Bağlı Değil", StringComparison.Ordinal));
         Assert(text.Contains(
@@ -186,9 +203,9 @@ static void RenderMainWindow()
         Assert(buttonNames.Contains("Astral onar"));
         Assert(buttonNames.Contains("Profil temizle"));
         Assert(buttonNames.Contains("Tanı paketi oluştur"));
+        Assert(!buttonNames.Contains("Seçili hedefleri hızlı test et"));
         Assert(!buttonNames.Contains("Tanılama geçmişini aç"));
         Assert(!buttonNames.Contains("Tanılama raporu hazırla"));
-        Assert(!buttonNames.Contains("Seçili hedefleri hızlı test et"));
         Assert(buttonNames.Contains("Sürüm notlarını aç"));
         Assert(!buttonNames.Any(button => button.Contains("WireSock", StringComparison.OrdinalIgnoreCase)));
         Assert(!buttonNames.Any(button =>
@@ -216,9 +233,14 @@ static void RenderMainWindow()
         var diagnosticsBundleButton = FindVisualChildren<Button>(window)
             .Single(button => button.Name == "DiagnosticsBundleButton");
         Assert(diagnosticsBundleButton.ToolTip?.ToString() == "Tanı paketi oluştur ve klasörü aç");
+        Assert(FindVisualChildren<TextBlock>(diagnosticsBundleButton)
+            .Any(block => block.Text == "Rapor Oluştur"));
         Assert(ToolTipService.GetShowsToolTipOnKeyboardFocus(diagnosticsBundleButton) == true);
         var repairButton = FindVisualChildren<Button>(window)
             .Single(button => button.Name == "RepairButton");
+        Assert(!repairButton.IsEnabled);
+        Assert(repairButton.ToolTip?.ToString() == "Sorun algılanmadığı için onarım gerekmiyor.");
+        Assert(ToolTipService.GetShowOnDisabled(repairButton) == true);
         Assert(ToolTipService.GetShowsToolTipOnKeyboardFocus(repairButton) == true);
         var cleanProfileButton = FindVisualChildren<Button>(window)
             .Single(button => button.Name == "CleanProfileButton");
@@ -296,6 +318,19 @@ static void RenderMainWindow()
         Assert(blogspotHosts.Contains("blogspot.com", StringComparer.OrdinalIgnoreCase));
         Assert(blogspotHosts.Contains("blogger.com", StringComparer.OrdinalIgnoreCase));
         Assert(!blogspotHosts.Contains("*.blogspot.com", StringComparer.OrdinalIgnoreCase));
+        Assert(registry.TryGet("discord", out var discordTarget));
+        var discordHosts = MainWindow.GetTargetTestHostsForTesting(discordTarget);
+        Assert(discordHosts.Contains("discord.com", StringComparer.OrdinalIgnoreCase));
+        Assert(!discordHosts.Contains("discordapp.net", StringComparer.OrdinalIgnoreCase));
+        Assert(registry.TryGet("azar", out var azarTarget));
+        Assert(!MainWindow.GetTargetTestHostsForTesting(azarTarget)
+            .Contains("api.azarlive.io", StringComparer.OrdinalIgnoreCase));
+        Assert(registry.TryGet("livu", out var livuTarget));
+        Assert(!MainWindow.GetTargetTestHostsForTesting(livuTarget)
+            .Contains("api.livu.me", StringComparer.OrdinalIgnoreCase));
+        Assert(registry.TryGet("tango", out var tangoTarget));
+        Assert(!MainWindow.GetTargetTestHostsForTesting(tangoTarget)
+            .Contains("api.tango.me", StringComparer.OrdinalIgnoreCase));
 
         var visibleTargetCardTexts = targetToggles
             .SelectMany(toggle => FindVisualChildren<TextBlock>(toggle))
@@ -318,7 +353,7 @@ static void RenderMainWindow()
         }
         Assert(visibleTargetCardTexts.Any(value => value is "Seçili"));
         Assert(visibleTargetCardTexts.Any(value => value is "Hazır"));
-        Assert(visibleTargetCardTexts.Any(value => value is "Test yok"));
+        Assert(visibleTargetCardTexts.Any(value => value is "Kapsam hazır"));
 
         foreach (var targetToggle in targetToggles)
         {
@@ -438,12 +473,44 @@ static void VerifyConnectedTargetCardsRequireProbeEvidence()
             .ToArray();
 
         Assert(!cardTexts.Contains("Kapsamda", StringComparer.Ordinal));
-        Assert(cardTexts.Contains("Test bekliyor", StringComparer.Ordinal));
-
+        Assert(cardTexts.Contains("Kapsam aktif", StringComparer.Ordinal));
         Assert(!FindVisualChildren<Button>(window)
             .Any(button => button.Name == "TargetQuickTestButton"));
 
-        Console.WriteLine("GEÇTİ Bağlı hedef kartı test kanıtı olmadan kapsamda görünmedi");
+        Console.WriteLine("GEÇTİ Bağlı hedef kartı manuel test aksiyonu olmadan kapsam aktif gösterdi");
+    }
+    finally
+    {
+        ForceCloseWindow(window);
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static void VerifyStartupUpdateCheckShowsAvailableUpdate()
+{
+    MainWindow? window = null;
+    var root = CreateTemporaryDirectory();
+
+    try
+    {
+        window = CreateMainWindow(root, updateService: CreateFakeUpdateService(root));
+        window.Show();
+        window.UpdateLayout();
+
+        var updateButton = FindVisualChildren<Button>(window)
+            .Single(button => button.Name == "AutoUpdateButton");
+
+        PumpDispatcherUntil(
+            () => updateButton.Visibility == Visibility.Visible && updateButton.IsEnabled,
+            TimeSpan.FromSeconds(3));
+
+        Assert(updateButton.Visibility == Visibility.Visible);
+        Assert(updateButton.IsEnabled);
+        Assert(AutomationProperties.GetName(updateButton).Contains(
+            "9.9.9",
+            StringComparison.Ordinal));
+
+        Console.WriteLine("GEÇTİ Açılış güncelleme denetimi güncelleme butonunu gösterdi");
     }
     finally
     {
@@ -622,7 +689,8 @@ static void ForceCloseWindow(MainWindow? window)
 
 static MainWindow CreateMainWindow(
     string root,
-    FakeProcessLauncher? processLauncher = null)
+    FakeProcessLauncher? processLauncher = null,
+    AppUpdateService? updateService = null)
 {
     var paths = new AppPaths(root);
     var bootstrapper = new FakeWireSockBootstrapper(
@@ -647,11 +715,21 @@ static MainWindow CreateMainWindow(
             allowNonDefaultDataRoots: true),
         new FakeStartupLaunchService(),
         new FakeWireSockUninstaller(),
-        new AppUpdateService(
+        updateService ?? new AppUpdateService(
             new HttpClient(),
             paths,
             new FakeVerifiedDownloader(),
             requireUpdateAuthenticode: false));
+}
+
+static AppUpdateService CreateFakeUpdateService(string root)
+{
+    var paths = new AppPaths(root);
+    return new AppUpdateService(
+        new HttpClient(new FakeUpdateHttpMessageHandler()),
+        paths,
+        new FakeVerifiedDownloader(),
+        requireUpdateAuthenticode: false);
 }
 
 static void RenderConsentWindow()
@@ -708,11 +786,49 @@ static void SaveWindowPng(Window window, string outputPath)
         96,
         PixelFormats.Pbgra32);
     bitmap.Render(window);
+    AssertBitmapHasVisibleContent(bitmap);
 
     var encoder = new PngBitmapEncoder();
     encoder.Frames.Add(BitmapFrame.Create(bitmap));
     using var stream = File.Create(outputPath);
     encoder.Save(stream);
+}
+
+static void AssertBitmapHasVisibleContent(BitmapSource bitmap)
+{
+    var stride = bitmap.PixelWidth * 4;
+    var pixels = new byte[stride * bitmap.PixelHeight];
+    bitmap.CopyPixels(pixels, stride, 0);
+
+    var firstB = pixels[0];
+    var firstG = pixels[1];
+    var firstR = pixels[2];
+    var firstA = pixels[3];
+    var differentPixels = 0;
+    var visiblePixels = 0;
+
+    for (var offset = 0; offset < pixels.Length; offset += 4)
+    {
+        var b = pixels[offset];
+        var g = pixels[offset + 1];
+        var r = pixels[offset + 2];
+        var a = pixels[offset + 3];
+        if (a > 8)
+        {
+            visiblePixels++;
+        }
+
+        if (Math.Abs(r - firstR)
+            + Math.Abs(g - firstG)
+            + Math.Abs(b - firstB)
+            + Math.Abs(a - firstA) > 16)
+        {
+            differentPixels++;
+        }
+    }
+
+    Assert(visiblePixels > bitmap.PixelWidth * bitmap.PixelHeight / 2);
+    Assert(differentPixels > bitmap.PixelWidth * bitmap.PixelHeight / 20);
 }
 
 static IEnumerable<T> FindVisualChildren<T>(DependencyObject root)
@@ -833,6 +949,67 @@ file sealed class FakeVerifiedDownloader : IVerifiedDownloader
     {
         throw new NotSupportedException();
     }
+}
+
+file sealed class FakeUpdateHttpMessageHandler : HttpMessageHandler
+{
+    private const string PackageHash =
+        "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF";
+    private const string Version = "9.9.9";
+    private const string PackageName = "Astral-9.9.9-win-x64.zip";
+    private const string ChecksumName = "Astral-9.9.9-win-x64.sha256.txt";
+
+    protected override Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request,
+        CancellationToken cancellationToken)
+    {
+        if (request.RequestUri == AppUpdateService.DefaultLatestReleaseUri)
+        {
+            return Task.FromResult(CreateJsonResponse(
+                $$"""
+                {
+                  "tag_name": "v{{Version}}",
+                  "html_url": "https://github.com/ucsahinn/astral/releases/tag/v{{Version}}",
+                  "assets": [
+                    {
+                      "name": "{{PackageName}}",
+                      "browser_download_url": "https://github.com/ucsahinn/astral/releases/download/v{{Version}}/{{PackageName}}",
+                      "state": "uploaded",
+                      "size": 1024,
+                      "digest": "sha256:{{PackageHash}}"
+                    },
+                    {
+                      "name": "{{ChecksumName}}",
+                      "browser_download_url": "https://github.com/ucsahinn/astral/releases/download/v{{Version}}/{{ChecksumName}}",
+                      "state": "uploaded",
+                      "size": 93,
+                      "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+                    }
+                  ]
+                }
+                """));
+        }
+
+        if (request.RequestUri?.AbsoluteUri ==
+            $"https://github.com/ucsahinn/astral/releases/download/v{Version}/{ChecksumName}")
+        {
+            return Task.FromResult(CreateTextResponse($"{PackageHash}  {PackageName}"));
+        }
+
+        return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.NotFound));
+    }
+
+    private static HttpResponseMessage CreateJsonResponse(string content) =>
+        new(System.Net.HttpStatusCode.OK)
+        {
+            Content = new StringContent(content, Encoding.UTF8, "application/json")
+        };
+
+    private static HttpResponseMessage CreateTextResponse(string content) =>
+        new(System.Net.HttpStatusCode.OK)
+        {
+            Content = new StringContent(content, Encoding.UTF8, "text/plain")
+        };
 }
 
 file sealed class FakeProfileProvisioner(string profilePath) : IProfileProvisioner

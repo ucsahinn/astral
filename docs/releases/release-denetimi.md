@@ -16,21 +16,28 @@ Bu doküman, GitHub Releases yüzeyindeki sürüm kararlarını ve yayın kapıs
 
 ## Güncel Sürüm Kararı
 
-Güncel patch hedef `v2.2.18` olarak belirlendi.
+Güncel patch hedef `v2.2.19` olarak belirlendi.
 
-Neden `v2.2.18`?
+Neden `v2.2.19`?
 
-- v2.2.17 sonrası kullanıcı tarafında rota testi OK görünmesine rağmen bazı URL/login akışlarının tamamlanmadığı bildirildi.
-- Otomatik rota testi artık tek temsilci host yerine hedefin tanımlı somut hostlarını sırayla ölçer.
-- Wattpad, Bigo Live, Azar, Tango, LiVU, IMVU ve Blogspot preset kapsamı ek birinci taraf hostlarla genişletildi.
-- Astral.WebProxy allowlist dışı proxy isteklerini token/cookie/path yazmadan host düzeyinde tanılamaya aktarır.
-- Alt bardaki ayrı `Geçmiş` aksiyonu kaldırıldı; `Tanı Paketi` paketi oluşturup klasörü açmaya devam eder.
-- v2.2.17 yayınlandığı için bu rota kapsamı ve UI sadeleştirme hotfix'i ayrı `v2.2.18` sürümü olarak çıkarılır; böylece 2.2.17 kullanıcıları da otomatik güncelleme görür.
+- v2.2.18 sonrası kullanıcı çözünürlük/pencere boyutu değiştirince ana layout'un dağılabildiği bildirildi.
+- Ana pencere sabit `1280x720` viewport'a alındı ve kullanıcı resize davranışı kapatıldı; 1366x768 sınıfı ekranlarda taşma riski düşürüldü.
+- Uygulama açılışında güncelleme denetimi bağlantı kilidi hazırlığından önce arka planda başlar.
+- v2.2.18 tanı paketlerinde görülen `4 rota OK, 4 sorunlu` sonucu route-test host seçimi ve hosts-lock/WebProxy upstream DNS etkileşiminden kaynaklanıyordu; probe hostları rota domainlerinden ayrıldı ve WebProxy DoH/UDP DNS fallback ile sertleştirildi.
+- Sağ hedef panelindeki manuel `Hızlı Test` aksiyonu kaldırıldı; hedef kartları API probe timeout'larını ürün hatası gibi göstermeden yalnız kapsam hazır/aktif durumunu gösterir.
+- Restart akışı kapanış temizliği timeout olduğunda kullanıcıyı takılı bırakmaz; tanılamaya uyarı yazar ve restart helper'ı best-effort başlatır.
+- Alt bar `Rapor Oluştur`, `Onar`, `Profil Temizle`, `Güncelle`, `Sürüm Notları` ve GitHub aksiyonlarını daha net ayrıştırır.
+- `Onar` normal durumda pasif kalır; API probe timeout'u onarım sebebi yapılmaz, yalnız gerçek hata state'inde aktif olur ve disabled tooltip sorunsuz durumda neden onarım gerekmediğini açıklar.
+- Yeni WireSock profili `astral-scoped.conf`, yeni firewall kuralı `Astral.BlockTargetDomains` ve yeni hosts marker'ı `Astral hedef kilidi` olarak üretilir; eski `discord.conf` / `BlockDiscordDomains` kalıntıları cleanup için tanınmaya devam eder.
+- Tünel kapsamı tarayıcı düz bağlantı kilidi seçili hedef domainlerini kullanır; non-Discord web hedeflerinde PAC bypass/stale olsa bile `discord.com` varsayılanına düşmez.
+- Windows UI testi sabit pencere boyutunu, açılış güncelleme denetimini ve release notu butonunun yalnız release penceresi açtığını doğrular.
+- v2.2.18 yayınlandığı için bu sabit layout ve açılış update hotfix'i ayrı `v2.2.19` sürümü olarak çıkarılır; böylece 2.2.18 kullanıcıları da otomatik güncelleme görür.
 
 ## Public Release Yüzeyi
 
 | Release | Canlı durum | Asset durumu | Karar | Gerekçe |
 | --- | --- | --- | --- | --- |
+| `v2.2.19` | Yayın adayı | Bekliyor | Yayınla | Sabit ana pencere boyutu, sade kapsam durumu, restart timeout toleransı, açılışta bağımsız güncelleme denetimi ve WebProxy DNS fallback hotfixleri. |
 | `v2.2.18` | Yayında | 4 asset | Koru | Çoklu host rota testi, ek hedef hostları, WebProxy denied-host tanılaması ve Geçmiş butonu kaldırma hotfixleri. |
 | `v2.2.17` | Yayında | 4 asset | Koru | WireSock trafik kanıtı, 8 hedef kapsamı, otomatik hedef testi ve aksiyon barı netliği hotfixleri. |
 | `v2.2.16` | Yayında | 4 asset | Koru | Kanıtlı hedef kartı durumu, otomatik hedef testi ve aksiyon barı netliği hotfixleri. |
@@ -54,13 +61,13 @@ Neden `v2.2.18`?
 
 ## Yayın Kapısı
 
-`v2.2.18` yayınından önce tamamlanması gereken koşullar:
+`v2.2.19` yayınından önce tamamlanması gereken koşullar:
 
-- Proje, updater ve web proxy sürümü `2.2.18` ile aynı.
+- Proje, updater ve web proxy sürümü `2.2.19` ile aynı.
 - `src/Astral.App/app.manifest` kimlik sürümü proje sürümüyle aynı.
-- `Astral-2.2.18-win-x64.zip` ve sabit `Astral-win-x64.zip` aynı içeriği gösterir.
+- `Astral-2.2.19-win-x64.zip` ve sabit `Astral-win-x64.zip` aynı içeriği gösterir.
 - ZIP içinde `Astral.exe`, `Astral.Updater.exe`, `Astral.WebProxy.exe`, update manifest'i ve gerekli runtime dosyaları bulunur.
-- ZIP içindeki update manifest sürümü `2.2.18`.
+- ZIP içindeki update manifest sürümü `2.2.19`.
 - Astral release içinde eski isimli uyumluluk ZIP'i yayınlanmaz.
 - Kod imzalama sertifikası yapılandırılmadıysa paket imzasız olduğu açıkça not edilir.
 - `dotnet build`, Core tests, Windows tests, `scripts/verify.ps1`, `scripts/build-release.ps1`, `git diff --check` ve Gitleaks geçer.
