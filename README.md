@@ -27,7 +27,7 @@ Astral, Windows'ta yalnızca kullanıcının seçtiği uygulama veya web hedefle
 
 Uygulama hedefleri WireSock `AllowedApps` satırına dar kapsamla yazılır. Web hedeflerinde genel tarayıcı süreçleri profile eklenmez; seçili domainler `Astral.WebProxy.exe` ve PAC allowlist üzerinden yönlendirilir, diğer domainler DIRECT kalır.
 
-Astral resmi bir Discord, Roblox, Cloudflare, WireSock veya diğer marka sahibi ürünü değildir. Presetler yalnızca hedef kapsamını tanımlar; erişim durumu zamanla değişebilir.
+Astral resmi bir Discord, Cloudflare, WireSock veya diğer marka sahibi ürünü değildir. Presetler yalnızca hedef kapsamını tanımlar; erişim durumu zamanla değişebilir.
 
 ## Ekran Görüntüleri
 
@@ -46,7 +46,6 @@ Astral, seçili hedef/preset tabanlı bir bağlantı yöneticisidir. Kullanıcı
 Başlangıç presetleri:
 
 - Discord: Uygulama + Web
-- Roblox: Uygulama + Web
 - Wattpad: Web
 - Bigo Live: Web
 - Azar: Uygulama + Web
@@ -60,7 +59,7 @@ Başlangıç presetleri:
 | Özellik | Kullanıcıya etkisi |
 | --- | --- |
 | Tek tuşla bağlantı | Seçili hedefler için bağlantıyı açıp kapatmayı kolaylaştırır. |
-| İlk ekranda hedef kartları | Discord, Roblox, Wattpad ve diğer hazır hedefler ana ekrandan seçilir. |
+| İlk ekranda hedef kartları | Discord, Wattpad ve diğer hazır hedefler ana ekrandan seçilir. |
 | Domain kapsamı | Web hedeflerinde yalnızca seçili domainler Astral.WebProxy üzerinden gider; diğer domainler DIRECT kalır. |
 | Canlı durum kartları | DNS, bağlantı durumu ve hedef kapsamını sade biçimde gösterir. |
 | Tanılama paketi | Bağlantı sorunlarını incelemek için paylaşıma uygun rapor hazırlar. |
@@ -99,7 +98,7 @@ Release sayfasındaki ZIP paketini manuel indirdiğinizde yanında verilen SHA-2
 | Sorun giderme | [docs/sorun-giderme.md](docs/sorun-giderme.md) |
 | Mimari | [docs/mimari.md](docs/mimari.md) |
 | Kaynak sorun denetimi | [docs/kaynak-sorun-denetimi.md](docs/kaynak-sorun-denetimi.md) |
-| v2.2.16 release notu | [docs/releases/v2.2.16.md](docs/releases/v2.2.16.md) |
+| v2.2.17 release notu | [docs/releases/v2.2.17.md](docs/releases/v2.2.17.md) |
 
 ## Geliştirme
 
@@ -124,4 +123,4 @@ Güvenlik açığı bildirmek için [GitHub Security Advisory](https://github.co
 
 ## Lisans ve Üçüncü Taraf Notu
 
-Astral kaynak kodu bu repodaki [LICENSE](LICENSE) koşullarıyla yayınlanır. WireSock, Cloudflare WARP, Discord, Roblox, Wattpad, Bigo Live, Azar, Tango, LiVU, IMVU, Blogspot ve diğer marka/adlar kendi sahiplerine aittir. Üçüncü taraf sınırları için [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) dosyasına bakın.
+Astral kaynak kodu bu repodaki [LICENSE](LICENSE) koşullarıyla yayınlanır. WireSock, Cloudflare WARP, Discord, Wattpad, Bigo Live, Azar, Tango, LiVU, IMVU, Blogspot ve diğer marka/adlar kendi sahiplerine aittir. Üçüncü taraf sınırları için [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) dosyasına bakın.

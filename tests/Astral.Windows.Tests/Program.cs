@@ -156,8 +156,8 @@ static void RenderMainWindow()
         Assert(text.Contains("Astral", StringComparison.Ordinal));
         Assert(text.Contains("Desteklenen hedef kapsamı hazır", StringComparison.Ordinal));
         Assert(text.Contains("Hedef kapsamı", StringComparison.Ordinal));
-        Assert(text.Contains("9 hedef hazır", StringComparison.Ordinal));
-        Assert(text.Contains("9 hedef hazır · seçili kapsam bağlantıya dahil edilir.", StringComparison.Ordinal));
+        Assert(text.Contains("8 hedef hazır", StringComparison.Ordinal));
+        Assert(text.Contains("8 hedef hazır · seçili kapsam bağlantıya dahil edilir.", StringComparison.Ordinal));
         Assert(!text.Contains("TÜNEL KAPSAMI", StringComparison.Ordinal));
         Assert(!text.Contains("Hedefleri Seç", StringComparison.Ordinal));
         Assert(!text.Contains("Hedef Merkezi", StringComparison.Ordinal));
@@ -170,13 +170,13 @@ static void RenderMainWindow()
         Assert(text.Contains("Tanılama", StringComparison.Ordinal));
         Assert(text.Contains("Debug tanılama", StringComparison.Ordinal));
         Assert(text.Contains("Kapalı. Normal rapor hafif kalır.", StringComparison.Ordinal));
-        Assert(text.Contains("Rapor hazırla", StringComparison.Ordinal));
-        Assert(text.Contains("Bağlanınca test", StringComparison.Ordinal));
-        Assert(text.Contains("Hedef testi:", StringComparison.Ordinal));
+        Assert(!text.Contains("Rapor hazırla", StringComparison.Ordinal));
+        Assert(!text.Contains("Bağlanınca test", StringComparison.Ordinal));
+        Assert(text.Contains("Otomatik hedef testi:", StringComparison.Ordinal));
         Assert(text.Contains("Hazır", StringComparison.Ordinal));
         Assert(text.Contains("Astral Bağlı Değil", StringComparison.Ordinal));
         Assert(text.Contains(
-            "Bağlantı sorunlarını incelemek için rapor hazırla",
+            "Tanı paketi alt bardan oluşturulur.",
             StringComparison.Ordinal));
         var buttonNames = FindVisualChildren<Button>(window)
             .Where(button => button.Visibility == Visibility.Visible)
@@ -186,8 +186,9 @@ static void RenderMainWindow()
         Assert(buttonNames.Contains("Astral onar"));
         Assert(buttonNames.Contains("Profil temizle"));
         Assert(buttonNames.Contains("Tanı paketi oluştur"));
-        Assert(buttonNames.Contains("Tanılama raporu hazırla"));
-        Assert(buttonNames.Contains("Seçili hedefleri hızlı test et"));
+        Assert(buttonNames.Contains("Tanılama geçmişini aç"));
+        Assert(!buttonNames.Contains("Tanılama raporu hazırla"));
+        Assert(!buttonNames.Contains("Seçili hedefleri hızlı test et"));
         Assert(buttonNames.Contains("Sürüm notlarını aç"));
         Assert(!buttonNames.Any(button => button.Contains("WireSock", StringComparison.OrdinalIgnoreCase)));
         Assert(!buttonNames.Any(button =>
@@ -199,11 +200,31 @@ static void RenderMainWindow()
         var updateButton = FindVisualChildren<Button>(window)
             .Single(button => button.Name == "AutoUpdateButton");
         Assert(updateButton.Visibility == Visibility.Collapsed);
-        var targetQuickTestButton = FindVisualChildren<Button>(window)
-            .Single(button => button.Name == "TargetQuickTestButton");
-        Assert(!targetQuickTestButton.IsEnabled);
+        Assert(!FindVisualChildren<Button>(window)
+            .Any(button => button.Name == "TargetQuickTestButton"));
         var releaseNotesButton = FindVisualChildren<Button>(window)
             .Single(button => button.Name == "ReleaseNotesButton");
+        var releaseNotesButtonText = FindVisualChildren<TextBlock>(releaseNotesButton)
+            .Select(block => block.Text)
+            .ToArray();
+        Assert(releaseNotesButtonText.Contains("Sürüm Notları", StringComparer.Ordinal));
+        Assert(releaseNotesButton.ToolTip?.ToString() == "Sürüm notlarını aç");
+        Assert(!releaseNotesButton.ToolTip!.ToString()!.Contains("klasör", StringComparison.OrdinalIgnoreCase));
+        Assert(ToolTipService.GetShowsToolTipOnKeyboardFocus(releaseNotesButton) == true);
+        var diagnosticsHistoryButton = FindVisualChildren<Button>(window)
+            .Single(button => button.Name == "DiagnosticsHistoryButton");
+        Assert(diagnosticsHistoryButton.ToolTip?.ToString() == "Tanılama geçmişi klasörünü aç");
+        Assert(ToolTipService.GetShowsToolTipOnKeyboardFocus(diagnosticsHistoryButton) == true);
+        var diagnosticsBundleButton = FindVisualChildren<Button>(window)
+            .Single(button => button.Name == "DiagnosticsBundleButton");
+        Assert(diagnosticsBundleButton.ToolTip?.ToString() == "Tanı paketi oluştur ve klasörü aç");
+        Assert(ToolTipService.GetShowsToolTipOnKeyboardFocus(diagnosticsBundleButton) == true);
+        var repairButton = FindVisualChildren<Button>(window)
+            .Single(button => button.Name == "RepairButton");
+        Assert(ToolTipService.GetShowsToolTipOnKeyboardFocus(repairButton) == true);
+        var cleanProfileButton = FindVisualChildren<Button>(window)
+            .Single(button => button.Name == "CleanProfileButton");
+        Assert(ToolTipService.GetShowsToolTipOnKeyboardFocus(cleanProfileButton) == true);
         var releaseNotesWindowOpened = false;
         window.Dispatcher.BeginInvoke(new Action(() =>
         {
@@ -226,11 +247,11 @@ static void RenderMainWindow()
                 "TargetToggle_",
                 StringComparison.Ordinal))
             .ToArray();
-        Assert(targetToggles.Length == 9);
+        Assert(targetToggles.Length == 8);
         var targetRows = FindVisualChildren<UniformGrid>(window)
             .Where(grid => grid.Name is "TargetCardsTopPanel" or "TargetCardsBottomPanel")
             .ToDictionary(grid => grid.Name, grid => grid);
-        Assert(targetRows["TargetCardsTopPanel"].Children.Count == 5);
+        Assert(targetRows["TargetCardsTopPanel"].Children.Count == 4);
         Assert(targetRows["TargetCardsBottomPanel"].Children.Count == 4);
         var targetNames = targetToggles
             .Select(AutomationProperties.GetName)
@@ -238,7 +259,6 @@ static void RenderMainWindow()
         var expectedTargets = new[]
                  {
                      "Discord hedefi",
-                     "Roblox hedefi",
                      "Wattpad hedefi",
                      "Bigo Live hedefi",
                      "Azar hedefi",
@@ -254,7 +274,6 @@ static void RenderMainWindow()
         foreach (var iconKey in new[]
                  {
                      "discord",
-                     "roblox",
                      "wattpad",
                      "bigo-live",
                      "azar",
@@ -285,7 +304,6 @@ static void RenderMainWindow()
         foreach (var expectedTarget in new[]
                  {
                      "Discord",
-                     "Roblox",
                      "Wattpad",
                      "Bigo Live",
                      "Azar",
@@ -314,17 +332,10 @@ static void RenderMainWindow()
         Assert(targetToggles.Any(toggle =>
             toggle.Name == "TargetToggle_discord"
             && toggle.IsChecked == true));
-        Assert(targetToggles.Any(toggle => toggle.Name == "TargetToggle_roblox"));
+        Assert(!targetToggles.Any(toggle => toggle.Name == "TargetToggle_roblox"));
         Assert(targetToggles.Any(toggle => toggle.Name == "TargetToggle_wattpad"));
         Assert(targetToggles.All(toggle =>
             !toggle.Name.Contains("custom", StringComparison.OrdinalIgnoreCase)));
-
-        var robloxTarget = targetToggles.Single(toggle =>
-            toggle.Name == "TargetToggle_roblox");
-        robloxTarget.IsChecked = true;
-        window.UpdateLayout();
-        Assert(GetController(window).TargetSelection.SelectedTargetIds
-            .Contains("roblox", StringComparer.OrdinalIgnoreCase));
 
         var runInBackgroundSwitch = switches.Single(toggle =>
             toggle.Name == "RunInBackgroundToggle");
@@ -428,9 +439,8 @@ static void VerifyConnectedTargetCardsRequireProbeEvidence()
         Assert(!cardTexts.Contains("Kapsamda", StringComparer.Ordinal));
         Assert(cardTexts.Contains("Test bekliyor", StringComparer.Ordinal));
 
-        var targetQuickTestButton = FindVisualChildren<Button>(window)
-            .Single(button => button.Name == "TargetQuickTestButton");
-        Assert(targetQuickTestButton.IsEnabled);
+        Assert(!FindVisualChildren<Button>(window)
+            .Any(button => button.Name == "TargetQuickTestButton"));
 
         Console.WriteLine("GEÇTİ Bağlı hedef kartı test kanıtı olmadan kapsamda görünmedi");
     }

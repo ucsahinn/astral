@@ -33,7 +33,6 @@ using WpfBrushes = System.Windows.Media.Brushes;
 using WpfCheckBox = System.Windows.Controls.CheckBox;
 using WpfImage = System.Windows.Controls.Image;
 using WpfPath = System.Windows.Shapes.Path;
-using WpfRectangle = System.Windows.Shapes.Rectangle;
 using WpfToolTip = System.Windows.Controls.ToolTip;
 
 namespace Astral.App;
@@ -50,7 +49,7 @@ public partial class MainWindow : Window, IDisposable
     private static readonly Uri RepositoryUri = new(
         "https://github.com/ucsahinn/astral");
     private static readonly Uri ReleaseNotesUri = new(
-        "https://github.com/ucsahinn/astral/releases/tag/v2.2.16");
+        "https://github.com/ucsahinn/astral/releases/tag/v2.2.17");
     private static readonly Uri BackgroundVideoUri = new(
         "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260606_154941_df1a96e1-a06f-450c-bd02-d863414cc1a0.mp4");
     private static readonly string LocalBackgroundVideoPath = Path.Combine(
@@ -248,11 +247,11 @@ public partial class MainWindow : Window, IDisposable
         {
             _automaticTargetTestQueued = false;
             _targetProbeResults.Clear();
-            _lastTargetTestSummary = "Hedef testi çalıştırılmadı.";
+            _lastTargetTestSummary = "Otomatik hedef testi çalıştırılmadı.";
             if (!_isTargetTestRunning)
             {
                 TargetTestSummary.Text =
-                    "Hedef testi: bağlantı açılınca seçili hedefler tek tek ölçülür.";
+                    "Otomatik hedef testi: bağlantı açılınca seçili hedefler tek tek ölçülür.";
             }
         }
 
@@ -262,7 +261,7 @@ public partial class MainWindow : Window, IDisposable
             ? "Devam eden işlem bitince onarım kullanılabilir."
             : "Bağlantı dosyalarını güvenle yenile";
         ApplyUpdateControls(snapshot.IsBusy);
-        ApplyTargetTestButtonState(snapshot);
+        ApplyTargetTestSummaryState(snapshot);
         StatusMessage.Text = GetStatusMessage(snapshot);
         StatusDetail.Text = GetDetail(snapshot);
         RefreshTargetScopeView(snapshot.IsBusy || snapshot.IsConnected);
@@ -721,7 +720,7 @@ public partial class MainWindow : Window, IDisposable
             TunnelState.Preparing => "Kurulum, dijital imza ve bağlantı profili doğrulanıyor.",
             TunnelState.Connecting => "Astral tünel motoru başlatılıyor.",
             TunnelState.Disconnecting => "Bağlantı güvenli biçimde sonlandırılıyor.",
-            TunnelState.Error => "Tanılama raporu oluştur veya onarım akışını başlat.",
+            TunnelState.Error => "Tanı paketi oluştur veya onarım akışını başlat.",
             _ => "Astral bağlı değilken seçili hedefler düz bağlantıya çıkmaz."
         };
     }
@@ -770,7 +769,7 @@ public partial class MainWindow : Window, IDisposable
             toggle.Unchecked += TargetToggle_Changed;
             _targetToggles[target.Id] = toggle;
             _targetOrder[target.Id] = index;
-            if (index < 5)
+            if (index < 4)
             {
                 TargetCardsTopPanel.Children.Add(toggle);
             }
@@ -830,8 +829,8 @@ public partial class MainWindow : Window, IDisposable
         _settingsStore.SetTargetSelection(selection);
         _targetProbeResults.Clear();
         _automaticTargetTestQueued = false;
-        _lastTargetTestSummary = "Hedef testi çalıştırılmadı.";
-        TargetTestSummary.Text = "Hedef testi: bağlantı açılınca seçili hedefler tek tek ölçülür.";
+        _lastTargetTestSummary = "Otomatik hedef testi çalıştırılmadı.";
+        TargetTestSummary.Text = "Otomatik hedef testi: bağlantı açılınca seçili hedefler tek tek ölçülür.";
         _diagnostics.Info(
             "ui.targetSelection",
             "Hedef seçimi güncellendi.",
@@ -1036,7 +1035,7 @@ public partial class MainWindow : Window, IDisposable
                     },
                     new TextBlock
                     {
-                        Text = "Hızlı test, web hedeflerinde yerel proxy üzerinden CONNECT 443 dener; uygulama hedeflerinde profil kapsamını doğrular.",
+                        Text = "Otomatik test, bağlantı açılınca web hedeflerinde yerel proxy üzerinden CONNECT 443 dener; uygulama hedeflerinde profil kapsamını doğrular.",
                         Margin = new Thickness(0, 3, 0, 0),
                         TextWrapping = TextWrapping.Wrap,
                         Foreground = new SolidColorBrush(MediaColor.FromRgb(170, 211, 226))
@@ -1164,7 +1163,7 @@ public partial class MainWindow : Window, IDisposable
                         return;
                     }
 
-                    await RunSelectedTargetsProbeAsync(automatic: true);
+                    await RunSelectedTargetsProbeAsync();
                 }
                 catch (OperationCanceledException)
                 {
@@ -1177,7 +1176,7 @@ public partial class MainWindow : Window, IDisposable
                     _automaticTargetTestQueued = false;
                     if (!_disposed)
                     {
-                        ApplyTargetTestButtonState(_controller.Snapshot);
+                        ApplyTargetTestSummaryState(_controller.Snapshot);
                         RefreshLiveStatusCards(_controller.Snapshot);
                     }
                 }
@@ -1185,13 +1184,12 @@ public partial class MainWindow : Window, IDisposable
             DispatcherPriority.Background);
     }
 
-    private void ApplyTargetTestButtonState(TunnelSnapshot snapshot)
+    private void ApplyTargetTestSummaryState(TunnelSnapshot snapshot)
     {
         if (_isTargetTestRunning)
         {
-            TargetQuickTestButton.IsEnabled = false;
-            TargetQuickTestLabel.Text = "Testte";
-            TargetQuickTestButton.ToolTip = "Hedef testi çalışıyor.";
+            TargetTestSummary.Text =
+                "Otomatik hedef testi başladı; seçili hedefler sırayla ölçülüyor.";
             return;
         }
 
@@ -1199,26 +1197,26 @@ public partial class MainWindow : Window, IDisposable
             .SelectedTargets
             .Any(target => target.HasWebScope
                 || target.HasApplicationScope);
-        var enabled = snapshot.IsConnected
-            && !snapshot.IsBusy
-            && hasSelectedTarget;
-        TargetQuickTestButton.IsEnabled = enabled;
-        TargetQuickTestLabel.Text = _isTargetTestRunning
-            ? "Testte"
-            : enabled
-                ? "Hızlı test"
-                : "Bağlanınca test";
-        TargetQuickTestButton.ToolTip = enabled
-            ? "Seçili hedefleri sırayla hızlı test et"
-            : "Hızlı test için önce bağlantıyı açın.";
+        if (!hasSelectedTarget)
+        {
+            TargetTestSummary.Text = "Otomatik hedef testi: seçili hedef yok.";
+            return;
+        }
+
+        if (!snapshot.IsConnected)
+        {
+            TargetTestSummary.Text =
+                "Otomatik hedef testi: bağlantı açılınca seçili hedefler tek tek ölçülür.";
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(_lastTargetTestSummary))
+        {
+            TargetTestSummary.Text = "Hedef testi: " + _lastTargetTestSummary;
+        }
     }
 
-    private async void TestSelectedTargets_Click(object sender, RoutedEventArgs e)
-    {
-        await RunSelectedTargetsProbeAsync(automatic: false);
-    }
-
-    private async Task RunSelectedTargetsProbeAsync(bool automatic)
+    private async Task RunSelectedTargetsProbeAsync()
     {
         if (_isTargetTestRunning)
         {
@@ -1228,11 +1226,8 @@ public partial class MainWindow : Window, IDisposable
         var snapshot = _controller.Snapshot;
         if (!snapshot.IsConnected || snapshot.IsBusy)
         {
-            if (!automatic)
-            {
-                TargetTestSummary.Text = "Hedef testi için önce Astral bağlantısını açın.";
-            }
-            ApplyTargetTestButtonState(snapshot);
+            TargetTestSummary.Text = "Otomatik hedef testi için önce Astral bağlantısını açın.";
+            ApplyTargetTestSummaryState(snapshot);
             return;
         }
 
@@ -1243,26 +1238,17 @@ public partial class MainWindow : Window, IDisposable
             .ToArray();
         if (selectedTargets.Length == 0)
         {
-            if (!automatic)
-            {
-                TargetTestSummary.Text = "Test edilecek seçili hedef yok.";
-            }
+            TargetTestSummary.Text = "Test edilecek seçili hedef yok.";
             return;
         }
 
         _isTargetTestRunning = true;
-        TargetQuickTestButton.IsEnabled = false;
-        TargetTestSummary.Text = automatic
-            ? "Otomatik hedef testi başladı; seçili hedefler sırayla ölçülüyor."
-            : "Hedef testi başladı; seçili hedefler sırayla ölçülüyor.";
-        _lastTargetTestSummary = automatic
-            ? "Otomatik hedef testi çalışıyor."
-            : "Hedef testi çalışıyor.";
+        TargetTestSummary.Text =
+            "Otomatik hedef testi başladı; seçili hedefler sırayla ölçülüyor.";
+        _lastTargetTestSummary = "Otomatik hedef testi çalışıyor.";
         _diagnostics.Info(
-            automatic ? "ui.targetTest.autoStart" : "ui.targetTest.start",
-            automatic
-                ? "Seçili hedefler için otomatik test başlatıldı."
-                : "Seçili hedefler için hızlı test başlatıldı.",
+            "ui.targetTest.autoStart",
+            "Seçili hedefler için otomatik test başlatıldı.",
             new Dictionary<string, string?>
             {
                 ["selectedTargets"] = string.Join(", ", selectedTargets.Select(target => target.Label))
@@ -1277,7 +1263,7 @@ public partial class MainWindow : Window, IDisposable
         try
         {
             var scopeStatus = await _controller.EnsureCurrentWebProxyScopeAsync(
-                "target-quick-test",
+                "target-auto-test",
                 linkedSource.Token);
             if (scopeStatus.Required && !scopeStatus.IsApplied)
             {
@@ -1364,7 +1350,7 @@ public partial class MainWindow : Window, IDisposable
             TargetTestSummary.Text = "Hedef testi: " + _lastTargetTestSummary;
             _diagnostics.Info(
                 "ui.targetTest.complete",
-                "Hızlı hedef testi tamamlandı.",
+                "Otomatik hedef testi tamamlandı.",
                 CreateTargetTestDiagnosticDetails(results));
             _diagnostics.WriteHealth(
                 "hedef testi tamamlandı",
@@ -1372,16 +1358,16 @@ public partial class MainWindow : Window, IDisposable
         }
         catch (OperationCanceledException)
         {
-            _lastTargetTestSummary = "Hedef testi iptal edildi veya zaman aşımına uğradı.";
+            _lastTargetTestSummary = "Otomatik hedef testi iptal edildi veya zaman aşımına uğradı.";
             TargetTestSummary.Text = _lastTargetTestSummary;
             _diagnostics.Warning(
                 "ui.targetTest.cancelled",
-                "Hızlı hedef testi iptal edildi veya zaman aşımına uğradı.");
+                "Otomatik hedef testi iptal edildi veya zaman aşımına uğradı.");
         }
         finally
         {
             _isTargetTestRunning = false;
-            ApplyTargetTestButtonState(_controller.Snapshot);
+            ApplyTargetTestSummaryState(_controller.Snapshot);
             RefreshTargetScopeView(_controller.Snapshot.IsBusy
                 || _controller.Snapshot.IsConnected);
             RefreshLiveStatusCards(_controller.Snapshot);
@@ -1489,7 +1475,7 @@ public partial class MainWindow : Window, IDisposable
         {
             _diagnostics.Warning(
                 "ui.targetTest",
-                "PAC dosyası hızlı test için okunamadı.",
+                "PAC dosyası otomatik hedef testi için okunamadı.",
                 new Dictionary<string, string?>
                 {
                     ["diagnostic"] = exception.Message
@@ -1992,39 +1978,6 @@ public partial class MainWindow : Window, IDisposable
         return canvas;
     }
 
-    private static Canvas CreateRobloxIcon(WpfBrush foreground, MediaColor cutoutColor)
-    {
-        var canvas = CreateIconCanvas();
-        var diamond = new WpfRectangle
-        {
-            Width = 19,
-            Height = 19,
-            Fill = foreground,
-            RadiusX = 2,
-            RadiusY = 2,
-            RenderTransformOrigin = new System.Windows.Point(0.5, 0.5),
-            RenderTransform = new RotateTransform(45)
-        };
-        Canvas.SetLeft(diamond, 6.5);
-        Canvas.SetTop(diamond, 6.5);
-        canvas.Children.Add(diamond);
-
-        var cutout = new WpfRectangle
-        {
-            Width = 6,
-            Height = 6,
-            Fill = new SolidColorBrush(cutoutColor),
-            RadiusX = 1,
-            RadiusY = 1,
-            RenderTransformOrigin = new System.Windows.Point(0.5, 0.5),
-            RenderTransform = new RotateTransform(45)
-        };
-        Canvas.SetLeft(cutout, 13);
-        Canvas.SetTop(cutout, 13);
-        canvas.Children.Add(cutout);
-        return canvas;
-    }
-
     private static Canvas CreateIconCanvas()
     {
         return new Canvas
@@ -2042,7 +1995,6 @@ public partial class MainWindow : Window, IDisposable
         return iconKey switch
         {
             "discord" => new("DC", TargetVisualKind.Letter, Rgb(88, 101, 242), Rgb(125, 235, 255)),
-            "roblox" => new("RB", TargetVisualKind.Letter, Rgb(26, 31, 43), Rgb(196, 210, 230)),
             "wattpad" => new("W", TargetVisualKind.Letter, Rgb(255, 103, 26), Rgb(255, 175, 72)),
             "bigo-live" => new("BG", TargetVisualKind.Letter, Rgb(27, 169, 255), Rgb(93, 255, 146)),
             "azar" => new("AZ", TargetVisualKind.Letter, Rgb(255, 89, 139), Rgb(125, 235, 255)),
@@ -2067,7 +2019,6 @@ public partial class MainWindow : Window, IDisposable
     {
         Letter,
         Discord,
-        Roblox,
         Live,
         Spark,
         Chat,
@@ -3357,7 +3308,7 @@ public partial class MainWindow : Window, IDisposable
             Show();
             Activate();
             StatusMessage.Text = "Kapanış tamamlanamadı";
-            StatusDetail.Text = "Bağlantı koruması doğrulanamadı. Tanılama raporu hazırlayın.";
+            StatusDetail.Text = "Bağlantı koruması doğrulanamadı. Tanı paketi oluşturun.";
             return;
         }
 

@@ -71,6 +71,11 @@ public sealed class DiscordTunnelController : IAsyncDisposable
     private TunnelReadinessSnapshot _lastTunnelReadiness =
         TunnelReadinessSnapshot.ProbeUnavailable("Tunnel readiness probe has not run.");
     private bool _lastWireSockConnectionEstablished;
+    private long? _wireSockTrafficBaselineBytesReceived;
+    private long? _wireSockTrafficBaselineBytesSent;
+    private bool _lastWireSockTrafficDeltaObserved;
+    private string? _lastWireSockTrafficDiagnostic =
+        "WireSock traffic proof has not been checked.";
     private string? _lastWireSockHandshakeDiagnostic =
         "WireSock handshake has not been checked.";
     private string? _lastWireSockProcessId;
@@ -575,6 +580,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             wireSockExecutable,
             profilePath,
             cancellationToken);
+        CaptureWireSockTrafficBaseline();
         _diagnostics.Info(
             "controller.process",
             "WireSock süreci başlatılıyor.",
@@ -663,7 +669,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         if (!IsWireSockHandshakeReady())
         {
             throw new InvalidOperationException(
-                "WireSock bağlantı onayı alınamadı. Astral bağlantı motoru çalışıyor görünüyor ancak tünel bağlantısı tamamlandığını doğrulamadı; farklı ağ, DNS veya ISP engeli olabilir.");
+                "WireSock bağlantı kanıtı doğrulanamadı. Astral bağlantı motoru çalışıyor görünüyor ancak bu denemede hazır logu veya adapter trafik artışı alınamadı; onarım akışını çalıştırıp tekrar deneyin.");
         }
 
         if (!_lastTunnelReadiness.BlocksConnection)
@@ -690,6 +696,44 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             _lastWireSockConnectionEstablished.ToString();
         details["wireSockHandshakeDiagnostic"] =
             _lastWireSockHandshakeDiagnostic;
+        details["wireSockTrafficDeltaObserved"] =
+            _lastWireSockTrafficDeltaObserved.ToString();
+        details["wireSockTrafficDiagnostic"] =
+            _lastWireSockTrafficDiagnostic;
+        if (_wireSockTrafficBaselineBytesReceived is not null)
+        {
+            details["wireSockTrafficBaselineBytesReceived"] =
+                _wireSockTrafficBaselineBytesReceived.Value
+                    .ToString(CultureInfo.InvariantCulture);
+        }
+
+        if (_wireSockTrafficBaselineBytesSent is not null)
+        {
+            details["wireSockTrafficBaselineBytesSent"] =
+                _wireSockTrafficBaselineBytesSent.Value
+                    .ToString(CultureInfo.InvariantCulture);
+        }
+
+        if (_lastTunnelReadiness.WireSockAdapterBytesReceived is not null
+            && _wireSockTrafficBaselineBytesReceived is not null)
+        {
+            details["wireSockTrafficDeltaBytesReceived"] =
+                CalculateCounterDelta(
+                        _wireSockTrafficBaselineBytesReceived,
+                        _lastTunnelReadiness.WireSockAdapterBytesReceived)
+                    .ToString(CultureInfo.InvariantCulture);
+        }
+
+        if (_lastTunnelReadiness.WireSockAdapterBytesSent is not null
+            && _wireSockTrafficBaselineBytesSent is not null)
+        {
+            details["wireSockTrafficDeltaBytesSent"] =
+                CalculateCounterDelta(
+                        _wireSockTrafficBaselineBytesSent,
+                        _lastTunnelReadiness.WireSockAdapterBytesSent)
+                    .ToString(CultureInfo.InvariantCulture);
+        }
+
         if (!string.IsNullOrWhiteSpace(_lastWireSockProcessId))
         {
             details["wireSockProcessId"] = _lastWireSockProcessId;
@@ -728,23 +772,105 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             return false;
         }
 
-        if (!IsWireSockHandshakeReady())
-        {
-            return false;
-        }
-
         if (attempt < MinTransparentReadinessChecks)
         {
             return false;
         }
 
-        _lastTunnelReadiness = TunnelReadinessSnapshot.TransparentProcessRunning(
-            _lastTunnelReadiness,
-            "WireSock transparent mode is running; virtual adapter status is not required.");
+        if (IsWireSockHandshakeReady())
+        {
+            _lastTunnelReadiness = TunnelReadinessSnapshot.TransparentProcessRunning(
+                _lastTunnelReadiness,
+                "WireSock transparent mode is running; tunnel-started log marker was observed.");
 
-        _lastWireSockHandshakeDiagnostic = null;
+            _lastWireSockHandshakeDiagnostic = null;
 
-        return true;
+            return true;
+        }
+
+        if (!_lastTunnelReadiness.BlocksConnection
+            && HasWireSockTrafficDelta())
+        {
+            _lastTunnelReadiness = TunnelReadinessSnapshot.TransparentProcessRunning(
+                _lastTunnelReadiness,
+                "WireSock transparent mode is running; adapter traffic increased after process start.");
+
+            _lastWireSockHandshakeDiagnostic =
+                "WireSock log marker was not observed; adapter traffic delta confirmed readiness.";
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private void CaptureWireSockTrafficBaseline()
+    {
+        _wireSockTrafficBaselineBytesReceived = null;
+        _wireSockTrafficBaselineBytesSent = null;
+        _lastWireSockTrafficDeltaObserved = false;
+        try
+        {
+            var baseline = _tunnelReadinessProbe.Capture();
+            _wireSockTrafficBaselineBytesReceived =
+                baseline.WireSockAdapterBytesReceived;
+            _wireSockTrafficBaselineBytesSent =
+                baseline.WireSockAdapterBytesSent;
+            _lastWireSockTrafficDiagnostic =
+                _wireSockTrafficBaselineBytesReceived is null
+                    && _wireSockTrafficBaselineBytesSent is null
+                    ? "WireSock adapter traffic baseline is unavailable."
+                    : "WireSock adapter traffic baseline captured before process start.";
+        }
+        catch (Exception exception)
+            when (exception is InvalidOperationException
+                or NotSupportedException
+                or IOException
+                or UnauthorizedAccessException)
+        {
+            _lastWireSockTrafficDiagnostic =
+                AstralDiagnostics.RedactForLog(exception.Message);
+        }
+    }
+
+    private bool HasWireSockTrafficDelta()
+    {
+        if (!_lastTunnelReadiness.WireSockAdapterDetected
+            || !_lastTunnelReadiness.WireSockAdapterUp)
+        {
+            _lastWireSockTrafficDeltaObserved = false;
+            _lastWireSockTrafficDiagnostic =
+                "WireSock adapter traffic delta is unavailable because adapter is not ready.";
+            return false;
+        }
+
+        var receivedDelta = CalculateCounterDelta(
+            _wireSockTrafficBaselineBytesReceived,
+            _lastTunnelReadiness.WireSockAdapterBytesReceived);
+        var sentDelta = CalculateCounterDelta(
+            _wireSockTrafficBaselineBytesSent,
+            _lastTunnelReadiness.WireSockAdapterBytesSent);
+        if (receivedDelta > 0 || sentDelta > 0)
+        {
+            _lastWireSockTrafficDeltaObserved = true;
+            _lastWireSockTrafficDiagnostic = null;
+            return true;
+        }
+
+        _lastWireSockTrafficDeltaObserved = false;
+        _lastWireSockTrafficDiagnostic =
+            "WireSock adapter counters did not increase after process start.";
+        return false;
+    }
+
+    private static long CalculateCounterDelta(long? baseline, long? current)
+    {
+        if (baseline is null || current is null || current.Value <= baseline.Value)
+        {
+            return 0;
+        }
+
+        return current.Value - baseline.Value;
     }
 
     private void CaptureWireSockProcessState()

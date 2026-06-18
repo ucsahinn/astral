@@ -90,7 +90,8 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Denetleyici transparent modda pasif adaptörü tunnel-started loguyla kabul eder", ControllerAcceptsInactiveWireSockAdapterInTransparentModeAsync),
     ("Denetleyici transparent modda eksik adaptörü tunnel-started loguyla kabul eder", ControllerAcceptsMissingWireSockAdapterInTransparentModeAsync),
     ("Denetleyici transparent modda eksik probe'u tunnel-started loguyla kabul eder", ControllerAcceptsUnavailableWireSockProbeInTransparentModeAsync),
-    ("Denetleyici transparent modda handshake logu yokken bağlı raporlamaz", ControllerRejectsMissingWireSockHandshakeInTransparentModeAsync),
+    ("Denetleyici transparent modda trafik kanıtıyla eksik handshake logunu kabul eder", ControllerAcceptsTrafficProofWithoutWireSockHandshakeLogAsync),
+    ("Denetleyici transparent modda handshake ve trafik kanıtı yokken bağlı raporlamaz", ControllerRejectsMissingWireSockHandshakeInTransparentModeAsync),
     ("Denetleyici WireSock tunnel-started loguyla bağlı raporlar", ControllerAcceptsWireSockTunnelStartedLogAsync),
     ("Denetleyici WireSock adaptörü gecikirse yeniden dener", ControllerRetriesDelayedWireSockAdapterAsync),
     ("Denetleyici WireSock doğrulamasını hedef uygulama yenilemeden yapar", ControllerChecksWireSockWithoutTargetProcessRestartAsync),
@@ -172,11 +173,10 @@ static Task TargetRegistryDefinesBuiltInPresetsAsync()
     var registry = TargetRegistry.CreateDefault();
     var targets = registry.GetBuiltInTargets().ToArray();
 
-    Assert(targets.Length == 9);
+    Assert(targets.Length == 8);
     Assert(targets.Select(target => target.Id).SequenceEqual(
         [
             TargetIds.Discord,
-            TargetIds.Roblox,
             TargetIds.Wattpad,
             TargetIds.Azar,
             TargetIds.BigoLive,
@@ -192,10 +192,7 @@ static Task TargetRegistryDefinesBuiltInPresetsAsync()
     Assert(discord.ExecutableHints.Any(hint =>
         hint.FileName.Equals("Discord.exe", StringComparison.OrdinalIgnoreCase)));
 
-    Assert(registry.TryGet(TargetIds.Roblox, out var roblox));
-    Assert(roblox.ScopeKind == TargetScopeKind.ApplicationAndWeb);
-    Assert(roblox.ExecutableHints.Any(hint =>
-        hint.FileName.Equals("RobloxPlayerBeta.exe", StringComparison.OrdinalIgnoreCase)));
+    Assert(!registry.TryGet("roblox", out _));
 
     Assert(registry.TryGet(TargetIds.Wattpad, out var wattpad));
     Assert(wattpad.ScopeKind == TargetScopeKind.Web);
@@ -313,7 +310,7 @@ static Task TargetScopeResolverUsesWebProxyForWebTargetsAsync()
             app.Equals(webProxyPath, StringComparison.OrdinalIgnoreCase)));
         Assert(plan.ProxyRules.Any(rule => rule.Pattern == "wattpad.com"));
         Assert(plan.ProxyRules.Any(rule => rule.Pattern == "blogspot.com"));
-        Assert(!plan.ProxyRules.Any(rule => rule.Pattern.Contains("roblox", StringComparison.OrdinalIgnoreCase)));
+        Assert(!plan.ProxyRules.Any(rule => rule.Pattern.Contains("gameclient", StringComparison.OrdinalIgnoreCase)));
         Assert(plan.AllowedApplications.All(app => !RoutingPlan.IsBrowserExecutable(app)));
 
         var wattpadOnly = resolver.Resolve(new TargetSelection(
@@ -667,7 +664,7 @@ static Task DiscordScopeDefaultsToAppOnlyAsync()
         Assert(apps.All(app => !app.Equals("chrome.exe", StringComparison.OrdinalIgnoreCase)));
         Assert(apps.All(app => !app.Contains("Chrome", StringComparison.OrdinalIgnoreCase)));
         Assert(apps.All(app => !app.Equals("firefox.exe", StringComparison.OrdinalIgnoreCase)));
-        Assert(apps.All(app => !app.Contains("roblox", StringComparison.OrdinalIgnoreCase)));
+        Assert(apps.All(app => !app.Contains("gameclient", StringComparison.OrdinalIgnoreCase)));
     }
     finally
     {
@@ -724,7 +721,7 @@ static Task DiscordScopeDoesNotIncludeBrowsersWhenLegacyFlagIsEnabledAsync()
         Assert(apps.All(app => !app.Contains("Firefox", StringComparison.OrdinalIgnoreCase)));
         Assert(apps.All(app => !app.Contains("Opera", StringComparison.OrdinalIgnoreCase)));
         Assert(apps.All(app => !app.Equals("Update.exe", StringComparison.OrdinalIgnoreCase)));
-        Assert(apps.All(app => !app.Contains("roblox", StringComparison.OrdinalIgnoreCase)));
+        Assert(apps.All(app => !app.Contains("gameclient", StringComparison.OrdinalIgnoreCase)));
     }
     finally
     {
@@ -778,7 +775,7 @@ static Task ProfileBuilderIsStrictAsync()
         [Peer]
         PublicKey = public
         Endpoint = engage.cloudflareclient.com:2408
-        AllowedApps = chrome.exe, roblox.exe, Update.exe
+        AllowedApps = chrome.exe, gameclient.exe, Update.exe
         AllowedIPs = 0.0.0.0/0
         """;
 
@@ -796,7 +793,7 @@ static Task ProfileBuilderIsStrictAsync()
     Assert(profile.Contains("Discord.exe", StringComparison.Ordinal));
     Assert(profile.Contains("chrome.exe", StringComparison.OrdinalIgnoreCase));
     Assert(profile.Contains("msedge.exe", StringComparison.OrdinalIgnoreCase));
-    Assert(!profile.Contains("roblox.exe", StringComparison.OrdinalIgnoreCase));
+    Assert(!profile.Contains("gameclient.exe", StringComparison.OrdinalIgnoreCase));
     Assert(!profile.Contains("Update.exe", StringComparison.OrdinalIgnoreCase));
     Assert(profile.Split("AllowedApps =", StringSplitOptions.None).Length == 2);
     return Task.CompletedTask;
@@ -887,7 +884,7 @@ static async Task WgcfProvisionerBuildsDiscordAccessProfileAsync()
         Assert(allowedAppsLine.Contains("msedge.exe", StringComparison.OrdinalIgnoreCase));
         Assert(allowedAppsLine.Contains(discordDirectory, StringComparison.OrdinalIgnoreCase));
         Assert(profile.Contains(discordDirectory, StringComparison.OrdinalIgnoreCase));
-        Assert(!profile.Contains("roblox.exe", StringComparison.OrdinalIgnoreCase));
+        Assert(!profile.Contains("gameclient.exe", StringComparison.OrdinalIgnoreCase));
         Assert(!profile.Contains("Update.exe", StringComparison.OrdinalIgnoreCase));
         Assert(commandRunner.Commands.SequenceEqual(
             ["register --accept-tos", "generate"],
@@ -2412,7 +2409,7 @@ static async Task ControllerLifecycleAsync()
         Assert(profileProvisioner.LastAllowedApplications.All(app =>
             !app.Equals("msedge.exe", StringComparison.OrdinalIgnoreCase)));
         Assert(profileProvisioner.LastAllowedApplications.All(app =>
-            !app.Contains("roblox", StringComparison.OrdinalIgnoreCase)));
+            !app.Contains("gameclient", StringComparison.OrdinalIgnoreCase)));
         Assert(processLauncher.LastExecutable == wireSockExecutable);
         Assert(processLauncher.LastArguments.SequenceEqual(
             [
@@ -2906,7 +2903,7 @@ static async Task ControllerChecksWireSockWithoutTargetProcessRestartAsync()
         await controller.ConnectAsync();
 
         Assert(controller.Snapshot.State == TunnelState.Connected);
-        Assert(readinessProbe.CaptureCount == 1);
+        Assert(readinessProbe.CaptureCount == 2);
         Assert(targetProcessManager.RestartCount == 0);
         Assert(targetProcessManager.VerifyReadyCount == 0);
     }
@@ -3162,6 +3159,80 @@ static async Task ControllerAcceptsUnavailableWireSockProbeInTransparentModeAsyn
         wireSockLogLines: "Wireguard tunnel has been started.");
 }
 
+static async Task ControllerAcceptsTrafficProofWithoutWireSockHandshakeLogAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var process = new FakeManagedProcess();
+    var accessLock = new FakeDiscordAccessLock();
+    var paths = new AppPaths(root);
+    var diagnostics = new AstralDiagnostics(
+        paths,
+        TimeSpan.Zero);
+    var discordManager = new FakeDiscordProcessManager(
+        new DiscordProcessSnapshot(
+            1,
+            [Path.Combine(root, "Discord", "app-1.0.9999", "Discord.exe")],
+            [100]));
+    var readinessProbe = new FakeTunnelReadinessProbe(
+        TunnelReadinessSnapshot.Ready(
+            "Up",
+            128,
+            256,
+            "wt0",
+            "WireGuard Tunnel"),
+        TunnelReadinessSnapshot.Ready(
+            "Up",
+            128,
+            384,
+            "wt0",
+            "WireGuard Tunnel"));
+    var controller = new DiscordTunnelController(
+        paths,
+        new DiscordAppScope(root, root, root),
+        new FakeWireSockBootstrapper(Path.Combine(
+            root,
+            "WireSock VPN Client",
+            "bin",
+            WireSockPackage.CliExecutableFileName)),
+        new FakeProfileProvisioner(Path.Combine(root, "discord.conf")),
+        new FakeProcessLauncher(process, "WireSock started"),
+        TimeSpan.Zero,
+        accessLock,
+        diagnostics,
+        discordManager,
+        readinessProbe,
+        tunnelReadinessRetryDelay: TimeSpan.Zero);
+
+    try
+    {
+        await controller.ConnectAsync();
+
+        Assert(controller.Snapshot.State == TunnelState.Connected);
+        Assert(!process.HasExited);
+
+        var details = controller.CreateDiagnosticDetails();
+        Assert(details["wireSockMode"] == "transparent");
+        Assert(details["wireSockConnectionEstablished"] == "False");
+        Assert(details["wireSockTrafficDeltaObserved"] == "True");
+        Assert(details["wireSockAdapterName"] == "wt0");
+        Assert(details["wireSockAdapterDescription"] == "WireGuard Tunnel");
+
+        var health = await File.ReadAllTextAsync(paths.HealthReport);
+        Assert(health.Contains("\"status\":\"bağlantı hazır\"", StringComparison.Ordinal));
+        Assert(health.Contains(
+            "\"wireSockTrafficDeltaObserved\":\"True\"",
+            StringComparison.Ordinal));
+        Assert(health.Contains(
+            "adapter traffic delta confirmed readiness",
+            StringComparison.OrdinalIgnoreCase));
+    }
+    finally
+    {
+        await controller.DisposeAsync();
+        Directory.Delete(root, recursive: true);
+    }
+}
+
 static async Task ControllerRejectsMissingWireSockHandshakeInTransparentModeAsync()
 {
     var root = CreateTemporaryDirectory();
@@ -3212,13 +3283,13 @@ static async Task ControllerRejectsMissingWireSockHandshakeInTransparentModeAsyn
         var health = await File.ReadAllTextAsync(paths.HealthReport);
         Assert(health.Contains("\"status\":\"hata\"", StringComparison.Ordinal));
         Assert(health.Contains(
-            "WireSock bağlantı onayı alınamadı",
+            "WireSock bağlantı kanıtı doğrulanamadı",
             StringComparison.Ordinal));
         Assert(health.Contains(
             "\"wireSockConnectionEstablished\":\"False\"",
             StringComparison.Ordinal));
         Assert(health.Contains(
-            "tunnel-started",
+            "\"wireSockTrafficDeltaObserved\":\"False\"",
             StringComparison.OrdinalIgnoreCase));
     }
     finally
@@ -6066,7 +6137,7 @@ file sealed class FakeWgcfCommandRunner(AppPaths paths) : ICommandRunner
                 [Peer]
                 PublicKey = test-public-key
                 Endpoint = engage.cloudflareclient.com:2408
-                AllowedApps = chrome.exe, roblox.exe, Update.exe
+                AllowedApps = chrome.exe, gameclient.exe, Update.exe
                 AllowedIPs = 0.0.0.0/0
                 """);
             return Task.FromResult(new CommandResult(0, "generated", string.Empty));

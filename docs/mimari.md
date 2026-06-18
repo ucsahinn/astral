@@ -52,13 +52,13 @@ Seçili web domainlerini taşıyan küçük loopback proxy exe'sidir. `--allow <
 10. Seçili uygulama exe'leri ve gerekiyorsa `Astral.WebProxy.exe` yeni `AllowedApps` satırına yazılır.
 11. Web hedefleri varsa PAC dosyası oluşturulur ve `Astral.WebProxy.exe` allowlist ile başlatılır.
 12. WireSock VPN Client `run -config <profile> -log-level info` komutuyla transparent mode'da kullanıcı süreci olarak başlar.
-13. Readiness doğrulaması transparent mode'da sanal adaptörü tek başına yeterli saymaz; WireSock süreci sağlıklı kalmalı, erken çıkış yapmamalı, tünel başlangıç onayı üretmeli ve hedef kapsamı dar kalmalıdır.
+13. Readiness doğrulaması transparent mode'da sanal adaptörü tek başına yeterli saymaz; WireSock süreci sağlıklı kalmalı, erken çıkış yapmamalı ve tünel başlangıç logu ya da süreç başlangıcından sonra artan adapter trafik kanıtı üretmelidir.
 14. Bağlantı kesilirken WireSock süreci sonlandırılır, PAC/proxy state'i geri alınır ve bağlantı koruması tekrar etkinleştirilir.
 
 ## Hedef Modeli
 
 - `TargetDefinition`: id, ad, kategori, kapsam türü, domainler, executable ipuçları ve ikon anahtarını taşır.
-- `TargetRegistry`: Discord, Roblox, Wattpad, Bigo Live, Azar, Tango, LiVU, IMVU ve Blogspot presetlerini sağlar.
+- `TargetRegistry`: Discord, Wattpad, Bigo Live, Azar, Tango, LiVU, IMVU ve Blogspot presetlerini sağlar.
 - `TargetSelectionStore`: seçimi `settings.json` içinde saklar; eski özel hedef alanlarını sessizce yok sayar.
 - `TargetScopeResolver`: seçimi `RoutingPlan` haline getirir.
 - `RoutingPlan`: `AllowedApplications`, proxy domain kuralları ve kullanıcıya gösterilecek kapsam özetini içerir.

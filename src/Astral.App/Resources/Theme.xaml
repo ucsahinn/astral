@@ -68,6 +68,7 @@
         <Setter Property="FontSize" Value="13" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="ToolTipService.ShowsToolTipOnKeyboardFocus" Value="True" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
@@ -101,7 +102,10 @@
                         <Trigger Property="IsKeyboardFocused" Value="True">
                             <Setter TargetName="ButtonBorder"
                                     Property="BorderBrush"
-                                    Value="{StaticResource AccentBrush}" />
+                                    Value="#F5F7FB" />
+                            <Setter TargetName="ButtonBorder"
+                                    Property="BorderThickness"
+                                    Value="2" />
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
                             <Setter TargetName="ButtonBorder"
@@ -129,6 +133,7 @@
         <Setter Property="FontSize" Value="13" />
         <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="ToolTipService.ShowsToolTipOnKeyboardFocus" Value="True" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
@@ -190,6 +195,7 @@
         <Setter Property="FontSize" Value="13" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="ToolTipService.ShowsToolTipOnKeyboardFocus" Value="True" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
@@ -240,6 +246,7 @@
         <Setter Property="FontSize" Value="13" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="ToolTipService.ShowsToolTipOnKeyboardFocus" Value="True" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
@@ -301,6 +308,7 @@
         <Setter Property="FontSize" Value="13" />
         <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="ToolTipService.ShowsToolTipOnKeyboardFocus" Value="True" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
@@ -496,7 +504,7 @@
                                     VerticalAlignment="Top"
                                     Margin="0"
                                     CornerRadius="7"
-                                    Background="{StaticResource AccentBrush}"
+                                    Background="{StaticResource AccentCyanBrush}"
                                     BorderBrush="#F5F7FB"
                                     BorderThickness="1"
                                     Opacity="0">

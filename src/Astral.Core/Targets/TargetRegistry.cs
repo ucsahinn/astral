@@ -7,7 +7,6 @@ public sealed class TargetRegistry
     private static readonly IReadOnlyList<string> BuiltInTargetOrder =
     [
         TargetIds.Discord,
-        TargetIds.Roblox,
         TargetIds.Wattpad,
         TargetIds.Azar,
         TargetIds.BigoLive,
@@ -44,14 +43,6 @@ public sealed class TargetRegistry
                 ["discord.com", "discordapp.com", "discordapp.net", "discord.gg", "discord.gift", "discord.media", "discordstatus.com", "discordcdn.com", "cdn.discordapp.com", "dl.discordapp.net", "updates.discord.com", "gateway.discord.gg", "media.discordapp.net"],
                 ["Discord.exe", "DiscordPTB.exe", "DiscordCanary.exe", "DiscordDevelopment.exe"],
                 "discord"),
-            Create(
-                TargetIds.Roblox,
-                "Roblox",
-                TargetCategory.Game,
-                TargetScopeKind.ApplicationAndWeb,
-                ["roblox.com", "rbxcdn.com", "roblox.com.tr"],
-                ["RobloxPlayerBeta.exe", "RobloxStudioBeta.exe"],
-                "roblox"),
             Create(
                 TargetIds.Wattpad,
                 "Wattpad",

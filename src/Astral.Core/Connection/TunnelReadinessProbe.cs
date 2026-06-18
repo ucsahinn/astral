@@ -29,7 +29,9 @@ public sealed record TunnelReadinessSnapshot(
     string? WireSockAdapterStatus,
     long? WireSockAdapterBytesReceived,
     long? WireSockAdapterBytesSent,
-    string? Diagnostic)
+    string? Diagnostic,
+    string? WireSockAdapterName = null,
+    string? WireSockAdapterDescription = null)
 {
     public const string ReadyStatus = "ready";
     public const string WireSockAdapterInactiveStatus = "wiresock-adapter-inactive";
@@ -55,6 +57,23 @@ public sealed record TunnelReadinessSnapshot(
             bytesReceived,
             bytesSent,
             Diagnostic: null);
+
+    public static TunnelReadinessSnapshot Ready(
+        string? adapterStatus,
+        long? bytesReceived,
+        long? bytesSent,
+        string? adapterName,
+        string? adapterDescription) =>
+        new(
+            ReadyStatus,
+            WireSockAdapterDetected: true,
+            WireSockAdapterUp: true,
+            adapterStatus,
+            bytesReceived,
+            bytesSent,
+            Diagnostic: null,
+            adapterName,
+            adapterDescription);
 
     public static TunnelReadinessSnapshot WireSockAdapterInactive(
         string? adapterStatus,
@@ -90,7 +109,9 @@ public sealed record TunnelReadinessSnapshot(
             captured.WireSockAdapterStatus,
             captured.WireSockAdapterBytesReceived,
             captured.WireSockAdapterBytesSent,
-            diagnostic);
+            diagnostic,
+            captured.WireSockAdapterName,
+            captured.WireSockAdapterDescription);
 
     public static TunnelReadinessSnapshot ProbeUnavailable(string? diagnostic) =>
         new(
@@ -122,6 +143,18 @@ public sealed record TunnelReadinessSnapshot(
             ["wireSockAdapterStatus"] = WireSockAdapterStatus,
             ["tunnelReadinessDiagnostic"] = Diagnostic
         };
+
+        if (!string.IsNullOrWhiteSpace(WireSockAdapterName))
+        {
+            details["wireSockAdapterName"] =
+                AstralDiagnostics.RedactForLog(WireSockAdapterName);
+        }
+
+        if (!string.IsNullOrWhiteSpace(WireSockAdapterDescription))
+        {
+            details["wireSockAdapterDescription"] =
+                AstralDiagnostics.RedactForLog(WireSockAdapterDescription);
+        }
 
         if (WireSockAdapterBytesReceived is not null)
         {
@@ -167,7 +200,9 @@ public sealed class WindowsTunnelReadinessProbe : ITunnelReadinessProbe
                 return TunnelReadinessSnapshot.Ready(
                     status,
                     bytesReceived,
-                    bytesSent);
+                    bytesSent,
+                    adapter.Name,
+                    adapter.Description);
             }
 
             var description = AstralDiagnostics.RedactForLog(adapter.Description)

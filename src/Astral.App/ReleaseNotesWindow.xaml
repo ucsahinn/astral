@@ -82,11 +82,11 @@
                                 VerticalAlignment="Center">
                         <TextBlock FontSize="22"
                                    FontWeight="SemiBold"
-                                   Text="Astral v2.2.16" />
+                                   Text="Astral v2.2.17" />
                         <TextBlock Margin="0,5,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
-                                   Text="Kanıtlı hedef durumu ve premium aksiyon barı hotfix'i" />
+                                   Text="WireSock doğrulama, 8 hedef kapsamı ve aksiyon barı hotfix'i" />
                     </StackPanel>
                 </Grid>
 
@@ -109,7 +109,7 @@
                                            FontSize="14"
                                            LineHeight="21"
                                            TextWrapping="Wrap"
-                                           Text="Bu sürüm Astral bağlı görünürken seçili hedeflerin test kanıtı olmadan kapsamda görünmesi riskini kapatır. Bağlantı hazır olduktan sonra hedefler tek tek ölçülür; her kart kendi sonucunu gösterir ve sorunlu hedefler diğerlerinden ayrılır." />
+                                           Text="Bu sürüm WireSock transparent mode doğrulamasını tek bir log satırına bağlı kalmadan adapter trafik kanıtıyla güçlendirir. Hedef kapsamı 8 aktif preset'e iner, bağlantı hazır olduktan sonra hedefler otomatik ölçülür ve manuel test düğmesi gösterilmez." />
                             </StackPanel>
                         </Border>
 
@@ -128,11 +128,19 @@
                                            FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
+                                           Text="&#x2022; WireSock hazır logu eksik olsa bile process canlı, adapter Up ve başlangıçtan sonra trafik artışı varsa transparent mode bağlantı kanıtı kabul edilir." />
+                                <TextBlock FontSize="13"
+                                           LineHeight="22"
+                                           TextWrapping="Wrap"
+                                           Text="&#x2022; Roblox hedef preset'i aktif listeden çıkarıldı; ana hedef paneli 4+4 düzeninde 8 hedef gösterir." />
+                                <TextBlock FontSize="13"
+                                           LineHeight="22"
+                                           TextWrapping="Wrap"
                                            Text="&#x2022; Hedef kartları artık global Connected durumunu tek başına başarı kanıtı saymaz; test sonucu yoksa Test bekliyor durumunda kalır." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Bağlantı hazır olduğunda seçili hedefler otomatik sıraya alınır; manuel Hızlı test düğmesi aynı per-target ölçümü tekrar çalıştırır." />
+                                           Text="&#x2022; Bağlantı hazır olduğunda seçili hedefler otomatik sıraya alınır; ayrı manuel test düğmesi gösterilmez." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
@@ -144,7 +152,7 @@
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Tanılama ve sürüm notu aksiyonları görünür etiketlerle ayrıldı: Rapor Oluştur tanı paketi üretir, Sürüm Notları bu pencereyi açar." />
+                                           Text="&#x2022; Tanılama ve sürüm notu aksiyonları görünür etiketlerle ayrıldı: Tanı Paketi tanılama paketini üretir, Sürüm Notları bu pencereyi açar." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
@@ -202,7 +210,7 @@
                     <TextBlock VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource MutedTextBrush}"
-                               Text="Bu not, v2.2.16 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
+                               Text="Bu not, v2.2.17 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
                     <Button Grid.Column="1"
                             Margin="0,0,10,0"
                             Height="40"

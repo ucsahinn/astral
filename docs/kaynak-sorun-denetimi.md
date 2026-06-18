@@ -16,7 +16,6 @@ Astral, eski geniş kapsamlı bağlantı yaklaşımlarını büyütmek yerine he
 ## Başlangıç Presetleri
 
 - Discord
-- Roblox
 - Wattpad
 - Bigo Live
 - Azar

@@ -16,21 +16,22 @@ Bu doküman, GitHub Releases yüzeyindeki sürüm kararlarını ve yayın kapıs
 
 ## Güncel Sürüm Kararı
 
-Güncel patch hedef `v2.2.16` olarak belirlendi.
+Güncel patch hedef `v2.2.17` olarak belirlendi.
 
-Neden `v2.2.16`?
+Neden `v2.2.17`?
 
-- v2.2.15 üstüne hedef kartları global `Connected` durumunu tek başına başarı kanıtı saymayacak şekilde sertleştirildi.
-- Bağlantı hazır olunca seçili hedefler otomatik test kuyruğuna alınır; manuel hızlı test aynı per-target ölçümü tekrar çalıştırır.
-- Bir hedef sorunluyken diğer hedeflerin OK kalabilmesi için kapsam özeti ve kart durumu hedef bazlı sayımla güncellendi.
-- Tanılama ve sürüm notu aksiyonları görünür etiketlerle ayrıldı; release notes butonu artık log klasörü aksiyonu gibi görünmez.
-- v2.2.15 yayınlandığı için bu UI/kanıt hotfix'i ayrı `v2.2.16` sürümü olarak çıkarılır; böylece 2.2.15 kullanıcıları da otomatik güncelleme görür.
+- v2.2.16 üstüne WireSock transparent mode doğrulaması tek bir log satırına bağlı kalmayacak şekilde adapter trafik kanıtıyla güçlendirildi.
+- Roblox aktif hedef listesinden çıkarıldı; hedef paneli 8 preset ve 4+4 grid düzeniyle devam eder.
+- Manuel hedef testi butonu kaldırıldı; hedef ölçümü yalnız bağlantı hazır olduktan sonra otomatik çalışır.
+- Tanılama paketi, tanılama geçmişi ve sürüm notu aksiyonları alt barda ayrı butonlarla netleştirildi.
+- v2.2.16 yayınlandığı için bu bağlantı kanıtı ve hedef kapsam hotfix'i ayrı `v2.2.17` sürümü olarak çıkarılır; böylece 2.2.16 kullanıcıları da otomatik güncelleme görür.
 
 ## Public Release Yüzeyi
 
 | Release | Canlı durum | Asset durumu | Karar | Gerekçe |
 | --- | --- | --- | --- | --- |
-| `v2.2.16` | Yayın adayı | Bekliyor | Yayınla | Kanıtlı hedef kartı durumu, otomatik hedef testi ve aksiyon barı netliği hotfixleri. |
+| `v2.2.17` | Yayın adayı | 4 asset yerelde hazır | Yayınla | WireSock trafik kanıtı, 8 hedef kapsamı, otomatik hedef testi ve aksiyon barı netliği hotfixleri. |
+| `v2.2.16` | Yayında | 4 asset | Koru | Kanıtlı hedef kartı durumu, otomatik hedef testi ve aksiyon barı netliği hotfixleri. |
 | `v2.2.15` | Yayında | 4 asset | Koru | WireSock tunnel-started kapısı, ortak log kilidi, hedef hızlı testi ve tanılama hotfixleri. |
 | `v2.2.14` | Yayında | 4 asset | Koru | Scoped PAC doğrulama, kullanıcı alanı PAC dosyası, hedef hızlı testi ve tanılama hotfixleri. |
 | `v2.2.13` | Tarihsel aday | Yerine geçti | Koru | Plain `AllowedApps`, normal internet DIRECT smoke ve scope hardening hotfixleri. |
@@ -51,13 +52,13 @@ Neden `v2.2.16`?
 
 ## Yayın Kapısı
 
-`v2.2.16` yayınından önce tamamlanması gereken koşullar:
+`v2.2.17` yayınından önce tamamlanması gereken koşullar:
 
-- Proje, updater ve web proxy sürümü `2.2.16` ile aynı.
+- Proje, updater ve web proxy sürümü `2.2.17` ile aynı.
 - `src/Astral.App/app.manifest` kimlik sürümü proje sürümüyle aynı.
-- `Astral-2.2.16-win-x64.zip` ve sabit `Astral-win-x64.zip` aynı içeriği gösterir.
+- `Astral-2.2.17-win-x64.zip` ve sabit `Astral-win-x64.zip` aynı içeriği gösterir.
 - ZIP içinde `Astral.exe`, `Astral.Updater.exe`, `Astral.WebProxy.exe`, update manifest'i ve gerekli runtime dosyaları bulunur.
-- ZIP içindeki update manifest sürümü `2.2.16`.
+- ZIP içindeki update manifest sürümü `2.2.17`.
 - Astral release içinde eski isimli uyumluluk ZIP'i yayınlanmaz.
 - Kod imzalama sertifikası yapılandırılmadıysa paket imzasız olduğu açıkça not edilir.
 - `dotnet build`, Core tests, Windows tests, `scripts/verify.ps1`, `scripts/build-release.ps1`, `git diff --check` ve Gitleaks geçer.
