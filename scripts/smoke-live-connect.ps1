@@ -247,15 +247,25 @@ function Copy-HealthResult {
         [string]$Health.details.wireSockProcessExitCode
     $result.HealthWireSockHandshakeDiagnostic =
         [string]$Health.details.wireSockHandshakeDiagnostic
+    $result.HealthWireSockTrafficDeltaObserved =
+        [string]$Health.details.wireSockTrafficDeltaObserved
+    $result.HealthWireSockTrafficDiagnostic =
+        [string]$Health.details.wireSockTrafficDiagnostic
     $adapterReady =
         $result.HealthTunnelReadiness -eq 'ready' -and
         $result.HealthWireSockAdapterDetected -eq 'True' -and
         $result.HealthWireSockAdapterUp -eq 'True' -and
-        $result.HealthWireSockConnectionEstablished -eq 'True'
+        (
+            $result.HealthWireSockConnectionEstablished -eq 'True' -or
+            $result.HealthWireSockTrafficDeltaObserved -eq 'True'
+        )
     $transparentReady =
         $result.HealthTunnelReadiness -eq 'transparent-process-running' -and
         $result.HealthWireSockMode -eq 'transparent' -and
-        $result.HealthWireSockConnectionEstablished -eq 'True' -and
+        (
+            $result.HealthWireSockConnectionEstablished -eq 'True' -or
+            $result.HealthWireSockTrafficDeltaObserved -eq 'True'
+        ) -and
         $result.HealthWireSockProcessExited -ne 'True'
     $result.HealthTunnelReady = $adapterReady -or $transparentReady
 }
@@ -460,6 +470,8 @@ $result = [ordered]@{
     HealthWireSockProcessExited = ''
     HealthWireSockProcessExitCode = ''
     HealthWireSockHandshakeDiagnostic = ''
+    HealthWireSockTrafficDeltaObserved = ''
+    HealthWireSockTrafficDiagnostic = ''
     HealthTunnelReady = $false
     HostsLockRemovedWhileConnected = $false
     FirewallRuleDisabledWhileConnected = $false
