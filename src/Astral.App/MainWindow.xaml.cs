@@ -41,6 +41,8 @@ public partial class MainWindow : Window, IDisposable
 {
     internal static TimeSpan ShutdownCleanupTimeout { get; set; } =
         TimeSpan.FromSeconds(20);
+    internal static TimeSpan MaintenanceCleanupTimeout { get; set; } =
+        TimeSpan.FromSeconds(90);
     internal bool HasAttemptedControllerShutdownCleanup { get; private set; }
 
     private static readonly TimeSpan LiveDnsRefreshInterval = TimeSpan.FromSeconds(15);
@@ -49,7 +51,7 @@ public partial class MainWindow : Window, IDisposable
     private static readonly Uri RepositoryUri = new(
         "https://github.com/ucsahinn/astral");
     private static readonly Uri ReleaseNotesUri = new(
-        "https://github.com/ucsahinn/astral/releases/tag/v2.2.20");
+        "https://github.com/ucsahinn/astral/releases/tag/v2.2.21");
     private static readonly Uri BackgroundVideoUri = new(
         "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260606_154941_df1a96e1-a06f-450c-bd02-d863414cc1a0.mp4");
     private static readonly string LocalBackgroundVideoPath = Path.Combine(
@@ -912,7 +914,10 @@ public partial class MainWindow : Window, IDisposable
         if (snapshot.State is TunnelState.Error
             or TunnelState.DiscordRestartRequired)
         {
-            return TargetCardState.Problem;
+            return _targetProbeResults.TryGetValue(target.Id, out var failedProbe)
+                && failedProbe.Status is TargetProbeStatus.Failed
+                    ? TargetCardState.Problem
+                    : TargetCardState.Selected;
         }
 
         if (snapshot.IsConnected
@@ -966,6 +971,8 @@ public partial class MainWindow : Window, IDisposable
         if (_targetWarningBadges.GetValueOrDefault(target.Id) is { } warningBadge)
         {
             warningBadge.Visibility = state is TargetCardState.Problem
+                && _targetProbeResults.TryGetValue(target.Id, out var probe)
+                && probe.Status is TargetProbeStatus.Failed
                 ? Visibility.Visible
                 : Visibility.Collapsed;
         }
@@ -2238,7 +2245,7 @@ public partial class MainWindow : Window, IDisposable
             _settingsStore.SetRunInBackgroundOnCloseEnabled(false);
             if (!await DisposeControllerForShutdownAsync(
                     "profile-clean",
-                    ShutdownCleanupTimeout))
+                    MaintenanceCleanupTimeout))
             {
                 throw new TimeoutException(
                     "Astral kapanış temizliği süresinde tamamlanamadı. Lütfen tanılama raporu oluşturup tekrar deneyin.");
@@ -2287,7 +2294,7 @@ public partial class MainWindow : Window, IDisposable
 
         var confirmation = MessageBox.Show(
             "Astral bağlantıyı kapatacak; profil, wgcf aracı ve kurucu önbelleğini yeniden üretilecek hale getirecek. " +
-            "Ayarlar, WireSock kurulumu ve tanılama kayıtları korunur.\n\nDevam edilsin mi?",
+            "Ayarlar ve tanılama kayıtları korunur. Son tanı WireSock motoru arızasına işaret ediyorsa ve WireSock Astral tarafından kurulduysa motor da yeniden kurulacak hale getirilir.\n\nDevam edilsin mi?",
             "Astral onar",
             MessageBoxButton.YesNo,
             MessageBoxImage.Question,
@@ -2312,21 +2319,37 @@ public partial class MainWindow : Window, IDisposable
         {
             if (!await DisconnectControllerForMaintenanceAsync(
                     "repair",
-                    ShutdownCleanupTimeout))
+                    MaintenanceCleanupTimeout))
             {
                 throw new TimeoutException(
                     "Bağlantı kapatma işlemi süresinde tamamlanamadı. Lütfen tanılama raporu oluşturup tekrar deneyin.");
             }
-            SetMaintenanceProgress(68, "Profil ve önbellek temizleniyor");
+            var reinstallWireSock = ShouldRepairWireSockEngine();
+            if (reinstallWireSock)
+            {
+                SetMaintenanceProgress(54, "WireSock motoru yenileniyor");
+                await _wireSockUninstaller.UninstallIfAstralInstalledAsync(
+                    installedByAstral: true,
+                    CancellationToken.None);
+                _settingsStore.SetWireSockInstalledByAstral(installed: false);
+            }
+
+            SetMaintenanceProgress(68, reinstallWireSock
+                ? "Profil ve kurulum önbelleği temizleniyor"
+                : "Profil ve önbellek temizleniyor");
             await Task.Run(
                 () => _cleanupService.RepairAsync(CancellationToken.None));
 
             StatusMessage.Text = "Onarım tamamlandı";
-            StatusDetail.Text = "Sonraki Bağlan işleminde profil ve wgcf dosyaları yeniden üretilecek.";
+            StatusDetail.Text = reinstallWireSock
+                ? "Sonraki Bağlan işleminde WireSock, profil ve wgcf dosyaları yeniden kurulacak."
+                : "Sonraki Bağlan işleminde profil ve wgcf dosyaları yeniden üretilecek.";
             SetMaintenanceProgress(100, "Onarım tamamlandı");
 
             MessageBox.Show(
-                "Astral onarıldı. Sonraki bağlantıda profil yeniden oluşturulacak.",
+                reinstallWireSock
+                    ? "Astral onarıldı. Sonraki bağlantıda WireSock motoru ve profil yeniden hazırlanacak."
+                    : "Astral onarıldı. Sonraki bağlantıda profil yeniden oluşturulacak.",
                 "Astral",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
@@ -2351,6 +2374,41 @@ public partial class MainWindow : Window, IDisposable
             RefreshTargetScopeView(_controller.Snapshot.IsBusy
                 || _controller.Snapshot.IsConnected);
         }
+    }
+
+    private bool ShouldRepairWireSockEngine()
+    {
+        var installedByAstral = _settingsStore.IsWireSockInstalledByAstral()
+            || File.Exists(_paths.WireSockInstallMarker)
+            || File.Exists(_paths.LegacyWireSockInstallMarker);
+        if (!installedByAstral)
+        {
+            return false;
+        }
+
+        var details = _controller.CreateDiagnosticDetails();
+        if (!details.TryGetValue("tunnelReadiness", out var readiness)
+            || !string.Equals(
+                readiness,
+                TunnelReadinessSnapshot.WireSockAdapterInactiveStatus,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var received = details.TryGetValue(
+                "wireSockAdapterBytesReceived",
+                out var bytesReceived)
+            ? bytesReceived
+            : null;
+        var sent = details.TryGetValue(
+                "wireSockAdapterBytesSent",
+                out var bytesSent)
+            ? bytesSent
+            : null;
+
+        return string.Equals(received, "0", StringComparison.Ordinal)
+            && string.Equals(sent, "0", StringComparison.Ordinal);
     }
 
     private void SetMaintenanceProgress(double value, string label)
@@ -2614,11 +2672,14 @@ public partial class MainWindow : Window, IDisposable
         await _controller.DisconnectAsync(CancellationToken.None);
     }
 
-    private void ExitFromTray()
+    private async void ExitFromTray()
     {
         _exitRequested = true;
-        RestoreFromTray();
-        Close();
+        _diagnostics.Info("ui.tray", "Astral bildirim alanından kapatılıyor.");
+        await CloseAfterShutdownCleanupAsync(
+            "tray-exit",
+            recoverOnFailure: false,
+            deferClose: false);
     }
 
     private void DisposeTrayIcon()
@@ -2743,7 +2804,7 @@ public partial class MainWindow : Window, IDisposable
             StatusDetail.Text = "Bağlantı ve koruma durumu kapatılıyor.";
             if (!await DisposeControllerForShutdownAsync(
                     "restart",
-                    ShutdownCleanupTimeout))
+                    MaintenanceCleanupTimeout))
             {
                 StatusDetail.Text =
                     "Kapanış temizliği zaman aşımına uğradı; Astral yeniden başlatma yine de başlatılıyor.";
@@ -2976,7 +3037,7 @@ public partial class MainWindow : Window, IDisposable
                 SetUpdateStageProgress(8, "Bağlantı kapatılıyor");
                 if (!await DisconnectControllerForMaintenanceAsync(
                         "update-install",
-                        ShutdownCleanupTimeout))
+                        MaintenanceCleanupTimeout))
                 {
                     throw new TimeoutException(
                         "Güncelleme öncesi bağlantı kapatma işlemi süresinde tamamlanamadı.");
@@ -3271,7 +3332,18 @@ public partial class MainWindow : Window, IDisposable
         }
 
         e.Cancel = true;
-        if (_isClosing)
+        await CloseAfterShutdownCleanupAsync(
+            "window-close",
+            recoverOnFailure: true,
+            deferClose: true);
+    }
+
+    private async Task CloseAfterShutdownCleanupAsync(
+        string operation,
+        bool recoverOnFailure,
+        bool deferClose)
+    {
+        if (_allowClose || _isClosing)
         {
             return;
         }
@@ -3286,7 +3358,7 @@ public partial class MainWindow : Window, IDisposable
         try
         {
             await DisposeControllerForShutdownAsync(
-                "window-close",
+                operation,
                 ShutdownCleanupTimeout);
         }
         catch (Exception exception)
@@ -3295,19 +3367,28 @@ public partial class MainWindow : Window, IDisposable
                 "ui.shutdown",
                 "Kapanış temizliği tamamlanamadı.",
                 exception);
-            _exitRequested = false;
-            _isClosing = false;
-            IsEnabled = true;
-            Show();
-            Activate();
-            StatusMessage.Text = "Kapanış tamamlanamadı";
-            StatusDetail.Text = "Bağlantı koruması doğrulanamadı. Tanı paketi oluşturun.";
-            return;
+            if (recoverOnFailure)
+            {
+                _exitRequested = false;
+                _isClosing = false;
+                IsEnabled = true;
+                Show();
+                Activate();
+                StatusMessage.Text = "Kapanış tamamlanamadı";
+                StatusDetail.Text = "Bağlantı koruması doğrulanamadı. Tanı paketi oluşturun.";
+                return;
+            }
         }
 
         Dispose();
         _allowClose = true;
-        _ = Dispatcher.BeginInvoke(new Action(Close));
+        if (deferClose)
+        {
+            _ = Dispatcher.BeginInvoke(new Action(Close));
+            return;
+        }
+
+        Close();
     }
 
     private async Task<bool> DisconnectControllerForMaintenanceAsync(

@@ -26,7 +26,7 @@
                       UnloadedBehavior="Close"
                       Stretch="UniformToFill"
                       Volume="0"
-                      Opacity="0.92"
+                      Opacity="0.96"
                       IsHitTestVisible="False"
                       Loaded="BackgroundVideo_Loaded"
                       MediaEnded="BackgroundVideo_MediaEnded"
@@ -35,15 +35,15 @@
         <Rectangle IsHitTestVisible="False">
             <Rectangle.Fill>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                    <GradientStop Color="#52040710" Offset="0" />
-                    <GradientStop Color="#32091322" Offset="0.34" />
-                    <GradientStop Color="#12071120" Offset="0.72" />
-                    <GradientStop Color="#1C040710" Offset="1" />
+                    <GradientStop Color="#46040710" Offset="0" />
+                    <GradientStop Color="#26091322" Offset="0.34" />
+                    <GradientStop Color="#0D071120" Offset="0.72" />
+                    <GradientStop Color="#16040710" Offset="1" />
                 </LinearGradientBrush>
             </Rectangle.Fill>
         </Rectangle>
 
-        <Rectangle IsHitTestVisible="False" Opacity="0.10">
+        <Rectangle IsHitTestVisible="False" Opacity="0.08">
             <Rectangle.Fill>
                 <RadialGradientBrush Center="0.72,0.42"
                                      GradientOrigin="0.72,0.38"
@@ -57,7 +57,7 @@
             </Rectangle.Fill>
         </Rectangle>
 
-        <Rectangle IsHitTestVisible="False" Opacity="0.20">
+        <Rectangle IsHitTestVisible="False" Opacity="0.16">
             <Rectangle.Fill>
                 <LinearGradientBrush StartPoint="0,1" EndPoint="0,0">
                     <GradientStop Color="#88040710" Offset="0" />
@@ -67,7 +67,7 @@
             </Rectangle.Fill>
         </Rectangle>
 
-        <Rectangle IsHitTestVisible="False" Opacity="0.07">
+        <Rectangle IsHitTestVisible="False" Opacity="0.05">
             <Rectangle.Fill>
                 <RadialGradientBrush Center="0.26,0.44"
                                      GradientOrigin="0.22,0.36"
@@ -80,7 +80,7 @@
             </Rectangle.Fill>
         </Rectangle>
 
-        <Rectangle IsHitTestVisible="False" Opacity="0.05">
+        <Rectangle IsHitTestVisible="False" Opacity="0.035">
             <Rectangle.Fill>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
                     <GradientStop Color="#307DEBFF" Offset="0" />
@@ -1090,7 +1090,7 @@
                                VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource SecondaryTextBrush}"
-                               Text="v2.2.20" />
+                               Text="v2.2.21" />
 
                     <Button Grid.Column="4"
                             x:Name="AutoUpdateButton"

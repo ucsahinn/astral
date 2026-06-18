@@ -654,6 +654,20 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             }
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
+        _lastTunnelReadiness = _tunnelReadinessProbe.Capture();
+        CaptureWireSockProcessState();
+        _lastWireSockConnectionEstablished =
+            HasWireSockConnectionEstablished(tunnelLogStartPosition);
+        if (TryMarkTunnelReadyForCurrentMode(MaxTunnelReadinessChecks))
+        {
+            _diagnostics.Info(
+                "controller.tunnelReadiness",
+                "Astral tünel adaptörü son denetimde hazır.",
+                CreateTunnelReadinessDetails());
+            return;
+        }
+
         _diagnostics.Warning(
             "controller.tunnelReadiness",
             "Astral bağlantı motoru hazır duruma geçmedi.",

@@ -93,6 +93,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Denetleyici transparent modda eksik probe'u tunnel-started loguyla kabul eder", ControllerAcceptsUnavailableWireSockProbeInTransparentModeAsync),
     ("Denetleyici transparent modda trafik kanıtıyla eksik handshake logunu kabul eder", ControllerAcceptsTrafficProofWithoutWireSockHandshakeLogAsync),
     ("Denetleyici transparent modda handshake ve trafik kanıtı yokken bağlı raporlamaz", ControllerRejectsMissingWireSockHandshakeInTransparentModeAsync),
+    ("Denetleyici son WireSock çıkışını tanılama detayına yazar", ControllerReportsWireSockExitAfterFinalReadinessProbeAsync),
     ("Denetleyici WireSock tunnel-started loguyla bağlı raporlar", ControllerAcceptsWireSockTunnelStartedLogAsync),
     ("Denetleyici WireSock adaptörü gecikirse yeniden dener", ControllerRetriesDelayedWireSockAdapterAsync),
     ("Denetleyici WireSock doğrulamasını hedef uygulama yenilemeden yapar", ControllerChecksWireSockWithoutTargetProcessRestartAsync),
@@ -3366,6 +3367,60 @@ static async Task ControllerRejectsMissingWireSockHandshakeInTransparentModeAsyn
     }
 }
 
+static async Task ControllerReportsWireSockExitAfterFinalReadinessProbeAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var process = new ExitAfterHasExitedChecksManagedProcess(
+        exitAfterChecks: 64,
+        exitCode: -1);
+    var accessLock = new FakeDiscordAccessLock();
+    var paths = new AppPaths(root);
+    var diagnostics = new AstralDiagnostics(
+        paths,
+        TimeSpan.Zero);
+    var readinessProbe = new FakeTunnelReadinessProbe(
+        TunnelReadinessSnapshot.WireSockAdapterInactive(
+            "Down",
+            0,
+            0,
+            "WireSock Virtual Adapter status is Down."));
+    var controller = new DiscordTunnelController(
+        paths,
+        new DiscordAppScope(root, root, root),
+        new FakeWireSockBootstrapper(Path.Combine(
+            root,
+            "WireSock VPN Client",
+            "bin",
+            WireSockPackage.CliExecutableFileName)),
+        new FakeProfileProvisioner(Path.Combine(root, "discord.conf")),
+        new FakeProcessLauncher(process, "WireSock started"),
+        TimeSpan.Zero,
+        accessLock,
+        diagnostics,
+        new NullDiscordProcessManager(),
+        readinessProbe,
+        tunnelReadinessRetryDelay: TimeSpan.Zero);
+
+    try
+    {
+        await controller.ConnectAsync();
+
+        Assert(controller.Snapshot.State == TunnelState.Error);
+        Assert(controller.Snapshot.Message.Contains(
+            "bağlantı doğrulanmadan kapandı",
+            StringComparison.OrdinalIgnoreCase));
+
+        var details = controller.CreateDiagnosticDetails();
+        Assert(details["wireSockProcessExited"] == "True");
+        Assert(details["wireSockProcessExitCode"] == "-1");
+    }
+    finally
+    {
+        await controller.DisposeAsync();
+        Directory.Delete(root, recursive: true);
+    }
+}
+
 static async Task ControllerAcceptsWireSockTunnelStartedLogAsync()
 {
     await ControllerAcceptsTransparentTunnelReadinessAsync(
@@ -6442,7 +6497,7 @@ file sealed class SequencedCommandRunner(params CommandResult[] results) : IComm
 }
 
 file sealed class FakeProcessLauncher(
-    FakeManagedProcess process,
+    IManagedProcess process,
     params string[] logLines)
     : IProcessLauncher
 {
@@ -6547,6 +6602,52 @@ file sealed class FakeManagedProcess : IManagedProcess
             HasExited = true;
         }
 
+        return ValueTask.CompletedTask;
+    }
+}
+
+file sealed class ExitAfterHasExitedChecksManagedProcess(
+    int exitAfterChecks,
+    int exitCode) : IManagedProcess
+{
+    private int _hasExitedChecks;
+    private bool _hasExited;
+
+    public event EventHandler? Exited;
+
+    public int ProcessId { get; } = 9001;
+
+    public DateTimeOffset? StartTime { get; } = DateTimeOffset.Now;
+
+    public bool HasExited
+    {
+        get
+        {
+            if (!_hasExited
+                && Interlocked.Increment(ref _hasExitedChecks) >= exitAfterChecks)
+            {
+                _hasExited = true;
+                Exited?.Invoke(this, EventArgs.Empty);
+            }
+
+            return _hasExited;
+        }
+    }
+
+    public bool ExitConfirmed => _hasExited;
+
+    public int? ExitCode => HasExited ? exitCode : null;
+
+    public Task StopAsync(TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        _hasExited = true;
+        Exited?.Invoke(this, EventArgs.Empty);
+        return Task.CompletedTask;
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        _hasExited = true;
         return ValueTask.CompletedTask;
     }
 }
