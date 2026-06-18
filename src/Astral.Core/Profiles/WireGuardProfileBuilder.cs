@@ -50,7 +50,7 @@ public static class WireGuardProfileBuilder
 
             if (!inserted && trimmed.StartsWith("Endpoint", StringComparison.OrdinalIgnoreCase))
             {
-                result.Add($"#@ws:AllowedApps = {string.Join(", ", apps)}");
+                result.Add($"AllowedApps = {string.Join(", ", apps)}");
                 inserted = true;
             }
         }

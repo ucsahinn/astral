@@ -26,7 +26,7 @@ Kontrol edin:
 
 - Preset seçili mi?
 - Uygulama farklı bir launcher veya updater exe üzerinden mi çalışıyor?
-- Tanılama paketinde `#@ws:AllowedApps` özeti seçili hedefi gösteriyor mu?
+- Tanılama paketinde `AllowedApps` özeti seçili hedefi gösteriyor mu?
 - WireSock kurulum veya readiness aşamasında hata var mı?
 
 ## WireSock Hazırlığı Doğrulanamadı

@@ -82,11 +82,11 @@
                                 VerticalAlignment="Center">
                         <TextBlock FontSize="22"
                                    FontWeight="SemiBold"
-                                   Text="Astral v2.2.12" />
+                                   Text="Astral v2.2.13" />
                         <TextBlock Margin="0,5,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
-                                   Text="WireSock transparent mode readiness, kapsam doğrulaması ve bağlantı hotfix'i" />
+                                   Text="WireSock AllowedApps kapsamı, normal internet kontrolü ve bağlantı hotfix'i" />
                     </StackPanel>
                 </Grid>
 
@@ -144,7 +144,7 @@
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; WireSock varsayılan transparent mode artık sanal adaptör zorunluluğu gibi yorumlanmıyor; süreç sağlıklı kaldığında hedef kapsamı hazır sayılıyor." />
+                                           Text="&#x2022; WireSock profili doğrudan AllowedApps satırıyla yazılıyor; seçili olmayan uygulamaların tünele düşme riski azaltıldı." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
@@ -167,7 +167,7 @@
                                            FontSize="13"
                                            LineHeight="21"
                                            TextWrapping="Wrap"
-                                           Text="Astral varsayılan WireSock transparent mode'da sanal adaptör zorunluymuş gibi davranmaz. WireSock süreci erken kapanırsa bağlantıyı hata sayar; süreç sağlıklı kalırsa seçili hedef kapsamı ve proxy/PAC planını hazır kabul eder." />
+                                           Text="Astral bağlantı sırasında hedef kapsamını dar tutar: uygulama hedefleri AllowedApps içinde kalır, web hedeflerinde ise yalnız Astral.WebProxy tünele alınır. Normal web trafiği DIRECT kalmalıdır." />
                                 <TextBlock Margin="0,8,0,0"
                                            FontSize="13"
                                            LineHeight="21"
@@ -194,7 +194,7 @@
                     <TextBlock VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource MutedTextBrush}"
-                               Text="Bu not, v2.2.12 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
+                               Text="Bu not, v2.2.13 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
                     <Button Grid.Column="1"
                             Margin="0,0,10,0"
                             Height="40"

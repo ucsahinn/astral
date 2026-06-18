@@ -4,8 +4,8 @@ Astral'ın güvenlik hedefi, seçili hedefler dışında kalan trafiği kapsam d
 
 ## Trafik Kapsamı
 
-- Uygulama hedefleri WireSock uyumlu `#@ws:AllowedApps` satırına dar kapsamla yazılır.
-- Web hedefleri için `chrome.exe`, `msedge.exe`, `firefox.exe`, `brave.exe`, `opera.exe`, `vivaldi.exe` gibi genel tarayıcı süreçleri `#@ws:AllowedApps` içine eklenmez.
+- Uygulama hedefleri WireSock `AllowedApps` satırına dar kapsamla yazılır.
+- Web hedefleri için `chrome.exe`, `msedge.exe`, `firefox.exe`, `brave.exe`, `opera.exe`, `vivaldi.exe` gibi genel tarayıcı süreçleri `AllowedApps` içine eklenmez.
 - Web hedeflerinde yalnız `Astral.WebProxy.exe` WireSock kapsamına girer.
 - PAC kuralı seçili domainlerde PROXY, diğer tüm domainlerde DIRECT döndürür.
 - Eski ayarlarda kalan özel hedef alanları yeni sürümde route planına taşınmaz.

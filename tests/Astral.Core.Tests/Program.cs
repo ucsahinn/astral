@@ -685,14 +685,14 @@ static Task ProfileBuilderIsStrictAsync()
             @"C:\Users\test\AppData\Local\Discord"
         ]);
 
-    Assert(profile.Contains("#@ws:AllowedApps = ", StringComparison.Ordinal));
+    Assert(profile.Contains("AllowedApps = ", StringComparison.Ordinal));
+    Assert(!profile.Contains("#@ws:AllowedApps", StringComparison.Ordinal));
     Assert(profile.Contains("Discord.exe", StringComparison.Ordinal));
     Assert(profile.Contains("chrome.exe", StringComparison.OrdinalIgnoreCase));
     Assert(profile.Contains("msedge.exe", StringComparison.OrdinalIgnoreCase));
     Assert(!profile.Contains("roblox.exe", StringComparison.OrdinalIgnoreCase));
     Assert(!profile.Contains("Update.exe", StringComparison.OrdinalIgnoreCase));
-    Assert(profile.Split("#@ws:AllowedApps =", StringSplitOptions.None).Length == 2);
-    Assert(!profile.Contains("\r\nAllowedApps =", StringComparison.Ordinal));
+    Assert(profile.Split("AllowedApps =", StringSplitOptions.None).Length == 2);
     return Task.CompletedTask;
 }
 
@@ -723,13 +723,13 @@ static Task ProfileBuilderQuotesApplicationsWithSpacesAsync()
 
     var allowedAppsLine = profile
         .Split(["\r\n", "\n"], StringSplitOptions.None)
-        .Single(line => line.StartsWith("#@ws:AllowedApps =", StringComparison.Ordinal));
+        .Single(line => line.StartsWith("AllowedApps =", StringComparison.Ordinal));
 
     Assert(allowedAppsLine.Contains("Discord.exe", StringComparison.Ordinal));
     Assert(allowedAppsLine.Contains($"\"{chromePath}\"", StringComparison.Ordinal));
     Assert(allowedAppsLine.Contains($"\"{bravePath}\"", StringComparison.Ordinal));
     Assert(!allowedAppsLine.Contains(
-        "#@ws:AllowedApps = C:\\Program Files\\",
+        "AllowedApps = C:\\Program Files\\",
         StringComparison.Ordinal));
     return Task.CompletedTask;
 }
@@ -775,7 +775,7 @@ static async Task WgcfProvisionerBuildsDiscordAccessProfileAsync()
         Assert(File.Exists(paths.WgcfExecutable));
         var allowedAppsLine = profile
             .Split(["\r\n", "\n"], StringSplitOptions.None)
-            .Single(line => line.StartsWith("#@ws:AllowedApps =", StringComparison.Ordinal));
+            .Single(line => line.StartsWith("AllowedApps =", StringComparison.Ordinal));
         Assert(allowedAppsLine.Contains("Discord.exe", StringComparison.Ordinal));
         Assert(allowedAppsLine.Contains("chrome.exe", StringComparison.OrdinalIgnoreCase));
         Assert(allowedAppsLine.Contains("msedge.exe", StringComparison.OrdinalIgnoreCase));
@@ -847,7 +847,8 @@ static async Task WgcfProvisionerUsesCachedProfileWhenRefreshFailsAsync()
             ["generate"],
             StringComparer.Ordinal));
         Assert(profile.Contains("Discord.exe", StringComparison.Ordinal));
-        Assert(profile.Contains("#@ws:AllowedApps", StringComparison.Ordinal));
+        Assert(profile.Contains("AllowedApps", StringComparison.Ordinal));
+        Assert(!profile.Contains("#@ws:AllowedApps", StringComparison.Ordinal));
         Assert(!profile.Contains("Update.exe", StringComparison.OrdinalIgnoreCase));
         Assert(progressMessages.Any(message => message.Contains(
             "mevcut profil",

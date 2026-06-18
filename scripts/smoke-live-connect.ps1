@@ -421,6 +421,10 @@ $result = [ordered]@{
     HostsLockRemovedWhileConnected = $false
     FirewallRuleDisabledWhileConnected = $false
     DirectDiscordTcp443WhileConnected = $false
+    DirectNonTargetTcp443WhileConnected = $false
+    ProfileHasPlainAllowedApps = $false
+    ProfileHasPrefixedAllowedApps = $false
+    ProfileUsesDirectAllowedApps = $false
     ProfileHasDiscord = $false
     ProfileHasDiscordFullPath = $false
     ProfileHasWebProxy = $false
@@ -472,6 +476,7 @@ try {
         $result.FirewallRuleDisabledWhileConnected =
             (Get-AstralRuleEnabled) -eq 'False'
         $result.DirectDiscordTcp443WhileConnected = Test-Tcp443 'discord.com'
+        $result.DirectNonTargetTcp443WhileConnected = Test-Tcp443 'www.microsoft.com'
 
         if (Test-Path -LiteralPath $profilePath) {
             $allowedAppsLine = Select-String `
@@ -479,6 +484,13 @@ try {
                 -Pattern '^(?:#@ws:)?AllowedApps\s*=' |
                 Select-Object -First 1
             $allowedAppsText = [string]$allowedAppsLine.Line
+            $result.ProfileHasPlainAllowedApps =
+                $allowedAppsText -match '^AllowedApps\s*='
+            $result.ProfileHasPrefixedAllowedApps =
+                $allowedAppsText -match '^#@ws:AllowedApps\s*='
+            $result.ProfileUsesDirectAllowedApps =
+                [bool]$result.ProfileHasPlainAllowedApps -and
+                -not [bool]$result.ProfileHasPrefixedAllowedApps
             $result.ProfileHasDiscord =
                 $allowedAppsText -match 'Discord\.exe'
             $result.ProfileHasDiscordFullPath =
@@ -565,6 +577,8 @@ $criticalChecks = @(
     'HealthTunnelReady',
     'HostsLockRemovedWhileConnected',
     'FirewallRuleDisabledWhileConnected',
+    'DirectNonTargetTcp443WhileConnected',
+    'ProfileUsesDirectAllowedApps',
     'ProfileHasDiscord',
     'ProfileHasDiscordFullPath',
     'ProfileHasWebProxy',
