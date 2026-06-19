@@ -82,11 +82,11 @@
                                 VerticalAlignment="Center">
                         <TextBlock FontSize="22"
                                    FontWeight="SemiBold"
-                                   Text="Astral VPN v2.2.25" />
+                                   Text="Astral VPN v2.2.26" />
                         <TextBlock Margin="0,5,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
-                                   Text="Arka plan video ve paket hotfix'i" />
+                                   Text="Arka plan video, hedef listesi ve paket hotfix'i" />
                     </StackPanel>
                 </Grid>
 
@@ -109,7 +109,7 @@
                                            FontSize="14"
                                            LineHeight="21"
                                            TextWrapping="Wrap"
-                                           Text="Bu sürüm v2.2.24 yayın asset'inde eski arka plan videosunun kalması ihtimalini giderir. Astral VPN artık istenen arka plan videosunu yalnız SHA-256 ile doğrulanmış yerel paket asset'i olarak kullanır; aynı sürüm numarasına takılmamak için güncelleme hattı v2.2.25'e çıkarıldı." />
+                                           Text="Bu sürüm v2.2.24 yayın asset'inde eski arka plan videosunun kalması ihtimalini gideren hattı tamamlar. Astral VPN artık istenen arka plan videosunu yalnız SHA-256 ile doğrulanmış yerel paket asset'i olarak kullanır ve aktif hedef listesini Roblox olmadan 15 hazır preset'e indirir." />
                             </StackPanel>
                         </Border>
 
@@ -140,7 +140,23 @@
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
+                                           Text="&#x2022; Roblox aktif preset listesinden ve paket resource listesinden çıkarıldı; hedef paneli 8+7 düzende 15 hazır hedef gösterir." />
+                                <TextBlock FontSize="13"
+                                           LineHeight="22"
+                                           TextWrapping="Wrap"
                                            Text="&#x2022; Hedef linkleri domain allowlist ile sınırlandı; hatalı veya yabancı host metadata'sı güvenli preset domainine düşer." />
+                                <TextBlock FontSize="13"
+                                           LineHeight="22"
+                                           TextWrapping="Wrap"
+                                           Text="&#x2022; Sol progress paneli süreç log satırı, daha okunur yüzde hesabı ve aktif adım chip'leriyle yenilendi." />
+                                <TextBlock FontSize="13"
+                                           LineHeight="22"
+                                           TextWrapping="Wrap"
+                                           Text="&#x2022; Kapanış, yeniden başlatma ve güncelleme öncesi bağlantı kapatma akışları daha hızlı tepki verecek şekilde interaktif timeout kullanır." />
+                                <TextBlock FontSize="13"
+                                           LineHeight="22"
+                                           TextWrapping="Wrap"
+                                           Text="&#x2022; Hedef doğrulama tanılaması seçili, doğrulanmış, sorunlu, atlanan ve bekleyen hedefleri ayrı ayrı yazar." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
@@ -160,11 +176,11 @@
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; v2.2.24'te yayımlanan eski video asset'i aynı sürüm numarasıyla tekrar kullanılmaz; v2.2.25 gerçek güncelleme olarak gelir." />
+                                           Text="&#x2022; v2.2.24'te yayımlanan eski video asset'i aynı sürüm numarasıyla tekrar kullanılmaz; v2.2.26 gerçek güncelleme olarak gelir." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Sürüm metadata'sı, updater, web proxy ve uygulama içi release bağlantısı v2.2.25 ile hizalandı." />
+                                           Text="&#x2022; Sürüm metadata'sı, updater, web proxy ve uygulama içi release bağlantısı v2.2.26 ile hizalandı." />
                             </StackPanel>
                         </Border>
 
@@ -210,7 +226,7 @@
                     <TextBlock VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource MutedTextBrush}"
-                                   Text="Bu not, v2.2.25 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
+                                   Text="Bu not, v2.2.26 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
                     <Button Grid.Column="1"
                             Margin="0,0,10,0"
                             Height="40"

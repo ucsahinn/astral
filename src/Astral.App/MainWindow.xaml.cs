@@ -42,7 +42,9 @@ namespace Astral.App;
 public partial class MainWindow : Window, IDisposable
 {
     internal static TimeSpan ShutdownCleanupTimeout { get; set; } =
-        TimeSpan.FromSeconds(20);
+        TimeSpan.FromSeconds(8);
+    internal static TimeSpan InteractiveCleanupTimeout { get; set; } =
+        TimeSpan.FromSeconds(18);
     internal static TimeSpan MaintenanceCleanupTimeout { get; set; } =
         TimeSpan.FromSeconds(90);
     internal bool HasAttemptedControllerShutdownCleanup { get; private set; }
@@ -54,11 +56,19 @@ public partial class MainWindow : Window, IDisposable
     private static readonly Uri RepositoryUri = new(
         "https://github.com/ucsahinn/astral");
     private static readonly Uri ReleaseNotesUri = new(
-        "https://github.com/ucsahinn/astral/releases/tag/v2.2.25");
+        "https://github.com/ucsahinn/astral/releases/tag/v2.2.26");
     private static readonly string LocalBackgroundVideoPath = Path.Combine(
         AppContext.BaseDirectory,
         "Assets",
         "background.mp4");
+    private static readonly string SourceBackgroundVideoPath = Path.GetFullPath(
+        Path.Combine(
+            AppContext.BaseDirectory,
+            "..",
+            "..",
+            "..",
+            "Assets",
+            "background.mp4"));
 
     private readonly DiscordTunnelController _controller;
     private readonly AppPaths _paths;
@@ -237,6 +247,7 @@ public partial class MainWindow : Window, IDisposable
 
     private void ApplySnapshot(TunnelSnapshot snapshot)
     {
+        var previousState = _lastObservedTunnelState;
         _lastObservedTunnelState = snapshot.State;
 
         if (!_isUpdateOperationRunning && snapshot.IsBusy)
@@ -252,7 +263,7 @@ public partial class MainWindow : Window, IDisposable
             if (!_isTargetTestRunning)
             {
                 TargetTestSummary.Text =
-                    "Kapsam durumu: seçili hedefler bağlantıya dahil edilir; Astral uygulamaları otomatik açmaz.";
+                    "Bağlanınca seçili hedefleri ölçer.";
             }
         }
 
@@ -260,11 +271,13 @@ public partial class MainWindow : Window, IDisposable
         ApplyRepairButtonState(snapshot);
         ApplyUpdateControls(snapshot.IsBusy);
         ApplyTargetTestSummaryState(snapshot);
+        ApplyTargetTestCardState(snapshot);
         StatusMessage.Text = GetStatusMessage(snapshot);
         StatusDetail.Text = GetDetail(snapshot);
         RefreshTargetScopeView(snapshot.IsBusy || snapshot.IsConnected);
         RefreshLiveStatusCards(snapshot);
         UpdateBackgroundVideoForSnapshot(snapshot);
+        QueueAutomaticTargetTestIfNeeded(snapshot, previousState);
 
         var templateLabel = ToggleButton.Template.FindName(
             "ToggleButtonLabel",
@@ -355,12 +368,24 @@ public partial class MainWindow : Window, IDisposable
         DnsSummary.Text = dns.Summary;
         DnsDetail.Text = dns.Detail;
 
-        ConnectionSummary.Text = GetConnectionSummary(snapshot.State);
-        ConnectionDetail.Text = GetConnectionDetail(snapshot);
+        if (HasSelectedTargetProbeFailure())
+        {
+            ConnectionSummary.Text = "Kontrol gerekiyor";
+            ConnectionDetail.Text = "Hedef testi başarısız; çıkış kanıtı yok";
+        }
+        else
+        {
+            ConnectionSummary.Text = GetConnectionSummary(snapshot.State);
+            ConnectionDetail.Text = GetConnectionDetail(snapshot);
+        }
 
         var routingPlan = _controller.CurrentRoutingPlan;
         var selectedTargetCount = _controller.TargetSelection.SelectedTargetIds.Count;
-        if (snapshot.IsConnected)
+        if (snapshot.IsConnected && HasSelectedTargetProbeFailure())
+        {
+            ScopeSummary.Text = "Kontrol gerekli";
+        }
+        else if (snapshot.IsConnected)
         {
             ScopeSummary.Text = $"{selectedTargetCount} hedef aktif";
         }
@@ -630,64 +655,165 @@ public partial class MainWindow : Window, IDisposable
     {
         var progress = GetProgress(snapshot);
 
-        StageProgressBar.Value = progress.Value;
-        StageProgressBar.Foreground = stateBrush;
-        StageProgressLabel.Text = progress.Label;
-        StageProgressPercent.Text = $"{progress.Value:0}%";
-
-        ApplyStageStep(StageStepLock, progress.ActiveStep >= 1, stateBrush);
-        ApplyStageStep(StageStepSetup, progress.ActiveStep >= 2, stateBrush);
-        ApplyStageStep(StageStepProfile, progress.ActiveStep >= 3, stateBrush);
-        ApplyStageStep(StageStepTunnel, progress.ActiveStep >= 4, stateBrush);
+        SetProgressVisual(
+            progress.Value,
+            progress.Label,
+            progress.Detail,
+            progress.ActiveStep,
+            stateBrush);
     }
 
-    private static (double Value, string Label, int ActiveStep) GetProgress(
+    private static (double Value, string Label, string Detail, int ActiveStep) GetProgress(
         TunnelSnapshot snapshot)
     {
         var message = snapshot.Message;
         return snapshot.State switch
         {
-            TunnelState.Connected => (100, "Bağlandı", 4),
-            TunnelState.DiscordRestartRequired => (96, "Hedef kontrol edilmeli", 4),
-            TunnelState.Verifying => (92, "Bağlantı doğrulanıyor", 4),
-            TunnelState.Connecting => (82, "Bağlantı açılıyor", 4),
-            TunnelState.Disconnecting => (62, "Bağlantı kapatılıyor", 4),
-            TunnelState.Error => (100, "Sorun var", 4),
+            TunnelState.Connected => (
+                100,
+                "Bağlantı hazır",
+                "Tünel kanıtı alındı; seçili hedef testi izleniyor.",
+                4),
+            TunnelState.DiscordRestartRequired => (
+                96,
+                "Hedef kontrol edilmeli",
+                "Kapsam kilidi hazır; hedef uygulama/web oturumu yenilenmeli.",
+                4),
+            TunnelState.Verifying => (
+                92,
+                "Bağlantı doğrulanıyor",
+                "WireSock, PAC ve seçili hedef çıkışı birlikte kontrol ediliyor.",
+                4),
+            TunnelState.Connecting => (
+                82,
+                "Bağlantı açılıyor",
+                "Motor başlıyor; yalnız seçili hedef kapsamı tünele alınıyor.",
+                4),
+            TunnelState.Disconnecting => (
+                62,
+                "Bağlantı kapatılıyor",
+                "PAC, proxy ve hedef kilidi geri alınıyor.",
+                4),
+            TunnelState.Error => (
+                100,
+                "Sorun var",
+                CreateProgressDetail(message, "Son adım tamamlanamadı; tanılama ayrıntısı hazır."),
+                4),
             TunnelState.Preparing when message.Contains(
                     "Cloudflare",
                     StringComparison.OrdinalIgnoreCase)
                 || message.Contains("WARP", StringComparison.OrdinalIgnoreCase)
                 || message.Contains("wgcf", StringComparison.OrdinalIgnoreCase)
                 || message.Contains("profil", StringComparison.OrdinalIgnoreCase)
-                => (68, "Profil hazırlanıyor", 3),
+                => (
+                    68,
+                    "Profil hazırlanıyor",
+                    "WARP profili ve seçili hedef rotası yeniden üretiliyor.",
+                    3),
             TunnelState.Preparing when message.Contains(
                     "Hedef bağlantısı",
                     StringComparison.OrdinalIgnoreCase)
-                => (22, "Hedef bağlantısı hazırlanıyor", 1),
+                => (
+                    22,
+                    "Hedef bağlantısı hazırlanıyor",
+                    "Seçili hedefler ve kaçış koruması hesaplanıyor.",
+                    1),
             TunnelState.Preparing when message.Contains(
                     "WireSock",
                     StringComparison.OrdinalIgnoreCase)
                 || message.Contains("kurul", StringComparison.OrdinalIgnoreCase)
                 || message.Contains("kurucu", StringComparison.OrdinalIgnoreCase)
                 || message.Contains("doğrulan", StringComparison.OrdinalIgnoreCase)
-                => (48, "Astral motoru doğrulanıyor", 2),
-            TunnelState.Preparing => (38, "Hazırlık çalışıyor", 2),
-            _ => (0, "Hazır", 0)
+                => (
+                    48,
+                    "Astral motoru doğrulanıyor",
+                    "İmza, servis dosyaları ve WireSock çalıştırma koşulları ölçülüyor.",
+                    2),
+            TunnelState.Preparing => (
+                38,
+                "Hazırlık çalışıyor",
+                CreateProgressDetail(message, "Bağlantı ön hazırlığı sürüyor."),
+                2),
+            _ => (
+                0,
+                "Hazır",
+                "Süreç beklemede; bağlantı başlatılınca adımlar canlı izlenir.",
+                0)
         };
     }
 
+    private void SetProgressVisual(
+        double value,
+        string label,
+        string detail,
+        int activeStep,
+        System.Windows.Media.Brush activeBrush)
+    {
+        var clampedValue = Math.Clamp(value, 0, 100);
+        StageProgressBar.Value = clampedValue;
+        StageProgressBar.Foreground = activeBrush;
+        StageProgressLabel.Text = label;
+        StageProgressDetail.Text = detail;
+        StageProgressPercent.Text = FormatProgressPercent(clampedValue);
+
+        ApplyStageStep(StageStepLockChip, StageStepLock, activeStep, 1, activeBrush);
+        ApplyStageStep(StageStepSetupChip, StageStepSetup, activeStep, 2, activeBrush);
+        ApplyStageStep(StageStepProfileChip, StageStepProfile, activeStep, 3, activeBrush);
+        ApplyStageStep(StageStepTunnelChip, StageStepTunnel, activeStep, 4, activeBrush);
+    }
+
+    private static string FormatProgressPercent(double value)
+    {
+        return value >= 99.5 && value < 100
+            ? "99%"
+            : $"{value:0}%";
+    }
+
+    private static string CreateProgressDetail(string message, string fallback)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return fallback;
+        }
+
+        return message.Length <= 96
+            ? message
+            : message[..93] + "...";
+    }
+
     private static void ApplyStageStep(
+        System.Windows.Controls.Border chip,
         System.Windows.Controls.TextBlock textBlock,
-        bool isActive,
+        int activeStep,
+        int step,
         System.Windows.Media.Brush activeBrush)
     {
         var inactiveBrush = (System.Windows.Media.Brush)
             System.Windows.Application.Current.Resources["SecondaryTextBrush"];
-        textBlock.Foreground = isActive
+        var isComplete = activeStep >= step;
+        var isCurrent = activeStep == step;
+        var activeColor = activeBrush is SolidColorBrush solidBrush
+            ? solidBrush.Color
+            : MediaColor.FromRgb(125, 235, 255);
+        var borderColor = isComplete
+            ? activeColor
+            : MediaColor.FromArgb(36, 142, 167, 255);
+        var backgroundColor = isCurrent
+            ? MediaColor.FromArgb(54, activeColor.R, activeColor.G, activeColor.B)
+            : isComplete
+                ? MediaColor.FromArgb(31, activeColor.R, activeColor.G, activeColor.B)
+                : MediaColor.FromArgb(22, 16, 29, 49);
+
+        textBlock.Foreground = isComplete
             ? activeBrush
             : inactiveBrush;
-        textBlock.FontWeight = isActive ? FontWeights.SemiBold : FontWeights.Normal;
-        textBlock.Opacity = isActive ? 1 : 0.58;
+        textBlock.FontWeight = isComplete ? FontWeights.SemiBold : FontWeights.Normal;
+        textBlock.Opacity = isComplete ? 1 : 0.62;
+        chip.BorderBrush = new SolidColorBrush(borderColor);
+        chip.Background = new SolidColorBrush(backgroundColor);
+        chip.Effect = isCurrent
+            ? CreateGlowEffect(12, 0.38, activeColor)
+            : null;
     }
 
     private static string GetStatusMessage(TunnelSnapshot snapshot)
@@ -846,7 +972,7 @@ public partial class MainWindow : Window, IDisposable
         _automaticTargetTestQueued = false;
         _lastTargetTestSummary = "Kapsam doğrulaması çalıştırılmadı.";
         TargetTestSummary.Text =
-            "Kapsam durumu: seçili hedefler bağlantıya dahil edilir; Astral uygulamaları otomatik açmaz.";
+            "Bağlanınca seçili hedefleri ölçer.";
         _diagnostics.Info(
             "ui.targetSelection",
             "Hedef seçimi güncellendi.",
@@ -856,6 +982,7 @@ public partial class MainWindow : Window, IDisposable
             });
         RefreshTargetScopeView(locked: false);
         RefreshLiveStatusCards(_controller.Snapshot);
+        ApplyTargetTestCardState(_controller.Snapshot);
     }
 
     private void TargetToggle_PreviewMouseLeftButtonUp(
@@ -1026,7 +1153,7 @@ public partial class MainWindow : Window, IDisposable
             {
                 TargetProbeStatus.Running => TargetCardState.Connecting,
                 TargetProbeStatus.Success or TargetProbeStatus.ProfileScope => TargetCardState.InScope,
-                TargetProbeStatus.Failed => TargetCardState.Selected,
+                TargetProbeStatus.Failed => TargetCardState.Problem,
                 TargetProbeStatus.Skipped => TargetCardState.Selected,
                 _ => TargetCardState.Selected
             };
@@ -1092,20 +1219,28 @@ public partial class MainWindow : Window, IDisposable
 
         if (state is TargetCardState.Connecting)
         {
-            var beginDelay = _targetOrder.TryGetValue(target.Id, out var order)
-                ? TimeSpan.FromMilliseconds(order * 110)
-                : TimeSpan.Zero;
-            iconBadge.BeginAnimation(
-                OpacityProperty,
-                new DoubleAnimation
-                {
-                    From = 0.72,
-                    To = 1,
-                    Duration = TimeSpan.FromMilliseconds(700),
-                    AutoReverse = true,
-                    RepeatBehavior = RepeatBehavior.Forever,
-                    BeginTime = beginDelay
-                });
+            if (IsReducedMotionPreferred())
+            {
+                iconBadge.BeginAnimation(OpacityProperty, null);
+                iconBadge.Opacity = 1;
+            }
+            else
+            {
+                var beginDelay = _targetOrder.TryGetValue(target.Id, out var order)
+                    ? TimeSpan.FromMilliseconds(order * 110)
+                    : TimeSpan.Zero;
+                iconBadge.BeginAnimation(
+                    OpacityProperty,
+                    new DoubleAnimation
+                    {
+                        From = 0.72,
+                        To = 1,
+                        Duration = TimeSpan.FromMilliseconds(700),
+                        AutoReverse = true,
+                        RepeatBehavior = RepeatBehavior.Forever,
+                        BeginTime = beginDelay
+                    });
+            }
         }
         else
         {
@@ -1133,7 +1268,7 @@ public partial class MainWindow : Window, IDisposable
         {
             TargetCardState.Problem => new SolidColorBrush(MediaColor.FromRgb(255, 122, 122)),
             TargetCardState.InScope => new SolidColorBrush(MediaColor.FromRgb(93, 255, 146)),
-            TargetCardState.Selected => new SolidColorBrush(MediaColor.FromRgb(93, 255, 146)),
+            TargetCardState.Selected => new SolidColorBrush(MediaColor.FromRgb(125, 235, 255)),
             TargetCardState.Connecting => new SolidColorBrush(MediaColor.FromRgb(125, 235, 255)),
             _ => new SolidColorBrush(MediaColor.FromRgb(97, 126, 151))
         };
@@ -1145,9 +1280,16 @@ public partial class MainWindow : Window, IDisposable
         TunnelSnapshot snapshot)
     {
         var stateText = GetTargetCardStateText(state);
-        var scopeText = snapshot.IsConnected && state is not TargetCardState.Passive
-            ? "Bağlantı açık; bu hedef kapsamda."
-            : "Bağlantı açıldığında bu hedef kapsama alınır.";
+        var scopeText = state switch
+        {
+            TargetCardState.Problem =>
+                "Bağlantı motoru açık olabilir, ancak bu hedef için çıkış kanıtı alınamadı.",
+            TargetCardState.InScope =>
+                "Bağlantı açık; bu hedef için çıkış kanıtı alındı.",
+            _ when snapshot.IsConnected && state is not TargetCardState.Passive =>
+                "Bağlantı açık; hedef testi bekleniyor.",
+            _ => "Bağlantı açıldığında bu hedef kapsama alınır."
+        };
         return new WpfToolTip
         {
             Content = new StackPanel
@@ -1228,7 +1370,7 @@ public partial class MainWindow : Window, IDisposable
         if (!_targetProbeResults.TryGetValue(targetId, out var result))
         {
             return snapshot.IsConnected
-                ? "Kapsam aktif"
+                ? "Test bekliyor"
                 : "Kapsam hazır";
         }
 
@@ -1236,9 +1378,9 @@ public partial class MainWindow : Window, IDisposable
         {
             TargetProbeStatus.Running => "Doğrulanıyor",
             TargetProbeStatus.Success or TargetProbeStatus.ProfileScope => "Kapsam aktif",
-            TargetProbeStatus.Failed => snapshot.IsConnected ? "Kapsam aktif" : "Kontrol",
+            TargetProbeStatus.Failed => "Sorunlu",
             TargetProbeStatus.Skipped => "Kapsam hazır",
-            _ => snapshot.IsConnected ? "Kapsam aktif" : "Kapsam hazır"
+            _ => snapshot.IsConnected ? "Test bekliyor" : "Kapsam hazır"
         };
     }
 
@@ -1249,7 +1391,7 @@ public partial class MainWindow : Window, IDisposable
             TargetProbeStatus.Running => new SolidColorBrush(MediaColor.FromRgb(255, 217, 85)),
             TargetProbeStatus.Success or TargetProbeStatus.ProfileScope
                 => new SolidColorBrush(MediaColor.FromRgb(93, 255, 146)),
-            TargetProbeStatus.Failed => new SolidColorBrush(MediaColor.FromRgb(125, 235, 255)),
+            TargetProbeStatus.Failed => new SolidColorBrush(MediaColor.FromRgb(255, 122, 122)),
             TargetProbeStatus.Skipped => new SolidColorBrush(MediaColor.FromRgb(170, 211, 226)),
             _ => new SolidColorBrush(MediaColor.FromRgb(120, 148, 166))
         };
@@ -1337,23 +1479,114 @@ public partial class MainWindow : Window, IDisposable
                 || target.HasApplicationScope);
         if (!hasSelectedTarget)
         {
-            TargetTestSummary.Text = "Kapsam durumu: seçili hedef yok.";
+            TargetTestSummary.Text = "Hedef testi: seçili hedef yok.";
             return;
         }
 
         if (!snapshot.IsConnected)
         {
             TargetTestSummary.Text =
-                "Kapsam durumu: seçili hedefler bağlantıya dahil edilir; Astral uygulamaları otomatik açmaz.";
+                "Bağlanınca seçili hedefleri ölçer.";
+            return;
+        }
+
+        if (HasSelectedTargetProbeFailure())
+        {
+            TargetTestSummary.Text =
+                "Hedef testi: kontrol gerekiyor. Kırmızı hedeflerde çıkış kanıtı alınamadı.";
+            return;
+        }
+
+        if (HasSelectedTargetProbeSuccess())
+        {
+            TargetTestSummary.Text =
+                "Hedef testi: seçili hedefler doğrulandı.";
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(_lastTargetTestSummary)
+            && !_lastTargetTestSummary.Contains(
+                "çalıştırılmadı",
+                StringComparison.OrdinalIgnoreCase)
+            && !_lastTargetTestSummary.Contains(
+                "UI'da gösterilmez",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            TargetTestSummary.Text = "Hedef testi: " + _lastTargetTestSummary;
             return;
         }
 
         TargetTestSummary.Text =
-            "Kapsam durumu: seçili hedefler bağlantıya dahil edildi; hedef uygulamaları siz açarsınız.";
+            "Bağlantı açık. Test Et ile seçili hedef çıkışını doğrulayın.";
+    }
+
+    private void ApplyTargetTestCardState(TunnelSnapshot snapshot)
+    {
+        var selectedCount = _controller.CurrentRoutingPlan
+            .SelectedTargets
+            .Count(target => target.HasWebScope || target.HasApplicationScope);
+        var hasSelected = selectedCount > 0;
+        var hasFailure = HasSelectedTargetProbeFailure();
+        var hasSuccess = HasSelectedTargetProbeSuccess();
+        TargetTestButton.IsEnabled = snapshot.IsConnected
+            && !snapshot.IsBusy
+            && !_isTargetTestRunning
+            && hasSelected;
+        TargetTestButton.Content = _isTargetTestRunning ? "Test..." : "Test Et";
+        TargetTestButton.ToolTip = !hasSelected
+            ? "Test edilecek hedef seçili değil."
+            : snapshot.IsBusy
+                ? "Devam eden bağlantı işlemi bitince test çalıştırılabilir."
+                : !snapshot.IsConnected
+                    ? "Önce Astral bağlantısını açın."
+                    : "Seçili hedeflerde bağlantı testini başlat";
+        ToolTipService.SetShowOnDisabled(TargetTestButton, true);
+        ToolTipService.SetShowsToolTipOnKeyboardFocus(TargetTestButton, true);
+
+        var borderColor = hasFailure
+            ? MediaColor.FromRgb(255, 122, 122)
+            : _isTargetTestRunning
+                ? MediaColor.FromRgb(255, 217, 85)
+                : hasSuccess
+                    ? MediaColor.FromRgb(93, 255, 146)
+                    : snapshot.IsConnected
+                        ? MediaColor.FromRgb(125, 235, 255)
+                        : MediaColor.FromRgb(66, 156, 212);
+        TargetTestCardBorder.BorderBrush = new SolidColorBrush(borderColor);
+        TargetTestCardBorder.Effect = CreateGlowEffect(
+            hasFailure || hasSuccess ? 28 : 16,
+            hasFailure || hasSuccess || _isTargetTestRunning ? 0.52 : 0.20,
+            borderColor);
+    }
+
+    private bool HasSelectedTargetProbeFailure()
+    {
+        return _controller.CurrentRoutingPlan
+            .SelectedTargets
+            .Any(target => _targetProbeResults.TryGetValue(target.Id, out var result)
+                && result.Status is TargetProbeStatus.Failed);
+    }
+
+    private bool HasSelectedTargetProbeSuccess()
+    {
+        var selectedTargets = _controller.CurrentRoutingPlan
+            .SelectedTargets
+            .Where(target => target.HasWebScope || target.HasApplicationScope)
+            .ToArray();
+        return selectedTargets.Length > 0
+            && selectedTargets.All(target =>
+                _targetProbeResults.TryGetValue(target.Id, out var result)
+                && (result.Status is TargetProbeStatus.Success
+                    or TargetProbeStatus.ProfileScope));
     }
 
     private async Task RunSelectedTargetsProbeAsync()
     {
+        if (_disposed || _isClosing || _windowLifetimeCancellation.IsCancellationRequested)
+        {
+            return;
+        }
+
         if (_isTargetTestRunning)
         {
             return;
@@ -1362,8 +1595,10 @@ public partial class MainWindow : Window, IDisposable
         var snapshot = _controller.Snapshot;
         if (!snapshot.IsConnected || snapshot.IsBusy)
         {
-            TargetTestSummary.Text = "Kapsam doğrulaması için önce Astral bağlantısını açın.";
-            ApplyTargetTestSummaryState(snapshot);
+            TargetTestSummary.Text = snapshot.IsBusy
+                ? "Bağlantı işlemi bitince hedef testi çalıştırılabilir."
+                : "Hedef testi için önce Astral bağlantısını açın.";
+            ApplyTargetTestCardState(snapshot);
             return;
         }
 
@@ -1382,6 +1617,7 @@ public partial class MainWindow : Window, IDisposable
         TargetTestSummary.Text =
             "Kapsam doğrulaması başladı; seçili hedefler sırayla ölçülüyor.";
         _lastTargetTestSummary = "Kapsam doğrulaması çalışıyor.";
+        ApplyTargetTestCardState(snapshot);
         _diagnostics.Info(
             "ui.targetTest.autoStart",
             "Seçili hedefler için kapsam doğrulaması başlatıldı.",
@@ -1390,10 +1626,20 @@ public partial class MainWindow : Window, IDisposable
                 ["selectedTargets"] = string.Join(", ", selectedTargets.Select(target => target.Label))
             });
 
+        CancellationToken lifetimeToken;
+        try
+        {
+            lifetimeToken = _windowLifetimeCancellation.Token;
+        }
+        catch (ObjectDisposedException)
+        {
+            return;
+        }
+
         using var timeoutSource = new CancellationTokenSource(TimeSpan.FromSeconds(75));
         using var linkedSource = CancellationTokenSource.CreateLinkedTokenSource(
             timeoutSource.Token,
-            _windowLifetimeCancellation.Token);
+            lifetimeToken);
 
         var results = new List<TargetProbeResult>();
         try
@@ -1415,6 +1661,7 @@ public partial class MainWindow : Window, IDisposable
                             DateTimeOffset.Now);
                         _targetProbeResults[target.Id] = scoped;
                         results.Add(scoped);
+                        LogTargetProbeResult(target, scoped);
                         continue;
                     }
 
@@ -1425,6 +1672,7 @@ public partial class MainWindow : Window, IDisposable
                         DateTimeOffset.Now);
                     _targetProbeResults[target.Id] = failed;
                     results.Add(failed);
+                    LogTargetProbeResult(target, failed);
                 }
 
                 _lastTargetTestSummary =
@@ -1452,6 +1700,7 @@ public partial class MainWindow : Window, IDisposable
                         DateTimeOffset.Now);
                     _targetProbeResults[target.Id] = scoped;
                     results.Add(scoped);
+                    LogTargetProbeResult(target, scoped);
                     RefreshTargetScopeView(_controller.Snapshot.IsBusy
                         || _controller.Snapshot.IsConnected);
                     continue;
@@ -1471,6 +1720,7 @@ public partial class MainWindow : Window, IDisposable
                     linkedSource.Token);
                 _targetProbeResults[target.Id] = result;
                 results.Add(result);
+                LogTargetProbeResult(target, result);
                 RefreshTargetScopeView(locked: true);
             }
 
@@ -1504,11 +1754,30 @@ public partial class MainWindow : Window, IDisposable
         {
             _isTargetTestRunning = false;
             ApplyTargetTestSummaryState(_controller.Snapshot);
+            ApplyTargetTestCardState(_controller.Snapshot);
             RefreshTargetScopeView(_controller.Snapshot.IsBusy
                 || _controller.Snapshot.IsConnected);
             RefreshLiveStatusCards(_controller.Snapshot);
             ApplyRepairButtonState(_controller.Snapshot);
         }
+    }
+
+    private void LogTargetProbeResult(
+        TargetDefinition target,
+        TargetProbeResult result)
+    {
+        _diagnostics.Info(
+            "ui.targetTest.target",
+            "Hedef doğrulama sonucu kaydedildi.",
+            new Dictionary<string, string?>
+            {
+                ["targetId"] = target.Id,
+                ["targetLabel"] = target.Label,
+                ["status"] = result.Status.ToString(),
+                ["host"] = result.Host,
+                ["message"] = result.Message,
+                ["testedAt"] = result.TestedAt.ToString("O", CultureInfo.InvariantCulture)
+            });
     }
 
     private async Task<TargetProbeResult> ProbeTargetHostsViaScopedProxyAsync(
@@ -1700,18 +1969,33 @@ public partial class MainWindow : Window, IDisposable
         if (target.Metadata.TryGetValue("probeHosts", out var probeHosts)
             && !string.IsNullOrWhiteSpace(probeHosts))
         {
-            return probeHosts
+            var hosts = probeHosts
                 .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Where(value => !string.IsNullOrWhiteSpace(value))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (TryGetTargetLaunchUri(target, out var launchUri)
+                && !string.IsNullOrWhiteSpace(launchUri.Host))
+            {
+                hosts.Add(launchUri.Host);
+            }
+
+            return hosts.Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
         }
 
-        return target.Domains
+        var domainHosts = target.Domains
             .Where(pattern => !pattern.IsWildcard)
             .Select(pattern => pattern.Value)
             .Where(value => !string.IsNullOrWhiteSpace(value))
+            .ToList();
+        if (TryGetTargetLaunchUri(target, out var fallbackLaunchUri)
+            && !string.IsNullOrWhiteSpace(fallbackLaunchUri.Host))
+        {
+            domainHosts.Add(fallbackLaunchUri.Host);
+        }
+
+        return domainHosts
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
             .ToArray();
@@ -1720,14 +2004,53 @@ public partial class MainWindow : Window, IDisposable
     private Dictionary<string, string?> CreateTargetTestDiagnosticDetails(
         IReadOnlyList<TargetProbeResult> results)
     {
+        var selectedTargets = _controller.CurrentRoutingPlan
+            .SelectedTargets
+            .ToArray();
+        var verifiedTargetIds = selectedTargets
+            .Where(target => _targetProbeResults.TryGetValue(target.Id, out var result)
+                && (result.Status is TargetProbeStatus.Success
+                    or TargetProbeStatus.ProfileScope))
+            .Select(target => target.Id)
+            .ToArray();
+        var failedTargetIds = selectedTargets
+            .Where(target => _targetProbeResults.TryGetValue(target.Id, out var result)
+                && result.Status is TargetProbeStatus.Failed)
+            .Select(target => target.Id)
+            .ToArray();
+        var skippedTargetIds = selectedTargets
+            .Where(target => _targetProbeResults.TryGetValue(target.Id, out var result)
+                && result.Status is TargetProbeStatus.Skipped)
+            .Select(target => target.Id)
+            .ToArray();
+        var runningTargetIds = selectedTargets
+            .Where(target => _targetProbeResults.TryGetValue(target.Id, out var result)
+                && result.Status is TargetProbeStatus.Running)
+            .Select(target => target.Id)
+            .ToArray();
+        var untestedTargetIds = selectedTargets
+            .Where(target => !_targetProbeResults.ContainsKey(target.Id))
+            .Select(target => target.Id)
+            .ToArray();
         var details = new Dictionary<string, string?>
         {
             ["summary"] = _lastTargetTestSummary,
-            ["selectedTargets"] = _controller.CurrentRoutingPlan.Summary
+            ["selectedTargets"] = _controller.CurrentRoutingPlan.Summary,
+            ["selectedTargetCount"] = selectedTargets.Length.ToString(CultureInfo.InvariantCulture),
+            ["verifiedTargetCount"] = verifiedTargetIds.Length.ToString(CultureInfo.InvariantCulture),
+            ["failedTargetCount"] = failedTargetIds.Length.ToString(CultureInfo.InvariantCulture),
+            ["skippedTargetCount"] = skippedTargetIds.Length.ToString(CultureInfo.InvariantCulture),
+            ["runningTargetCount"] = runningTargetIds.Length.ToString(CultureInfo.InvariantCulture),
+            ["untestedTargetCount"] = untestedTargetIds.Length.ToString(CultureInfo.InvariantCulture),
+            ["verifiedTargets"] = string.Join(", ", verifiedTargetIds),
+            ["failedTargets"] = string.Join(", ", failedTargetIds),
+            ["skippedTargets"] = string.Join(", ", skippedTargetIds),
+            ["runningTargets"] = string.Join(", ", runningTargetIds),
+            ["untestedTargets"] = string.Join(", ", untestedTargetIds)
         };
 
         var index = 0;
-        foreach (var target in _controller.CurrentRoutingPlan.SelectedTargets)
+        foreach (var target in selectedTargets)
         {
             if (!_targetProbeResults.TryGetValue(target.Id, out var result))
             {
@@ -1900,6 +2223,12 @@ public partial class MainWindow : Window, IDisposable
             OpenTargetWebsite(target);
             e.Handled = true;
         }
+    }
+
+    private async void TargetTest_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        await RunSelectedTargetsProbeAsync();
     }
 
     private static FrameworkElement CreateTargetMark(
@@ -2186,7 +2515,6 @@ public partial class MainWindow : Window, IDisposable
         return iconKey switch
         {
             "discord" => new("DC", TargetVisualKind.Letter, Rgb(88, 101, 242), Rgb(125, 235, 255)),
-            "roblox" => new("RB", TargetVisualKind.Letter, Rgb(20, 24, 32), Rgb(245, 247, 251)),
             "wattpad" => new("W", TargetVisualKind.Letter, Rgb(255, 103, 26), Rgb(255, 175, 72)),
             "bigo-live" => new("BG", TargetVisualKind.Letter, Rgb(27, 169, 255), Rgb(93, 255, 146)),
             "azar" => new("AZ", TargetVisualKind.Letter, Rgb(255, 89, 139), Rgb(125, 235, 255)),
@@ -2589,19 +2917,53 @@ public partial class MainWindow : Window, IDisposable
             && string.Equals(sent, "0", StringComparison.Ordinal);
     }
 
-    private void SetMaintenanceProgress(double value, string label)
+    private void SetMaintenanceProgress(
+        double value,
+        string label,
+        string? detail = null,
+        int activeStep = 0)
     {
-        StageProgressBar.Value = value;
-        StageProgressBar.Foreground = (System.Windows.Media.Brush)
+        var activeBrush = (System.Windows.Media.Brush)
             System.Windows.Application.Current.Resources["AccentCyanBrush"];
-        StageProgressLabel.Text = label;
-        StageProgressPercent.Text = $"{value:0}%";
+        SetProgressVisual(
+            value,
+            label,
+            detail ?? CreateMaintenanceProgressDetail(value, label),
+            activeStep == 0 ? GetActiveStepForProgress(value) : activeStep,
+            activeBrush);
     }
 
-    private void SetUpdateStageProgress(double value, string label)
+    private void SetUpdateStageProgress(
+        double value,
+        string label,
+        string? detail = null)
     {
         _isUpdateProgressPinned = true;
-        SetMaintenanceProgress(value, label);
+        SetMaintenanceProgress(value, label, detail);
+    }
+
+    private static int GetActiveStepForProgress(double value)
+    {
+        return value switch
+        {
+            <= 0 => 0,
+            < 35 => 1,
+            < 65 => 2,
+            < 88 => 3,
+            _ => 4
+        };
+    }
+
+    private static string CreateMaintenanceProgressDetail(double value, string label)
+    {
+        return value switch
+        {
+            >= 100 => label + ".",
+            < 35 => "Ön koşullar ve güvenli kapanış adımı izleniyor.",
+            < 65 => "Motor, servis ve profil bileşenleri ölçülüyor.",
+            < 88 => "Yerel profil ve önbellek işlemleri uygulanıyor.",
+            _ => "Son kontrol ve UI durum güncellemesi yapılıyor."
+        };
     }
 
     private void BackgroundVideo_Loaded(object sender, RoutedEventArgs e)
@@ -2739,6 +3101,11 @@ public partial class MainWindow : Window, IDisposable
         if (File.Exists(LocalBackgroundVideoPath))
         {
             return new Uri(LocalBackgroundVideoPath, UriKind.Absolute);
+        }
+
+        if (File.Exists(SourceBackgroundVideoPath))
+        {
+            return new Uri(SourceBackgroundVideoPath, UriKind.Absolute);
         }
 
         return null;
@@ -2951,6 +3318,55 @@ public partial class MainWindow : Window, IDisposable
 
     private void OpenTargetWebsite(TargetDefinition target)
     {
+        var snapshot = _controller.Snapshot;
+        if (snapshot.IsBusy)
+        {
+            TargetTestSummary.Text =
+                "Bağlantı hazırlanıyor. Hedefi açmadan önce test otomatik çalışacak.";
+            ApplyTargetTestCardState(snapshot);
+            return;
+        }
+
+        if (!snapshot.IsConnected)
+        {
+            TargetTestSummary.Text =
+                "Hedefi açmadan önce Astral bağlantısını açın.";
+            ApplyTargetTestCardState(snapshot);
+            return;
+        }
+
+        if (target.HasWebScope
+            && (!_targetProbeResults.TryGetValue(target.Id, out var result)
+                || result.Status is TargetProbeStatus.Failed
+                    or TargetProbeStatus.NotTested
+                    or TargetProbeStatus.Skipped))
+        {
+            TargetTestSummary.Text =
+                $"{target.Label} için önce hedef testi çalıştırılıyor.";
+            _ = Dispatcher.BeginInvoke(
+                new Action(async () =>
+                {
+                    try
+                    {
+                        await RunSelectedTargetsProbeAsync();
+                        if (_targetProbeResults.TryGetValue(target.Id, out var verified)
+                            && (verified.Status is TargetProbeStatus.Success
+                                or TargetProbeStatus.ProfileScope))
+                        {
+                            OpenTargetWebsite(target);
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                    }
+                }),
+                DispatcherPriority.Background);
+            return;
+        }
+
         if (!TryGetTargetLaunchUri(target, out var uri))
         {
             _diagnostics.Warning(
@@ -3065,9 +3481,14 @@ public partial class MainWindow : Window, IDisposable
             StopBackgroundVideo();
             StatusMessage.Text = "Astral yeniden başlatılıyor";
             StatusDetail.Text = "Bağlantı ve koruma durumu kapatılıyor.";
+            SetMaintenanceProgress(
+                14,
+                "Yeniden başlatma hazırlanıyor",
+                "Hedef testi iptal edildi; tünel ve koruma temizliği başlatıldı.",
+                1);
             if (!await DisposeControllerForShutdownAsync(
                     "restart",
-                    MaintenanceCleanupTimeout))
+                    InteractiveCleanupTimeout))
             {
                 StatusDetail.Text =
                     "Kapanış temizliği zaman aşımına uğradı; Astral yeniden başlatma yine de başlatılıyor.";
@@ -3297,10 +3718,13 @@ public partial class MainWindow : Window, IDisposable
             if (_controller.Snapshot.IsConnected)
             {
                 DiagnosticsStatus.Text = "Bağlantı kapatılıyor. Ardından güncelleme yüklenecek.";
-                SetUpdateStageProgress(8, "Bağlantı kapatılıyor");
+                SetUpdateStageProgress(
+                    8,
+                    "Bağlantı kapatılıyor",
+                    "Güncelleme öncesi tünel ve hedef kilidi geri alınıyor.");
                 if (!await DisconnectControllerForMaintenanceAsync(
                         "update-install",
-                        MaintenanceCleanupTimeout))
+                        InteractiveCleanupTimeout))
                 {
                     throw new TimeoutException(
                         "Güncelleme öncesi bağlantı kapatma işlemi süresinde tamamlanamadı.");
@@ -3312,7 +3736,10 @@ public partial class MainWindow : Window, IDisposable
             var executableName = GetExecutableName();
             DiagnosticsStatus.Text =
                 $"v{AppUpdateService.FormatVersion(_pendingUpdate.LatestVersion)} indiriliyor ve doğrulanıyor…";
-            SetUpdateStageProgress(18, "Güncelleme hazırlanıyor");
+            SetUpdateStageProgress(
+                18,
+                "Güncelleme hazırlanıyor",
+                "Paket bütünlüğü, sha256 ve sürüm bilgisi doğrulanıyor.");
             var progress = new Progress<AppUpdateProgress>(
                 value => SetUpdateProgress(value));
             var update = await _updateService.PrepareCheckedUpdateAsync(
@@ -3326,13 +3753,19 @@ public partial class MainWindow : Window, IDisposable
             {
                 _pendingUpdate = null;
                 DiagnosticsStatus.Text = "Astral güncel.";
-                SetUpdateStageProgress(100, "Astral güncel");
+                SetUpdateStageProgress(
+                    100,
+                    "Astral güncel",
+                    "Bu sürüm için yüklenecek yeni paket bulunmadı.");
                 return;
             }
 
             DiagnosticsStatus.Text =
                 "Güncelleme hazır. Astral kapanıp yeni sürümle açılacak.";
-            SetUpdateStageProgress(96, "Yükleme penceresi açılıyor");
+            SetUpdateStageProgress(
+                96,
+                "Yükleme penceresi açılıyor",
+                "Updater güvenli yeniden başlatma için devralıyor.");
             _diagnostics.Info(
                 "ui.update.prepared",
                 "Güncelleme paketi hazırlandı.",
@@ -3342,19 +3775,28 @@ public partial class MainWindow : Window, IDisposable
                 update,
                 executableName,
                 timeoutSource.Token);
-            SetUpdateStageProgress(100, "Astral yeniden başlatılıyor");
+            SetUpdateStageProgress(
+                100,
+                "Astral yeniden başlatılıyor",
+                "Updater başladı; ana uygulama kapanıyor.");
             _allowClose = true;
             System.Windows.Application.Current.Shutdown();
         }
         catch (OperationCanceledException)
         {
             DiagnosticsStatus.Text = "Güncelleme yüklemesi iptal edildi.";
-            SetUpdateStageProgress(100, "Yükleme iptal edildi");
+            SetUpdateStageProgress(
+                100,
+                "Yükleme iptal edildi",
+                "Mevcut sürüm kullanılmaya devam edecek.");
         }
         catch (Exception exception)
         {
             DiagnosticsStatus.Text = "Güncelleme yüklenemedi. Mevcut sürüm kullanılabilir.";
-            SetUpdateStageProgress(100, "Güncelleme başarısız");
+            SetUpdateStageProgress(
+                100,
+                "Güncelleme başarısız",
+                "Mevcut sürüm korunur; ayrıntı tanılama loguna yazıldı.");
             _diagnostics.Failure(
                 "ui.update.install",
                 "Güncelleme yükleme tamamlanamadı.",
@@ -3438,7 +3880,12 @@ public partial class MainWindow : Window, IDisposable
 
     private void SetUpdateProgress(AppUpdateProgress progress)
     {
-        SetUpdateStageProgress(progress.Percent, progress.Message);
+        SetUpdateStageProgress(
+            progress.Percent,
+            progress.Message,
+            string.IsNullOrWhiteSpace(progress.Detail)
+                ? "Güncelleme işlemi devam ediyor."
+                : progress.Detail);
         DiagnosticsStatus.Text = string.IsNullOrWhiteSpace(progress.Detail)
             ? progress.Message
             : $"{progress.Message}. {progress.Detail}";
@@ -3623,12 +4070,22 @@ public partial class MainWindow : Window, IDisposable
         StatusDetail.Text = "Bağlantı ve koruma durumu güvenle kapatılıyor.";
         _operationCancellation?.Cancel();
         StopBackgroundVideo();
+        SetMaintenanceProgress(
+            18,
+            "Kapanış hazırlanıyor",
+            "Arka hedef testi iptal edildi; tünel ve proxy temizliği başlatıldı.",
+            1);
 
         try
         {
             await DisposeControllerForShutdownAsync(
                 operation,
                 ShutdownCleanupTimeout);
+            SetMaintenanceProgress(
+                100,
+                "Kapanış tamamlandı",
+                "PAC, proxy ve hedef kilidi temizleme isteği tamamlandı.",
+                4);
         }
         catch (Exception exception)
         {
@@ -3696,13 +4153,24 @@ public partial class MainWindow : Window, IDisposable
         string operation,
         TimeSpan timeout)
     {
+        var stopwatch = Stopwatch.StartNew();
         var completedTask = await Task.WhenAny(
             operationTask,
             Task.Delay(timeout));
+        stopwatch.Stop();
 
         if (ReferenceEquals(completedTask, operationTask))
         {
             await operationTask;
+            _diagnostics.Info(
+                "ui.shutdown.complete",
+                "Kapanış/temizleme işlemi tamamlandı.",
+                new Dictionary<string, string?>
+                {
+                    ["operation"] = operation,
+                    ["elapsedMs"] = stopwatch.ElapsedMilliseconds.ToString(CultureInfo.InvariantCulture),
+                    ["state"] = _controller.Snapshot.State.ToString()
+                });
             return true;
         }
 
@@ -3713,6 +4181,7 @@ public partial class MainWindow : Window, IDisposable
             {
                 ["operation"] = operation,
                 ["timeoutMs"] = timeout.TotalMilliseconds.ToString("0", CultureInfo.InvariantCulture),
+                ["elapsedMs"] = stopwatch.ElapsedMilliseconds.ToString(CultureInfo.InvariantCulture),
                 ["state"] = _controller.Snapshot.State.ToString()
             });
         _diagnostics.WriteHealth(
@@ -3720,7 +4189,9 @@ public partial class MainWindow : Window, IDisposable
             new Dictionary<string, string?>
             {
                 ["operation"] = operation,
-                ["timeoutMs"] = timeout.TotalMilliseconds.ToString("0", CultureInfo.InvariantCulture)
+                ["timeoutMs"] = timeout.TotalMilliseconds.ToString("0", CultureInfo.InvariantCulture),
+                ["elapsedMs"] = stopwatch.ElapsedMilliseconds.ToString(CultureInfo.InvariantCulture),
+                ["state"] = _controller.Snapshot.State.ToString()
             });
 
         _ = operationTask.ContinueWith(

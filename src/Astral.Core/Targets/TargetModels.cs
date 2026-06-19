@@ -5,7 +5,6 @@ namespace Astral.Core.Targets;
 public static class TargetIds
 {
     public const string Discord = "discord";
-    public const string Roblox = "roblox";
     public const string Wattpad = "wattpad";
     public const string BigoLive = "bigo-live";
     public const string Azar = "azar";

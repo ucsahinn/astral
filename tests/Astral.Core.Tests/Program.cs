@@ -224,11 +224,10 @@ static Task TargetRegistryDefinesBuiltInPresetsAsync()
     var registry = TargetRegistry.CreateDefault();
     var targets = registry.GetBuiltInTargets().ToArray();
 
-    Assert(targets.Length == 16);
+    Assert(targets.Length == 15);
     Assert(targets.Select(target => target.Id).SequenceEqual(
         [
             TargetIds.Discord,
-            TargetIds.Roblox,
             TargetIds.Wattpad,
             TargetIds.Azar,
             TargetIds.BigoLive,
@@ -250,12 +249,6 @@ static Task TargetRegistryDefinesBuiltInPresetsAsync()
     Assert(discord.Domains.Any(domain => domain.Value == "discord.com"));
     Assert(discord.ExecutableHints.Any(hint =>
         hint.FileName.Equals("Discord.exe", StringComparison.OrdinalIgnoreCase)));
-
-    Assert(registry.TryGet(TargetIds.Roblox, out var roblox));
-    Assert(roblox.ScopeKind == TargetScopeKind.ApplicationAndWeb);
-    Assert(roblox.Domains.Any(domain => domain.Value == "roblox.com"));
-    Assert(roblox.ExecutableHints.Any(hint =>
-        hint.FileName.Equals("RobloxPlayerBeta.exe", StringComparison.OrdinalIgnoreCase)));
 
     Assert(registry.TryGet(TargetIds.Wattpad, out var wattpad));
     Assert(wattpad.ScopeKind == TargetScopeKind.Web);

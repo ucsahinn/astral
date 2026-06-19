@@ -16,7 +16,6 @@ Astral, eski geniş kapsamlı bağlantı yaklaşımlarını büyütmek yerine he
 ## Başlangıç Presetleri
 
 - Discord
-- Roblox
 - Wattpad
 - Bigo Live
 - Azar
@@ -53,7 +52,7 @@ Yeni hedef ekleme kararı erişim durumunu kalıcı gerçek gibi kodlamaz. Bir h
 | Threads | Web/App | `threads.net` tek başına yeterli olmayabilir; Türkiye'deki servis kapatma/account-region davranışı VPN ile çözülemeyebilir. | Watchlist |
 | Tidal | Web/App | RTÜK/lisans kaynaklı erişim değişken olabilir; player/CDN hostları genişlemeden önce tek tek ölçülmeli. | Watchlist |
 
-Roblox, Radio Garden, DW, VOA, Ekşi Sözlük, Grok, Imgur ve Pastebin artık aktif preset listesindedir. Bu durum erişimin kalıcı olarak engelli veya kesin çalışır olduğu anlamına gelmez; yalnız dar kapsamlı rota tanımının kaynakta bulunduğunu gösterir.
+Radio Garden, DW, VOA, Ekşi Sözlük, Grok, Imgur ve Pastebin artık aktif preset listesindedir. Roblox aktif preset listesinden çıkarıldı. Bu durum erişimin kalıcı olarak engelli veya kesin çalışır olduğu anlamına gelmez; yalnız dar kapsamlı rota tanımının kaynakta bulunduğunu gösterir.
 
 ## Test Kapsamı
 

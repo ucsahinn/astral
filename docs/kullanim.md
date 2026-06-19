@@ -18,7 +18,6 @@ Hedef seçimi ana ekranın sağ panelindedir. Kartlar ayrı bir pencere açmadan
 Hazır hedefler:
 
 - Discord
-- Roblox
 - Wattpad
 - Bigo Live
 - Azar

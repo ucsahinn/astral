@@ -26,24 +26,28 @@
                       UnloadedBehavior="Close"
                       Stretch="UniformToFill"
                       Volume="0"
-                      Opacity="0.96"
+                      Opacity="1"
                       IsHitTestVisible="False"
                       Loaded="BackgroundVideo_Loaded"
                       MediaEnded="BackgroundVideo_MediaEnded"
                       MediaFailed="BackgroundVideo_MediaFailed" />
 
+        <TextBlock x:Name="DiagnosticsStatus"
+                   Visibility="Collapsed"
+                   Text="Hazır" />
+
         <Rectangle IsHitTestVisible="False">
             <Rectangle.Fill>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                    <GradientStop Color="#46040710" Offset="0" />
-                    <GradientStop Color="#26091322" Offset="0.34" />
-                    <GradientStop Color="#0D071120" Offset="0.72" />
-                    <GradientStop Color="#16040710" Offset="1" />
+                    <GradientStop Color="#32040710" Offset="0" />
+                    <GradientStop Color="#1A091322" Offset="0.34" />
+                    <GradientStop Color="#07071120" Offset="0.72" />
+                    <GradientStop Color="#0E040710" Offset="1" />
                 </LinearGradientBrush>
             </Rectangle.Fill>
         </Rectangle>
 
-        <Rectangle IsHitTestVisible="False" Opacity="0.08">
+        <Rectangle IsHitTestVisible="False" Opacity="0.045">
             <Rectangle.Fill>
                 <RadialGradientBrush Center="0.72,0.42"
                                      GradientOrigin="0.72,0.38"
@@ -57,7 +61,7 @@
             </Rectangle.Fill>
         </Rectangle>
 
-        <Rectangle IsHitTestVisible="False" Opacity="0.16">
+        <Rectangle IsHitTestVisible="False" Opacity="0.10">
             <Rectangle.Fill>
                 <LinearGradientBrush StartPoint="0,1" EndPoint="0,0">
                     <GradientStop Color="#88040710" Offset="0" />
@@ -67,7 +71,7 @@
             </Rectangle.Fill>
         </Rectangle>
 
-        <Rectangle IsHitTestVisible="False" Opacity="0.05">
+        <Rectangle IsHitTestVisible="False" Opacity="0.025">
             <Rectangle.Fill>
                 <RadialGradientBrush Center="0.26,0.44"
                                      GradientOrigin="0.22,0.36"
@@ -80,7 +84,7 @@
             </Rectangle.Fill>
         </Rectangle>
 
-        <Rectangle IsHitTestVisible="False" Opacity="0.035">
+        <Rectangle IsHitTestVisible="False" Opacity="0.018">
             <Rectangle.Fill>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
                     <GradientStop Color="#307DEBFF" Offset="0" />
@@ -143,42 +147,6 @@
                                                  Angle="0" />
                             </TransformGroup>
                         </Border.RenderTransform>
-                        <Border.Triggers>
-                            <EventTrigger RoutedEvent="Loaded">
-                                <BeginStoryboard>
-                                    <Storyboard RepeatBehavior="Forever">
-                                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="LogoTilt"
-                                                                       Storyboard.TargetProperty="Angle">
-                                            <SplineDoubleKeyFrame KeyTime="0:0:0" Value="0" />
-                                            <SplineDoubleKeyFrame KeyTime="0:0:1.2" Value="0" />
-                                            <SplineDoubleKeyFrame KeyTime="0:0:1.45" Value="-3" />
-                                            <SplineDoubleKeyFrame KeyTime="0:0:1.7" Value="3" />
-                                            <SplineDoubleKeyFrame KeyTime="0:0:1.95" Value="-1.5" />
-                                            <SplineDoubleKeyFrame KeyTime="0:0:2.2" Value="0" />
-                                            <SplineDoubleKeyFrame KeyTime="0:0:4.6" Value="0" />
-                                        </DoubleAnimationUsingKeyFrames>
-                                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="LogoScale"
-                                                                       Storyboard.TargetProperty="ScaleX">
-                                            <SplineDoubleKeyFrame KeyTime="0:0:0" Value="1" />
-                                            <SplineDoubleKeyFrame KeyTime="0:0:1.2" Value="1" />
-                                            <SplineDoubleKeyFrame KeyTime="0:0:1.45" Value="1.035" />
-                                            <SplineDoubleKeyFrame KeyTime="0:0:1.7" Value="1.015" />
-                                            <SplineDoubleKeyFrame KeyTime="0:0:2.2" Value="1" />
-                                            <SplineDoubleKeyFrame KeyTime="0:0:4.6" Value="1" />
-                                        </DoubleAnimationUsingKeyFrames>
-                                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="LogoScale"
-                                                                       Storyboard.TargetProperty="ScaleY">
-                                            <SplineDoubleKeyFrame KeyTime="0:0:0" Value="1" />
-                                            <SplineDoubleKeyFrame KeyTime="0:0:1.2" Value="1" />
-                                            <SplineDoubleKeyFrame KeyTime="0:0:1.45" Value="1.035" />
-                                            <SplineDoubleKeyFrame KeyTime="0:0:1.7" Value="1.015" />
-                                            <SplineDoubleKeyFrame KeyTime="0:0:2.2" Value="1" />
-                                            <SplineDoubleKeyFrame KeyTime="0:0:4.6" Value="1" />
-                                        </DoubleAnimationUsingKeyFrames>
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </EventTrigger>
-                        </Border.Triggers>
                         <Border.Background>
                             <RadialGradientBrush Center="0.45,0.38"
                                                  GradientOrigin="0.32,0.24"
@@ -487,29 +455,73 @@
                                                Text="0%" />
                                 </Grid>
 
+                                <TextBlock x:Name="StageProgressDetail"
+                                           Margin="0,3,0,0"
+                                           FontSize="11"
+                                           Foreground="{StaticResource SecondaryTextBrush}"
+                                           Text="Süreç beklemede."
+                                           TextTrimming="CharacterEllipsis" />
+
                                 <ProgressBar x:Name="StageProgressBar"
-                                             Margin="0,10,0,0"
+                                             Margin="0,9,0,0"
                                              Style="{StaticResource StageProgressStyle}"
                                              Value="0" />
 
                                 <UniformGrid Margin="0,10,0,0"
+                                             HorizontalAlignment="Stretch"
                                              Columns="4">
-                                    <TextBlock x:Name="StageStepLock"
-                                               FontSize="11"
-                                               Foreground="{StaticResource SecondaryTextBrush}"
-                                               Text="Hazırlık" />
-                                    <TextBlock x:Name="StageStepSetup"
-                                               FontSize="11"
-                                               Foreground="{StaticResource SecondaryTextBrush}"
-                                               Text="Kurulum" />
-                                    <TextBlock x:Name="StageStepProfile"
-                                               FontSize="11"
-                                               Foreground="{StaticResource SecondaryTextBrush}"
-                                               Text="Profil" />
-                                    <TextBlock x:Name="StageStepTunnel"
-                                               FontSize="11"
-                                               Foreground="{StaticResource SecondaryTextBrush}"
-                                               Text="Bağlantı" />
+                                    <Border x:Name="StageStepLockChip"
+                                            Margin="0,0,5,0"
+                                            Padding="6,4"
+                                            BorderBrush="#248EA7FF"
+                                            BorderThickness="1"
+                                            CornerRadius="6"
+                                            Background="#22101D31">
+                                        <TextBlock x:Name="StageStepLock"
+                                                   HorizontalAlignment="Center"
+                                                   FontSize="10"
+                                                   Foreground="{StaticResource SecondaryTextBrush}"
+                                                   Text="Hazırlık" />
+                                    </Border>
+                                    <Border x:Name="StageStepSetupChip"
+                                            Margin="3,0,4,0"
+                                            Padding="6,4"
+                                            BorderBrush="#248EA7FF"
+                                            BorderThickness="1"
+                                            CornerRadius="6"
+                                            Background="#22101D31">
+                                        <TextBlock x:Name="StageStepSetup"
+                                                   HorizontalAlignment="Center"
+                                                   FontSize="10"
+                                                   Foreground="{StaticResource SecondaryTextBrush}"
+                                                   Text="Kurulum" />
+                                    </Border>
+                                    <Border x:Name="StageStepProfileChip"
+                                            Margin="4,0,3,0"
+                                            Padding="6,4"
+                                            BorderBrush="#248EA7FF"
+                                            BorderThickness="1"
+                                            CornerRadius="6"
+                                            Background="#22101D31">
+                                        <TextBlock x:Name="StageStepProfile"
+                                                   HorizontalAlignment="Center"
+                                                   FontSize="10"
+                                                   Foreground="{StaticResource SecondaryTextBrush}"
+                                                   Text="Profil" />
+                                    </Border>
+                                    <Border x:Name="StageStepTunnelChip"
+                                            Margin="5,0,0,0"
+                                            Padding="6,4"
+                                            BorderBrush="#248EA7FF"
+                                            BorderThickness="1"
+                                            CornerRadius="6"
+                                            Background="#22101D31">
+                                        <TextBlock x:Name="StageStepTunnel"
+                                                   HorizontalAlignment="Center"
+                                                   FontSize="10"
+                                                   Foreground="{StaticResource SecondaryTextBrush}"
+                                                   Text="Bağlantı" />
+                                    </Border>
                                 </UniformGrid>
                             </StackPanel>
                         </Border>
@@ -569,22 +581,6 @@
                                          Columns="4"
                                          HorizontalAlignment="Center"
                                          SnapsToDevicePixels="True" />
-                            <Border Margin="0,8,0,0"
-                                    Width="586"
-                                    Padding="9,6"
-                                    BorderBrush="#3F9CD4FF"
-                                    BorderThickness="1"
-                                    CornerRadius="8"
-                                    Background="#40101D31"
-                                    Visibility="Collapsed">
-                                <TextBlock x:Name="TargetTestSummary"
-                                           VerticalAlignment="Center"
-                                           FontSize="11"
-                                           Foreground="{StaticResource SecondaryTextBrush}"
-                                           TextWrapping="NoWrap"
-                                           TextTrimming="CharacterEllipsis"
-                                           Text="Kapsam durumu: seçili hedefler bağlantıya dahil edilir; Astral uygulamaları otomatik açmaz." />
-                            </Border>
                         </StackPanel>
                     </Border>
 
@@ -624,7 +620,8 @@
                                          Margin="-4,7,-4,0"
                                          Rows="1"
                                          Columns="4">
-                                <Border Margin="4,0"
+                                <Border x:Name="TargetTestCardBorder"
+                                        Margin="4,0"
                                         Padding="9,7"
                                         CornerRadius="8"
                                         BorderBrush="#429CD4FF"
@@ -748,26 +745,31 @@
                                                           StrokeEndLineCap="Round"
                                                           StrokeLineJoin="Round"
                                                           Fill="Transparent"
-                                                          Data="M6,3.5 L15.5,3.5 L20,8 L20,20.5 L6,20.5 Z M15.5,3.5 L15.5,8 L20,8 M9,11 L16.5,11 M9,14.5 L16.5,14.5 M9,18 L13.5,18" />
+                                                          Data="M4,12 A8,8 0 1 1 12,20 A8,8 0 0 1 4,12 Z M8.5,12.2 L11,14.7 L15.8,9.8" />
                                                 </Canvas>
                                             </Viewbox>
                                             <TextBlock FontSize="12.2"
                                                        FontWeight="SemiBold"
-                                                       Text="Tanılama" />
+                                                       Text="Hedef testi" />
                                         </StackPanel>
                                         <TextBlock Grid.Row="1"
-                                                   x:Name="DiagnosticsStatus"
+                                                   x:Name="TargetTestSummary"
                                                    Margin="0,4,0,4"
                                                    TextWrapping="Wrap"
                                                    FontSize="10.5"
                                                    LineHeight="13"
                                                    Foreground="{StaticResource SecondaryTextBrush}"
-                                                   Text="Rapor alt bardan." />
-                                        <TextBlock Grid.Row="2"
-                                                   FontSize="10.5"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{StaticResource MutedTextBrush}"
-                                                   Text="Hazır" />
+                                                   Text="Bağlanınca seçili hedefleri ölçer." />
+                                        <Button Grid.Row="2"
+                                                x:Name="TargetTestButton"
+                                                Height="28"
+                                                Padding="10,0"
+                                                HorizontalAlignment="Left"
+                                                Style="{StaticResource CommandButtonStyle}"
+                                                Click="TargetTest_Click"
+                                                Content="Test Et"
+                                                ToolTip="Seçili hedeflerde bağlantı testini başlat"
+                                                AutomationProperties.Name="Seçili hedeflerde bağlantı testini başlat" />
                                     </Grid>
                                 </Border>
 
@@ -1090,7 +1092,7 @@
                                VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource SecondaryTextBrush}"
-                               Text="v2.2.25" />
+                               Text="v2.2.26" />
 
                     <Button Grid.Column="4"
                             x:Name="AutoUpdateButton"

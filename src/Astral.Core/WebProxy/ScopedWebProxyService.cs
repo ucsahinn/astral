@@ -632,6 +632,17 @@ public sealed class WindowsScopedWebProxyService : IScopedWebProxyService, IAsyn
             }
         }
 
+        if (target.Metadata.TryGetValue("launchUrl", out var launchUrl)
+            && Uri.TryCreate(launchUrl, UriKind.Absolute, out var launchUri)
+            && launchUri.Scheme == Uri.UriSchemeHttps)
+        {
+            var host = TryNormalizeProbeHost(launchUri.Host);
+            if (host is not null)
+            {
+                yield return host;
+            }
+        }
+
         foreach (var domain in target.Domains)
         {
             if (domain.IsWildcard)
@@ -1144,7 +1155,8 @@ public sealed class WindowsScopedWebProxyService : IScopedWebProxyService, IAsyn
             "    PreviousAutoConfigURL = $previousAutoConfigUrl",
             "}",
             "$state | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath $statePath -Encoding UTF8",
-            "Set-ItemProperty -Path $keyPath -Name AutoConfigURL -Value $pacUrl | Out-Null"
+            "Set-ItemProperty -Path $keyPath -Name AutoConfigURL -Value $pacUrl | Out-Null",
+            GetInternetSettingsRefreshScript()
         ]);
     }
 
@@ -1165,7 +1177,20 @@ public sealed class WindowsScopedWebProxyService : IScopedWebProxyService, IAsyn
             "        Set-ItemProperty -Path $keyPath -Name AutoConfigURL -Value ([string]$state.PreviousAutoConfigURL) | Out-Null",
             "    }",
             "}",
-            "Remove-Item -LiteralPath $statePath -Force -ErrorAction SilentlyContinue"
+            "Remove-Item -LiteralPath $statePath -Force -ErrorAction SilentlyContinue",
+            GetInternetSettingsRefreshScript()
+        ]);
+    }
+
+    private static string GetInternetSettingsRefreshScript()
+    {
+        return string.Join(Environment.NewLine, [
+            "$signature = '[DllImport(\"wininet.dll\", SetLastError=true)] public static extern bool InternetSetOption(IntPtr hInternet, int dwOption, IntPtr lpBuffer, int dwBufferLength); [DllImport(\"user32.dll\", SetLastError=true, CharSet=CharSet.Auto)] public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam, uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);'",
+            "$native = Add-Type -MemberDefinition $signature -Name AstralInternetSettings -Namespace Astral.Native -PassThru",
+            "[void]$native::InternetSetOption([IntPtr]::Zero, 39, [IntPtr]::Zero, 0)",
+            "[void]$native::InternetSetOption([IntPtr]::Zero, 37, [IntPtr]::Zero, 0)",
+            "$unused = [UIntPtr]::Zero",
+            "[void]$native::SendMessageTimeout([IntPtr]0xffff, 0x001A, [UIntPtr]::Zero, 'Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings', 2, 1000, [ref]$unused)"
         ]);
     }
 

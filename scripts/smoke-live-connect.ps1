@@ -41,11 +41,6 @@ $targetAppPatterns = @{
     'discord' = @(
         'Discord(?:PTB|Canary|Development)?\.exe'
     )
-    'roblox' = @(
-        'RobloxPlayerBeta\.exe',
-        'RobloxPlayerLauncher\.exe',
-        'RobloxStudioBeta\.exe'
-    )
     'azar' = @(
         'Azar\.exe'
     )
@@ -63,7 +58,6 @@ $targetAppPatterns = @{
 }
 $targetLockProbeDomains = @{
     'discord' = @('discord.com', 'discord.gg')
-    'roblox' = @('roblox.com', 'www.roblox.com')
     'wattpad' = @('wattpad.com', 'www.wattpad.com')
     'azar' = @('azarlive.com', 'www.azarlive.com')
     'bigo-live' = @('bigo.tv', 'www.bigo.tv')
@@ -81,7 +75,6 @@ $targetLockProbeDomains = @{
 }
 $webTargetIds = @(
     'discord',
-    'roblox',
     'wattpad',
     'azar',
     'bigo-live',

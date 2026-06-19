@@ -150,7 +150,7 @@ static void RenderMainWindow()
         SaveWindowPng(window, Path.Combine(
             FindRepositoryRoot(),
             "artifacts",
-            "ui-main-window-v2.2.25.png"));
+            "ui-main-window-v2.2.26.png"));
 
         Assert(window.ResizeMode == ResizeMode.NoResize);
         Assert(window.Width == 1280);
@@ -183,19 +183,17 @@ static void RenderMainWindow()
         Assert(text.Contains("İŞLETİM MERKEZİ", StringComparison.Ordinal));
         Assert(text.Contains("Arka plan", StringComparison.Ordinal));
         Assert(text.Contains("Başlangıç", StringComparison.Ordinal));
-        Assert(text.Contains("Tanılama", StringComparison.Ordinal));
+        Assert(text.Contains("Hedef testi", StringComparison.Ordinal));
         Assert(text.Contains("Debug", StringComparison.Ordinal));
         Assert(text.Contains("Ayrıntılı tanı kapalı.", StringComparison.Ordinal));
         Assert(!text.Contains("Rapor hazırla", StringComparison.Ordinal));
-        Assert(!text.Contains("Bağlanınca test", StringComparison.Ordinal));
+        Assert(text.Contains("Bağlanınca seçili hedefleri ölçer.", StringComparison.Ordinal));
         Assert(!text.Contains("Hızlı Test", StringComparison.Ordinal));
         Assert(!text.Contains("Hedef testi:", StringComparison.Ordinal));
         Assert(!text.Contains("Kapsam durumu:", StringComparison.Ordinal));
         Assert(text.Contains("Hazır", StringComparison.Ordinal));
         Assert(text.Contains("Astral Bağlı Değil", StringComparison.Ordinal));
-        Assert(text.Contains(
-            "Rapor alt bardan.",
-            StringComparison.Ordinal));
+        Assert(!text.Contains("Rapor alt bardan.", StringComparison.Ordinal));
         var buttonNames = FindVisualChildren<Button>(window)
             .Where(button => button.Visibility == Visibility.Visible)
             .Select(AutomationProperties.GetName)
@@ -204,7 +202,7 @@ static void RenderMainWindow()
         Assert(buttonNames.Contains("Astral onar"));
         Assert(buttonNames.Contains("Profil temizle"));
         Assert(buttonNames.Contains("Tanı paketi oluştur"));
-        Assert(!buttonNames.Contains("Seçili hedefleri hızlı test et"));
+        Assert(buttonNames.Contains("Seçili hedeflerde bağlantı testini başlat"));
         Assert(!buttonNames.Contains("Tanılama geçmişini aç"));
         Assert(!buttonNames.Contains("Tanılama raporu hazırla"));
         Assert(buttonNames.Contains("Sürüm notlarını aç"));
@@ -218,8 +216,12 @@ static void RenderMainWindow()
         var updateButton = FindVisualChildren<Button>(window)
             .Single(button => button.Name == "AutoUpdateButton");
         Assert(updateButton.Visibility == Visibility.Collapsed);
-        Assert(!FindVisualChildren<Button>(window)
-            .Any(button => button.Name == "TargetQuickTestButton"));
+        var targetTestButton = FindVisualChildren<Button>(window)
+            .Single(button => button.Name == "TargetTestButton");
+        Assert(!targetTestButton.IsEnabled);
+        Assert(targetTestButton.ToolTip?.ToString() == "Önce Astral bağlantısını açın.");
+        Assert(ToolTipService.GetShowOnDisabled(targetTestButton) == true);
+        Assert(ToolTipService.GetShowsToolTipOnKeyboardFocus(targetTestButton) == true);
         var releaseNotesButton = FindVisualChildren<Button>(window)
             .Single(button => button.Name == "ReleaseNotesButton");
         var releaseNotesButtonText = FindVisualChildren<TextBlock>(releaseNotesButton)
@@ -268,19 +270,18 @@ static void RenderMainWindow()
                 "TargetToggle_",
                 StringComparison.Ordinal))
             .ToArray();
-        Assert(targetToggles.Length == 16);
+        Assert(targetToggles.Length == 15);
         var targetRows = FindVisualChildren<UniformGrid>(window)
             .Where(grid => grid.Name is "TargetCardsTopPanel" or "TargetCardsBottomPanel")
             .ToDictionary(grid => grid.Name, grid => grid);
         Assert(targetRows["TargetCardsTopPanel"].Children.Count == 8);
-        Assert(targetRows["TargetCardsBottomPanel"].Children.Count == 8);
+        Assert(targetRows["TargetCardsBottomPanel"].Children.Count == 7);
         var targetNames = targetToggles
             .Select(AutomationProperties.GetName)
             .ToArray();
         var expectedTargets = new[]
                  {
                      "Discord hedefi",
-                     "Roblox hedefi",
                      "Wattpad hedefi",
                      "Bigo Live hedefi",
                      "Azar hedefi",
@@ -303,7 +304,6 @@ static void RenderMainWindow()
         foreach (var iconKey in new[]
                  {
                      "discord",
-                     "roblox",
                      "wattpad",
                      "bigo-live",
                      "azar",
@@ -339,6 +339,7 @@ static void RenderMainWindow()
         var blogspotHosts = MainWindow.GetTargetTestHostsForTesting(blogspotTarget);
         Assert(blogspotHosts.Contains("blogspot.com", StringComparer.OrdinalIgnoreCase));
         Assert(blogspotHosts.Contains("blogger.com", StringComparer.OrdinalIgnoreCase));
+        Assert(blogspotHosts.Contains("www.blogger.com", StringComparer.OrdinalIgnoreCase));
         Assert(!blogspotHosts.Contains("*.blogspot.com", StringComparer.OrdinalIgnoreCase));
         Assert(registry.TryGet("discord", out var discordTarget));
         Assert(MainWindow.TryGetTargetLaunchUriForTesting(
@@ -389,7 +390,6 @@ static void RenderMainWindow()
         foreach (var expectedTarget in new[]
                  {
                      "Discord",
-                     "Roblox",
                      "Wattpad",
                      "Bigo Live",
                      "Azar",
@@ -425,9 +425,8 @@ static void RenderMainWindow()
         Assert(targetToggles.Any(toggle =>
             toggle.Name == "TargetToggle_discord"
             && toggle.IsChecked == true));
-        Assert(targetToggles.Any(toggle =>
-            toggle.Name == "TargetToggle_roblox"
-            && toggle.IsChecked != true));
+        Assert(!targetToggles.Any(toggle =>
+            toggle.Name == "TargetToggle_roblox"));
         Assert(targetToggles.Any(toggle => toggle.Name == "TargetToggle_wattpad"));
         Assert(targetToggles.All(toggle =>
             !toggle.Name.Contains("custom", StringComparison.OrdinalIgnoreCase)));
@@ -436,11 +435,10 @@ static void RenderMainWindow()
                 "TargetOpen_",
                 StringComparison.Ordinal))
             .ToArray();
-        Assert(targetOpenButtons.Length == 16);
+        Assert(targetOpenButtons.Length == 15);
         foreach (var expectedTarget in new[]
                  {
                      "Discord",
-                     "Roblox",
                      "Wattpad",
                      "Bigo Live",
                      "Azar",
@@ -483,6 +481,11 @@ static void RenderMainWindow()
         var stageProgressPercent = FindVisualChildren<TextBlock>(window)
             .Single(block => block.Name == "StageProgressPercent");
         Assert(stageProgressPercent.Text == "0%");
+        var stageProgressDetail = FindVisualChildren<TextBlock>(window)
+            .Single(block => block.Name == "StageProgressDetail");
+        Assert(stageProgressDetail.Text.Contains(
+            "adımlar canlı izlenir",
+            StringComparison.Ordinal));
         var stageProgressBar = FindVisualChildren<ProgressBar>(window)
             .Single();
         Assert(stageProgressBar.Value == 0);
@@ -568,8 +571,9 @@ static void VerifyConnectedTargetCardsRequireProbeEvidence()
         Assert(!cardTexts.Contains("Kapsamda", StringComparer.Ordinal));
         Assert(!cardTexts.Contains("Kapsam aktif", StringComparer.Ordinal));
         Assert(cardTexts.Contains("Discord", StringComparer.Ordinal));
-        Assert(!FindVisualChildren<Button>(window)
-            .Any(button => button.Name == "TargetQuickTestButton"));
+        var targetTestButton = FindVisualChildren<Button>(window)
+            .Single(button => button.Name == "TargetTestButton");
+        Assert(targetTestButton.IsEnabled);
 
         var openedUris = new List<Uri>();
         MainWindow.OpenUriOverrideForTesting = openedUris.Add;
@@ -588,8 +592,7 @@ static void VerifyConnectedTargetCardsRequireProbeEvidence()
                 RoutedEvent = System.Windows.Input.Keyboard.PreviewKeyDownEvent
             });
 
-            Assert(openedUris.Count == 1);
-            Assert(openedUris[0].AbsoluteUri == "https://discord.com/app");
+            Assert(openedUris.Count == 0);
             Assert(discordCard.IsChecked == wasChecked);
         }
         finally
@@ -597,7 +600,7 @@ static void VerifyConnectedTargetCardsRequireProbeEvidence()
             MainWindow.OpenUriOverrideForTesting = null;
         }
 
-        Console.WriteLine("GEÇTİ Bağlı hedef kartı manuel test aksiyonu olmadan kapsam aktif gösterdi");
+        Console.WriteLine("GEÇTİ Bağlı hedef kartı kanıt olmadan kapsam aktif göstermedi");
     }
     finally
     {

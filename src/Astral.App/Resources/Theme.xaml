@@ -356,7 +356,7 @@
     </Style>
 
     <Style x:Key="StageProgressStyle" TargetType="ProgressBar">
-        <Setter Property="Height" Value="11" />
+        <Setter Property="Height" Value="13" />
         <Setter Property="Minimum" Value="0" />
         <Setter Property="Maximum" Value="100" />
         <Setter Property="Background" Value="#56101D31" />
@@ -367,14 +367,14 @@
                 <ControlTemplate TargetType="ProgressBar">
                     <Grid x:Name="TemplateRoot"
                           SnapsToDevicePixels="True">
-                        <Border CornerRadius="5.5"
-                                BorderBrush="#459CD4FF"
+                        <Border CornerRadius="6.5"
+                                BorderBrush="#5D9CD4FF"
                                 BorderThickness="1">
                             <Border.Background>
                                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                                    <GradientStop Color="#80101D31" Offset="0" />
-                                    <GradientStop Color="#66203542" Offset="0.5" />
-                                    <GradientStop Color="#50101D31" Offset="1" />
+                                    <GradientStop Color="#90101D31" Offset="0" />
+                                    <GradientStop Color="#72203542" Offset="0.52" />
+                                    <GradientStop Color="#62101D31" Offset="1" />
                                 </LinearGradientBrush>
                             </Border.Background>
                         </Border>
@@ -383,9 +383,16 @@
                             <Grid x:Name="PART_Indicator"
                                   HorizontalAlignment="Left"
                                   ClipToBounds="True">
-                                <Border Background="{TemplateBinding Foreground}"
-                                        CornerRadius="5.5" />
-                                <Border CornerRadius="5.5"
+                                <Border CornerRadius="6.5">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                            <GradientStop Color="#FF7DEBFF" Offset="0" />
+                                            <GradientStop Color="#FFF6FF85" Offset="0.48" />
+                                            <GradientStop Color="#FF5DFF92" Offset="1" />
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                </Border>
+                                <Border CornerRadius="6.5"
                                         Opacity="0.5">
                                     <Border.Background>
                                         <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
@@ -395,11 +402,11 @@
                                         </LinearGradientBrush>
                                     </Border.Background>
                                 </Border>
-                                <Border Width="22"
+                                <Border Width="28"
                                         HorizontalAlignment="Right"
-                                        CornerRadius="5.5"
+                                        CornerRadius="6.5"
                                         Background="#C8F5F7FB"
-                                        Opacity="0.42" />
+                                        Opacity="0.32" />
                                 <Grid.Effect>
                                     <DropShadowEffect BlurRadius="14"
                                                       Direction="270"
@@ -517,9 +524,6 @@
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="CardBorder"
-                                    Property="BorderBrush"
-                                    Value="{StaticResource AccentBrush}" />
-                            <Setter TargetName="CardBorder"
                                     Property="Background"
                                     Value="#7A143D33" />
                         </Trigger>
@@ -545,9 +549,6 @@
                                 <Condition Property="IsEnabled" Value="False" />
                                 <Condition Property="IsChecked" Value="True" />
                             </MultiTrigger.Conditions>
-                            <Setter TargetName="CardBorder"
-                                    Property="BorderBrush"
-                                    Value="{StaticResource AccentBrush}" />
                             <Setter TargetName="CardBorder"
                                     Property="Background"
                                     Value="#7A143D33" />

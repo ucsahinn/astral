@@ -18,8 +18,8 @@
     <AssemblyCompany>ucsahinn</AssemblyCompany>
     <AssemblyProduct>Astral VPN</AssemblyProduct>
     <Copyright>Copyright (c) 2026 ucsahinn</Copyright>
-    <Version>2.2.25</Version>
-    <FileVersion>2.2.25.0</FileVersion>
+    <Version>2.2.26</Version>
+    <FileVersion>2.2.26.0</FileVersion>
     <RepositoryUrl>https://github.com/ucsahinn/astral</RepositoryUrl>
     <PublishTrimmed>false</PublishTrimmed>
     <PublishSingleFile>false</PublishSingleFile>
@@ -35,7 +35,6 @@
     <Resource Include="Assets\astral-mark.png" />
     <Resource Include="Assets\astral-v2.ico" />
     <Resource Include="Assets\targets\discord.svg" />
-    <Resource Include="Assets\targets\roblox.svg" />
     <Resource Include="Assets\targets\wattpad.svg" />
     <Resource Include="Assets\targets\azar.svg" />
     <Resource Include="Assets\targets\bigo-live.svg" />

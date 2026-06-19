@@ -22,10 +22,10 @@ wgcf, Cloudflare tarafından üretilen veya desteklenen resmi bir araç değildi
 
 ## Marka ve Servis Adları
 
-Discord, Roblox, Wattpad, Bigo Live, Azar, Tango, LiVU, IMVU, Blogspot, Radio Garden, Deutsche Welle, Voice of America, Ekşi Sözlük, Grok, Imgur, Pastebin, Cloudflare ve WireSock adları ilgili sahiplerine aittir. Astral VPN bağımsız bir bağlantı kapsamı yöneticisidir; bu servisler veya marka sahipleri tarafından onaylanmış resmi bir ürün değildir.
+Discord, Wattpad, Bigo Live, Azar, Tango, LiVU, IMVU, Blogspot, Radio Garden, Deutsche Welle, Voice of America, Ekşi Sözlük, Grok, Imgur, Pastebin, Cloudflare ve WireSock adları ilgili sahiplerine aittir. Astral VPN bağımsız bir bağlantı kapsamı yöneticisidir; bu servisler veya marka sahipleri tarafından onaylanmış resmi bir ürün değildir.
 
 Ana ekrandaki hedef kapsamı kartları için `src/Astral.App/Assets/targets` altında renkli hedef ikonları bundle edilir.
 
-- `discord.svg`, `roblox.svg`, `wattpad.svg` ve `blogspot.svg`: Simple Icons SVG kaynaklarından alınmıştır (`https://cdn.simpleicons.org/discord`, `https://cdn.simpleicons.org/roblox`, `https://cdn.simpleicons.org/wattpad`, `https://cdn.simpleicons.org/blogger`). Simple Icons projesi ikon verilerini CC0 1.0 altında yayımlar; marka ve ticari marka hakları ilgili sahiplerinde kalır.
+- `discord.svg`, `wattpad.svg` ve `blogspot.svg`: Simple Icons SVG kaynaklarından alınmıştır (`https://cdn.simpleicons.org/discord`, `https://cdn.simpleicons.org/wattpad`, `https://cdn.simpleicons.org/blogger`). Simple Icons projesi ikon verilerini CC0 1.0 altında yayımlar; marka ve ticari marka hakları ilgili sahiplerinde kalır.
 - `azar.svg`, `bigo-live.svg`, `imvu.svg`, `livu.svg` ve `tango.svg`: İlgili alan adlarının herkese açık favicon/app ikonlarından oluşturulmuş SVG wrapper dosyalarıdır. Kaynak URL biçimi `https://www.google.com/s2/favicons?domain=<alan-adi>&sz=128`; kullanılan alan adları sırasıyla `azarlive.com`, `bigo.tv`, `imvu.com`, `livu.me` ve `tango.me` şeklindedir. Bu ikonlar yalnızca hedef seçimini tanıtmak için kullanılır; Astral bu servisler veya marka sahipleri tarafından onaylanmış resmi bir ürün değildir.
 - `radio-garden.svg`, `deutsche-welle.svg`, `voice-of-america.svg`, `eksi-sozluk.svg`, `grok.svg`, `imgur.svg` ve `pastebin.svg`: Lisans açısından güvenli, marka renklerini ve tanıma ipuçlarını koruyan uygulama içi hedef işaretleridir. Resmi logo dosyası olarak dağıtılmaz; marka ve ticari marka hakları ilgili sahiplerinde kalır.
