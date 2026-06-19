@@ -94,6 +94,10 @@ $requiresWebProxy = @(
     $normalizedTargetIds |
         Where-Object { $webTargetIds -contains $_ }
 ).Count -gt 0
+$requiresApplicationTunnelProof = @(
+    $normalizedTargetIds |
+        Where-Object { $targetAppPatterns.ContainsKey($_) }
+).Count -gt 0
 $requiresDiscord = $normalizedTargetIds -contains 'discord'
 
 function Test-IsAdministrator {
@@ -451,13 +455,24 @@ function Copy-HealthResult {
             $result.HealthWireSockConnectionEstablished -eq 'True' -or
             $result.HealthWireSockTrafficDeltaObserved -eq 'True'
         )
+    $applicationProofReady =
+        $result.HealthWireSockConnectionEstablished -eq 'True' -or
+        $result.HealthWireSockTrafficDeltaObserved -eq 'True'
+    $result.HealthHasRequiredApplicationProof =
+        (-not $requiresApplicationTunnelProof) -or
+        $applicationProofReady
     $transparentReady =
         $result.HealthTunnelReadiness -eq 'transparent-process-running' -and
         $result.HealthWireSockMode -eq 'transparent' -and
         (
-            $result.HealthWireSockConnectionEstablished -eq 'True' -or
-            $result.HealthWireSockTrafficDeltaObserved -eq 'True' -or
-            $result.HealthWebProxyProofVerified -eq 'True'
+            (
+                $requiresApplicationTunnelProof -and
+                $applicationProofReady
+            ) -or
+            (
+                (-not $requiresApplicationTunnelProof) -and
+                $result.HealthWebProxyProofVerified -eq 'True'
+            )
         ) -and
         $result.HealthWireSockProcessExited -ne 'True'
     $result.HealthTunnelReady = $adapterReady -or $transparentReady
@@ -743,6 +758,7 @@ $result = [ordered]@{
     HealthWebProxyProofCountsMatch = -not $requiresWebProxy
     HealthWebProxyProofHasNoFailedTargets = -not $requiresWebProxy
     HealthHasRequiredWebProxyProof = -not $requiresWebProxy
+    HealthHasRequiredApplicationProof = -not $requiresApplicationTunnelProof
     HealthTunnelReady = $false
     HostsLockRemovedWhileConnected = $false
     FirewallRuleDisabledWhileConnected = $false
@@ -993,6 +1009,7 @@ $criticalChecks = @(
     'HealthWebProxyProofCountsMatch',
     'HealthWebProxyProofHasNoFailedTargets',
     'HealthHasRequiredWebProxyProof',
+    'HealthHasRequiredApplicationProof',
     'HostsLockRemovedWhileConnected',
     'FirewallRuleDisabledWhileConnected',
     'DirectNonTargetTcp443WhileConnected',

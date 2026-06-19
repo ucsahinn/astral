@@ -810,6 +810,14 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
         if (!IsWireSockHandshakeReady())
         {
+            if (RoutingPlanRequiresApplicationTunnelProof(CurrentRoutingPlan)
+                && _lastWebProxyProof.Required
+                && _lastWebProxyProof.IsVerified)
+            {
+                throw new InvalidOperationException(
+                    "Seçili uygulama tünel kanıtı doğrulanamadı. Web rotaları scoped proxy üzerinden doğrulandı ancak uygulama hedefleri için WireSock handshake veya adapter trafik artışı alınamadı; uygulamayı kapatıp yeniden açın, ardından tekrar bağlanın.");
+            }
+
             throw new InvalidOperationException(
                 "WireSock bağlantı kanıtı doğrulanamadı. Astral bağlantı motoru çalışıyor görünüyor ancak bu denemede hazır logu veya adapter trafik artışı alınamadı; onarım akışını çalıştırıp tekrar deneyin.");
         }
@@ -944,13 +952,9 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     return true;
                 }
 
-                _lastTunnelReadiness = TunnelReadinessSnapshot.TransparentProcessRunning(
-                    _lastTunnelReadiness,
-                    "WireSock transparent mode is running; scoped web proxy target proof confirmed web routes and selected application targets are awaiting first app traffic.");
-
                 _lastWireSockHandshakeDiagnostic =
-                    "WireSock log marker was not observed; scoped web proxy proof confirmed web routes. Selected application targets are in the WireSock profile and will be exercised when their app traffic starts.";
-                return true;
+                    "Seçili uygulama hedefleri için uygulama tünel kanıtı alınamadı; scoped web proxy kanıtı yalnızca web rotalarını doğrular ve app bağlantısı yerine geçmez.";
+                return false;
             }
 
             _lastTunnelReadiness = TunnelReadinessSnapshot.TransparentProcessRunning(
@@ -1493,7 +1497,8 @@ public sealed class DiscordTunnelController : IAsyncDisposable
     private static bool RoutingPlanRequiresApplicationTunnelProof(
         RoutingPlan routingPlan)
     {
-        return routingPlan.AllowedApplications.Any(IsApplicationTunnelExecutable);
+        return routingPlan.SelectedTargets.Any(target => target.HasApplicationScope)
+            || routingPlan.AllowedApplications.Any(IsApplicationTunnelExecutable);
     }
 
     private static bool RoutingPlanRequiresDiscordProcessRefresh(
@@ -1660,9 +1665,23 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             if (_wireSockProcess is null)
             {
                 _diagnostics.Info("controller.disconnect", "Aktif WireSock süreci yok; bağlantı koruması etkinleştiriliyor.");
-                await TryClearWebProxyScopeAsync("DisconnectWithoutProcess");
-                await TryClearTunnelScopeAsync("DisconnectWithoutProcess");
-                if (!await TryEnableAccessLockAsync("DisconnectWithoutProcess"))
+                var webProxyCleared =
+                    await TryClearWebProxyScopeAsync("DisconnectWithoutProcess");
+                var tunnelScopeCleared =
+                    await TryClearTunnelScopeAsync("DisconnectWithoutProcess");
+                var accessLockEnabled =
+                    await TryEnableAccessLockAsync("DisconnectWithoutProcess");
+                if (!webProxyCleared || !tunnelScopeCleared)
+                {
+                    SetDisconnectedCleanupFailure(
+                        "DisconnectWithoutProcess",
+                        webProxyCleared,
+                        tunnelScopeCleared,
+                        accessLockEnabled);
+                    return;
+                }
+
+                if (!accessLockEnabled)
                 {
                     SetDisconnectedProtectionFailure("DisconnectWithoutProcess");
                     return;
@@ -1683,9 +1702,23 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             }
 
             await DisposeProcessAsync();
-            await TryClearWebProxyScopeAsync("Disconnect");
-            await TryClearTunnelScopeAsync("Disconnect");
-            if (!await TryEnableAccessLockAsync("Disconnect"))
+            var disconnectWebProxyCleared =
+                await TryClearWebProxyScopeAsync("Disconnect");
+            var disconnectTunnelScopeCleared =
+                await TryClearTunnelScopeAsync("Disconnect");
+            var disconnectAccessLockEnabled =
+                await TryEnableAccessLockAsync("Disconnect");
+            if (!disconnectWebProxyCleared || !disconnectTunnelScopeCleared)
+            {
+                SetDisconnectedCleanupFailure(
+                    "Disconnect",
+                    disconnectWebProxyCleared,
+                    disconnectTunnelScopeCleared,
+                    disconnectAccessLockEnabled);
+                return;
+            }
+
+            if (!disconnectAccessLockEnabled)
             {
                 SetDisconnectedProtectionFailure("Disconnect");
                 return;
@@ -1916,12 +1949,34 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             "Hedef korumasi yeniden etkinlestirilemedi. Onar veya Profili Temizle akisini calistirin.");
     }
 
-    private async Task TryClearWebProxyScopeAsync(string operation)
+    private void SetDisconnectedCleanupFailure(
+        string operation,
+        bool webProxyCleared,
+        bool tunnelScopeCleared,
+        bool accessLockEnabled)
+    {
+        _diagnostics.WriteHealth(
+            "temizlik dogrulanamadi",
+            new Dictionary<string, string?>
+            {
+                ["operation"] = operation,
+                ["accessLock"] = accessLockEnabled ? "enabled" : "not-confirmed",
+                ["webProxy"] = webProxyCleared ? "cleared" : "not-confirmed",
+                ["tunnelScope"] = tunnelScopeCleared ? "cleared" : "not-confirmed"
+            });
+        SetStatus(
+            TunnelState.Error,
+            "Baglanti kapandi, hedef temizligi dogrulanamadi.",
+            "Web proxy veya tunel kapsami temizligi dogrulanamadi. Onar veya Profili Temizle akisini calistirin.");
+    }
+
+    private async Task<bool> TryClearWebProxyScopeAsync(string operation)
     {
         try
         {
             using var timeout = new CancellationTokenSource(CleanupPhaseTimeout);
             await _webProxyService.ClearAsync(timeout.Token);
+            return true;
         }
         catch (Exception exception)
             when (exception is OperationCanceledException or TimeoutException)
@@ -1941,19 +1996,22 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     ["timeoutMs"] = CleanupPhaseTimeout.TotalMilliseconds
                         .ToString(CultureInfo.InvariantCulture)
                 });
+            return false;
         }
         catch (Exception exception)
         {
             WriteDiagnostic(operation + "WebProxyScope", exception.ToString());
+            return false;
         }
     }
 
-    private async Task TryClearTunnelScopeAsync(string operation)
+    private async Task<bool> TryClearTunnelScopeAsync(string operation)
     {
         try
         {
             using var timeout = new CancellationTokenSource(CleanupPhaseTimeout);
             await _accessLock.ClearTunnelScopeAsync(timeout.Token);
+            return true;
         }
         catch (Exception exception)
             when (exception is OperationCanceledException or TimeoutException)
@@ -1973,10 +2031,12 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     ["timeoutMs"] = CleanupPhaseTimeout.TotalMilliseconds
                         .ToString(CultureInfo.InvariantCulture)
                 });
+            return false;
         }
         catch (Exception exception)
         {
             WriteDiagnostic(operation + "TunnelScope", exception.ToString());
+            return false;
         }
     }
 

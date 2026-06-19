@@ -101,7 +101,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Denetleyici transparent modda eksik probe'u tunnel-started loguyla kabul eder", ControllerAcceptsUnavailableWireSockProbeInTransparentModeAsync),
     ("Denetleyici transparent modda trafik kanıtıyla eksik handshake logunu kabul eder", ControllerAcceptsTrafficProofWithoutWireSockHandshakeLogAsync),
     ("Denetleyici transparent modda scoped web proxy kanıtıyla pasif adaptörü kabul eder", ControllerAcceptsScopedWebProxyProofInTransparentModeAsync),
-    ("Denetleyici app+web hedeflerde proxy kanıtıyla app trafiğini bekler", ControllerAcceptsAppWebTargetWhenScopedWebProxyProofExistsAsync),
+    ("Denetleyici app+web hedeflerde app kanıtı yokken bağlı raporlamaz", ControllerRejectsAppWebTargetWhenOnlyScopedWebProxyProofExistsAsync),
     ("Denetleyici uygulama ve web hedeflerinde adapter trafik kanıtını tanılamaya yazar", ControllerAcceptsAppWebTargetWithTrafficProofAsync),
     ("Denetleyici transparent modda handshake ve trafik kanıtı yokken bağlı raporlamaz", ControllerRejectsMissingWireSockHandshakeInTransparentModeAsync),
     ("Denetleyici son WireSock çıkışını tanılama detayına yazar", ControllerReportsWireSockExitAfterFinalReadinessProbeAsync),
@@ -2861,6 +2861,7 @@ static async Task ControllerDisconnectDoesNotReportProtectedWhenAccessLockRestor
         Assert(process.StopCount == 1);
         Assert(accessLock.ClearTunnelScopeCount == 1);
         Assert(accessLock.EnableCount == 1);
+        Assert(accessLock.EnableCount == 1);
         Assert(controller.Snapshot.State == TunnelState.Error);
         Assert(controller.Snapshot.Message.Contains(
             "korumasi dogrulanamadi",
@@ -2870,6 +2871,107 @@ static async Task ControllerDisconnectDoesNotReportProtectedWhenAccessLockRestor
         Assert(health.Contains("\"status\":\"koruma guncellenemedi\"", StringComparison.Ordinal));
         Assert(health.Contains("\"accessLock\":\"not-confirmed\"", StringComparison.Ordinal));
         Assert(!health.Contains("\"accessLock\":\"enabled\"", StringComparison.Ordinal));
+
+        await ControllerDisconnectDoesNotReportCleanWhenWebProxyCleanupFailsAsync();
+        await ControllerDisconnectDoesNotReportCleanWhenTunnelScopeCleanupFailsAsync();
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task ControllerDisconnectDoesNotReportCleanWhenWebProxyCleanupFailsAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var process = new FakeManagedProcess();
+    var paths = new AppPaths(root);
+    var diagnostics = new AstralDiagnostics(
+        paths,
+        TimeSpan.Zero);
+    var webProxy = new FakeScopedWebProxyService
+    {
+        ClearException = new TimeoutException("Web proxy cleanup timed out.")
+    };
+    var controller = new DiscordTunnelController(
+        paths,
+        new DiscordAppScope(root, root, root),
+        new FakeWireSockBootstrapper(Path.Combine(
+            root,
+            "WireSock VPN Client",
+            "bin",
+            WireSockPackage.CliExecutableFileName)),
+        new FakeProfileProvisioner(Path.Combine(root, "discord.conf")),
+        new FakeProcessLauncher(process),
+        TimeSpan.Zero,
+        new FakeDiscordAccessLock(),
+        diagnostics,
+        webProxyService: webProxy);
+    controller.TrySetTargetSelection(new TargetSelection([TargetIds.Wattpad]));
+
+    try
+    {
+        await controller.ConnectAsync();
+        await controller.DisconnectAsync();
+
+        Assert(process.StopCount == 1);
+        Assert(webProxy.ClearCount > 0);
+        Assert(controller.Snapshot.State == TunnelState.Error);
+        Assert(controller.Snapshot.Message.Contains(
+            "temizligi dogrulanamadi",
+            StringComparison.OrdinalIgnoreCase));
+
+        var health = await File.ReadAllTextAsync(paths.HealthReport);
+        Assert(health.Contains("\"webProxy\":\"not-confirmed\"", StringComparison.Ordinal));
+        Assert(health.Contains("\"accessLock\":\"enabled\"", StringComparison.Ordinal));
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task ControllerDisconnectDoesNotReportCleanWhenTunnelScopeCleanupFailsAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var process = new FakeManagedProcess();
+    var paths = new AppPaths(root);
+    var diagnostics = new AstralDiagnostics(
+        paths,
+        TimeSpan.Zero);
+    var accessLock = new FakeDiscordAccessLock(
+        clearTunnelScopeException: new TimeoutException("Tunnel scope cleanup timed out."));
+    var controller = new DiscordTunnelController(
+        paths,
+        new DiscordAppScope(root, root, root),
+        new FakeWireSockBootstrapper(Path.Combine(
+            root,
+            "WireSock VPN Client",
+            "bin",
+            WireSockPackage.CliExecutableFileName)),
+        new FakeProfileProvisioner(Path.Combine(root, "discord.conf")),
+        new FakeProcessLauncher(process),
+        TimeSpan.Zero,
+        accessLock,
+        diagnostics);
+    controller.TrySetTargetSelection(new TargetSelection([TargetIds.Wattpad]));
+
+    try
+    {
+        await controller.ConnectAsync();
+        await controller.DisconnectAsync();
+
+        Assert(process.StopCount == 1);
+        Assert(accessLock.ClearTunnelScopeCount == 1);
+        Assert(accessLock.EnableCount == 1);
+        Assert(controller.Snapshot.State == TunnelState.Error);
+        Assert(controller.Snapshot.Message.Contains(
+            "temizligi dogrulanamadi",
+            StringComparison.OrdinalIgnoreCase));
+
+        var health = await File.ReadAllTextAsync(paths.HealthReport);
+        Assert(health.Contains("\"tunnelScope\":\"not-confirmed\"", StringComparison.Ordinal));
+        Assert(health.Contains("\"accessLock\":\"enabled\"", StringComparison.Ordinal));
     }
     finally
     {
@@ -3862,7 +3964,7 @@ static async Task ControllerAcceptsScopedWebProxyProofInTransparentModeAsync()
     }
 }
 
-static async Task ControllerAcceptsAppWebTargetWhenScopedWebProxyProofExistsAsync()
+static async Task ControllerRejectsAppWebTargetWhenOnlyScopedWebProxyProofExistsAsync()
 {
     var root = CreateTemporaryDirectory();
     var process = new FakeManagedProcess();
@@ -3912,23 +4014,28 @@ static async Task ControllerAcceptsAppWebTargetWhenScopedWebProxyProofExistsAsyn
     {
         await controller.ConnectAsync();
 
-        Assert(controller.Snapshot.State == TunnelState.Connected);
-        Assert(!process.HasExited);
+        Assert(controller.Snapshot.State == TunnelState.Error);
+        Assert(!controller.Snapshot.IsConnected);
+        Assert(controller.Snapshot.Message.Contains(
+            "uygulama tünel kanıtı",
+            StringComparison.OrdinalIgnoreCase));
+        Assert(process.HasExited);
         Assert(webProxy.VerifyTargetAccessCount > 0);
 
         var details = controller.CreateDiagnosticDetails();
         Assert(details["wireSockMode"] == "transparent");
         Assert(details["wireSockConnectionEstablished"] == "False");
         Assert(details["webProxyProof.verified"] == "True");
-        Assert(details["tunnelReadiness"] == "transparent-process-running");
+        Assert(details["tunnelReadiness"] == "wiresock-adapter-inactive");
         Assert(details["wireSockHandshakeDiagnostic"]!.Contains(
-            "will be exercised",
+            "uygulama",
             StringComparison.OrdinalIgnoreCase));
 
         var health = await File.ReadAllTextAsync(paths.HealthReport);
-        Assert(health.Contains("\"status\"", StringComparison.Ordinal));
+        Assert(health.Contains("\"status\":\"hata\"", StringComparison.Ordinal));
+        Assert(!health.Contains("\"state\":\"Connected\"", StringComparison.Ordinal));
         Assert(health.Contains(
-            "will be exercised when their app traffic starts",
+            "uygulama",
             StringComparison.OrdinalIgnoreCase));
     }
     finally
@@ -6648,7 +6755,8 @@ file sealed class FakeDiscordAccessLock(
     Exception? disableException = null,
     Exception? applyTunnelScopeException = null,
     int applyTunnelScopeFailureAttempt = 1,
-    Exception? enableException = null) : IDiscordAccessLock
+    Exception? enableException = null,
+    Exception? clearTunnelScopeException = null) : IDiscordAccessLock
 {
     public int EnableCount { get; private set; }
 
@@ -6720,6 +6828,11 @@ file sealed class FakeDiscordAccessLock(
     {
         cancellationToken.ThrowIfCancellationRequested();
         ClearTunnelScopeCount++;
+        if (clearTunnelScopeException is not null)
+        {
+            return Task.FromException(clearTunnelScopeException);
+        }
+
         return Task.CompletedTask;
     }
 
@@ -6750,6 +6863,8 @@ file sealed class FakeScopedWebProxyService : IScopedWebProxyService
     public ScopedWebProxyStatus? Status { get; init; }
 
     public ScopedWebProxyProof? Proof { get; init; }
+
+    public Exception? ClearException { get; init; }
 
     public Task ApplyAsync(
         RoutingPlan routingPlan,
@@ -6797,6 +6912,11 @@ file sealed class FakeScopedWebProxyService : IScopedWebProxyService
     {
         cancellationToken.ThrowIfCancellationRequested();
         ClearCount++;
+        if (ClearException is not null)
+        {
+            return Task.FromException(ClearException);
+        }
+
         return Task.CompletedTask;
     }
 

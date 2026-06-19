@@ -71,7 +71,7 @@ public partial class MainWindow : Window, IDisposable
     private static readonly Uri RepositoryUri = new(
         "https://github.com/ucsahinn/astral");
     private static readonly Uri ReleaseNotesUri = new(
-        "https://github.com/ucsahinn/astral/releases/tag/v2.2.29");
+        "https://github.com/ucsahinn/astral/releases/tag/v2.2.30");
     private static readonly Uri BackgroundVideoCdnUri = new(
         "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260328_105406_16f4600d-7a92-4292-b96e-b19156c7830a.mp4");
     private static readonly string LocalBackgroundVideoPath = Path.Combine(
@@ -2382,8 +2382,7 @@ public partial class MainWindow : Window, IDisposable
         TargetProbeResult result)
     {
         return target.HasApplicationScope
-            && (result.Status is TargetProbeStatus.Success
-                or TargetProbeStatus.ProfileScope);
+            && result.Status is TargetProbeStatus.ProfileScope;
     }
 
     internal static bool IsSuccessfulTargetProbeApplicationScopeReadyForTesting(
@@ -2393,6 +2392,18 @@ public partial class MainWindow : Window, IDisposable
             target,
             new TargetProbeResult(
                 TargetProbeStatus.Success,
+                null,
+                string.Empty,
+                DateTimeOffset.Now));
+    }
+
+    internal static bool IsProfileScopeTargetProbeApplicationScopeReadyForTesting(
+        TargetDefinition target)
+    {
+        return IsTargetApplicationScopeReady(
+            target,
+            new TargetProbeResult(
+                TargetProbeStatus.ProfileScope,
                 null,
                 string.Empty,
                 DateTimeOffset.Now));
