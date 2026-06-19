@@ -1,13 +1,14 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [string]$PublishDirectory
+    [string]$PublishDirectory,
+    [switch]$AllowDownload
 )
 
 $ErrorActionPreference = 'Stop'
 
-$videoUrl = 'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260606_154941_df1a96e1-a06f-450c-bd02-d863414cc1a0.mp4'
-$expectedSha256 = '8DDCC4D001F91F43447103601299BAD902F761818B7DAF36B797134DFEF50ACC'
+$videoUrl = 'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260328_105406_16f4600d-7a92-4292-b96e-b19156c7830a.mp4'
+$expectedSha256 = '24048C39F8E52DE3A6373500B4755588CABEC98A5BAE009D7E3351DA48572CCD'
 $assetDirectory = Join-Path $PublishDirectory 'Assets'
 $videoPath = Join-Path $assetDirectory 'background.mp4'
 $temporaryPath = $videoPath + '.download'
@@ -41,11 +42,18 @@ function Copy-VerifiedBackgroundVideo {
             Select-Object -ExpandProperty FullName
     }
 
-    foreach ($candidate in $candidatePaths | Sort-Object -Unique) {
+    $seenCandidates = @{}
+    foreach ($candidate in $candidatePaths) {
         try {
             if (-not (Test-Path -LiteralPath $candidate)) {
                 continue
             }
+
+            $candidateKey = [IO.Path]::GetFullPath($candidate).ToUpperInvariant()
+            if ($seenCandidates.ContainsKey($candidateKey)) {
+                continue
+            }
+            $seenCandidates[$candidateKey] = $true
 
             $candidateHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $candidate).Hash
             if ($candidateHash -ne $expectedSha256) {
@@ -81,6 +89,10 @@ if (Test-Path -LiteralPath $temporaryPath) {
 
 try {
     if (-not (Copy-VerifiedBackgroundVideo -Destination $videoPath)) {
+        if (-not $AllowDownload) {
+            throw "Dogrulanmis yerel arka plan videosu bulunamadi. Beklenen SHA-256: $expectedSha256. Release build icin src\Astral.App\Assets\background.mp4 veya artifacts\background-source.mp4 dosyasini hazirlayin; manuel indirme gerekiyorsa -AllowDownload kullanin."
+        }
+
         $lastError = $null
         for ($attempt = 1; $attempt -le 3; $attempt++) {
             try {

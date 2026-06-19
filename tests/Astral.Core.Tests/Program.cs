@@ -47,6 +47,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("wgcf seçili hedefler için WireSock uyumlu Astral scoped profil üretir", WgcfProvisionerBuildsDiscordAccessProfileAsync),
     ("wgcf yenileme hatasında mevcut profili kullanır", WgcfProvisionerUsesCachedProfileWhenRefreshFailsAsync),
     ("wgcf boş hata çıktısını tanısız bırakmaz", WgcfProvisionerEmptyFailureIsDiagnosticAsync),
+    ("wgcf hata çıktısındaki hassas değerleri redakte eder", WgcfProvisionerRedactsSensitiveFailureOutputAsync),
     ("SHA-256 doğrulayıcı yalnızca sabit özeti kabul eder", HashVerifierIsStrictAsync),
     ("Doğrulanmış indirici geçici zaman aşımını tekrar dener", VerifiedDownloaderRetriesTransientTimeoutAsync),
     ("Doğrulanmış indirici geçici DNS hatasını tekrar dener", VerifiedDownloaderRetriesTransientDnsFailureAsync),
@@ -296,7 +297,8 @@ static Task TargetRegistryDefinesBuiltInPresetsAsync()
     Assert(targets.All(target =>
         target.Metadata.TryGetValue("launchUrl", out var launchUrl)
         && Uri.TryCreate(launchUrl, UriKind.Absolute, out var launchUri)
-        && launchUri.Scheme == Uri.UriSchemeHttps));
+        && launchUri.Scheme == Uri.UriSchemeHttps
+        && target.Domains.Any(domain => domain.Matches(launchUri.Host))));
 
     Assert(!targets.Any(target =>
         target.Id.Equals("custom-executable", StringComparison.OrdinalIgnoreCase)
@@ -1249,6 +1251,45 @@ static async Task WgcfProvisionerEmptyFailureIsDiagnosticAsync()
         Assert(exception.Message.Contains(
             "wgcf exit code 9",
             StringComparison.Ordinal));
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task WgcfProvisionerRedactsSensitiveFailureOutputAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var paths = new AppPaths(root);
+    var provisioner = new WgcfProvisioner(
+        paths,
+        new FakeVerifiedDownloader(),
+        new SensitiveFailureCommandRunner());
+
+    try
+    {
+        var exception = await AssertThrowsAsync<InvalidOperationException>(
+            () => provisioner.EnsureProfileAsync(
+                ["Discord.exe"],
+                null,
+                CancellationToken.None));
+
+        Assert(exception.Message.Contains(
+            "PrivateKey = [REDACTED]",
+            StringComparison.Ordinal));
+        Assert(exception.Message.Contains(
+            "Authorization = [REDACTED]",
+            StringComparison.Ordinal));
+        Assert(exception.Message.Contains(
+            "normal diagnostic",
+            StringComparison.Ordinal));
+        Assert(!exception.Message.Contains("super-private-key", StringComparison.Ordinal));
+        Assert(!exception.Message.Contains("fake-private-key-with-padding", StringComparison.Ordinal));
+        Assert(!exception.Message.Contains("example-token-value", StringComparison.Ordinal));
+        Assert(!exception.Message.Contains("fake:token", StringComparison.Ordinal));
+        Assert(!exception.Message.Contains("session-cookie-value", StringComparison.Ordinal));
+        Assert(exception.Message.Length < 520);
     }
     finally
     {
@@ -6650,6 +6691,23 @@ file sealed class EmptyFailureCommandRunner(int exitCode) : ICommandRunner
             exitCode,
             string.Empty,
             string.Empty));
+    }
+}
+
+file sealed class SensitiveFailureCommandRunner : ICommandRunner
+{
+    public Task<CommandResult> RunAsync(
+        string executable,
+        IReadOnlyList<string> arguments,
+        string workingDirectory,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(new CommandResult(
+            11,
+            "PrivateKey = super-private-key=\nAuthorization: Bearer example-token-value\nnormal diagnostic",
+            "Cookie = session-cookie-value\nAuthorization: Basic fake:token==\nPrivateKey: fake-private-key-with-padding=\nnormal diagnostic"));
     }
 }
 

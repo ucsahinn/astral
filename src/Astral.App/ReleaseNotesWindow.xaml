@@ -82,11 +82,11 @@
                                 VerticalAlignment="Center">
                         <TextBlock FontSize="22"
                                    FontWeight="SemiBold"
-                                   Text="Astral VPN v2.2.24" />
+                                   Text="Astral VPN v2.2.25" />
                         <TextBlock Margin="0,5,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
-                                   Text="Onarım, WireSock motoru ve hedef kartı hotfix'i" />
+                                   Text="Arka plan video ve paket hotfix'i" />
                     </StackPanel>
                 </Grid>
 
@@ -109,7 +109,7 @@
                                            FontSize="14"
                                            LineHeight="21"
                                            TextWrapping="Wrap"
-                                           Text="Bu sürüm v2.2.21 ve v2.2.22 tanı paketlerinde görülen transparent mod bağlantı doğrulama sorununu hedefler. Astral artık web hedeflerinde yalnız PAC durumuna bakmakla kalmaz; seçili her web hedefi için Astral.WebProxy üzerinden aktif CONNECT kanıtı alır ve bu kanıtı transparent WireSock readiness kararında kullanır." />
+                                           Text="Bu sürüm v2.2.24 yayın asset'inde eski arka plan videosunun kalması ihtimalini giderir. Astral VPN artık istenen arka plan videosunu yalnız SHA-256 ile doğrulanmış yerel paket asset'i olarak kullanır; aynı sürüm numarasına takılmamak için güncelleme hattı v2.2.25'e çıkarıldı." />
                             </StackPanel>
                         </Border>
 
@@ -128,43 +128,43 @@
                                            FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Onarım, profil temizleme, yeniden başlatma ve güncelleme kurulumu gibi bilinçli bakım işlemleri kısa pencere kapatma süresine takılmaz; ayrı 90 saniyelik bakım süresi kullanılır." />
+                                           Text="&#x2022; Arka plan video kaynağı kullanıcının istediği CloudFront videosuyla güncellendi ve release paketine sabit hash ile eklenir." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Son tanı WireSock adaptörünün inaktif kaldığını ve sıfır trafik ürettiğini gösterirse, WireSock Astral tarafından kurulmuşsa Onar akışı motoru yeniden kurulacak hale getirir." />
+                                           Text="&#x2022; Runtime uzak video fallback'i kaldırıldı; uygulama yalnız paketin içindeki Assets/background.mp4 dosyasını oynatır." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; WireSock readiness döngüsü bittiğinde süreç durumu son kez yakalanır; süreç kapanmışsa tanı detayına çıkış durumu ve çıkış kodu yazılır." />
+                                           Text="&#x2022; Hedef kartlarına erişilebilir harici bağlantı ikonu eklendi; ikon seçim durumunu değiştirmeden hedefin güvenli HTTPS sayfasını açar." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Hedef kartlarında sarı sorun rozeti genel bağlantı hatasında tüm hedeflere basılmaz; yalnız hedefe özel test başarısız olduğunda görünür." />
+                                           Text="&#x2022; Hedef linkleri domain allowlist ile sınırlandı; hatalı veya yabancı host metadata'sı güvenli preset domainine düşer." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Hedef kartı ve alt bar butonları focus/checked durumlarında border kalınlığını değiştirmez; küçük layout kaymaları kaldırıldı." />
+                                           Text="&#x2022; Wgcf/WireGuard yardımcı komut hatalarında private key, authorization, cookie ve token benzeri değerler loga yazılmadan maskelenir." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Video arka plan korunur; global overlay yoğunluğu azaltılarak arka plan daha görünür bırakılır." />
+                                           Text="&#x2022; Windows animasyon azaltma tercihi açıksa arka plan videosu oynatılmaz; arayüz okunabilir overlay ile kalır." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Güncelleme varsa alt bardaki güncelleme düğmesi görünür ve sürüm numarasını erişilebilir adında taşır." />
+                                           Text="&#x2022; Paket manifesti Assets/background.mp4 dosyasının beklenen uzunluk ve SHA-256 değerini zorunlu doğrular." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Windows UI testi kartlarda state metni kalmadığını, aktif hedef panelinin 8 kartta kaldığını ve sabit viewport davranışını doğrular." />
+                                           Text="&#x2022; Windows UI testi hedef kartı link butonlarını, klavye aktivasyonunu, video path'ini ve güncelleme butonu davranışını doğrular." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Alt bardaki Rapor Oluştur, Onar, Profil Temizle, Sürüm Notları ve GitHub aksiyonları aynı sabit layout içinde kalır." />
+                                           Text="&#x2022; v2.2.24'te yayımlanan eski video asset'i aynı sürüm numarasıyla tekrar kullanılmaz; v2.2.25 gerçek güncelleme olarak gelir." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Sürüm metadata'sı, updater, web proxy ve uygulama içi release bağlantısı v2.2.24 ile hizalandı." />
+                                           Text="&#x2022; Sürüm metadata'sı, updater, web proxy ve uygulama içi release bağlantısı v2.2.25 ile hizalandı." />
                             </StackPanel>
                         </Border>
 
@@ -210,7 +210,7 @@
                     <TextBlock VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource MutedTextBrush}"
-                                   Text="Bu not, v2.2.24 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
+                                   Text="Bu not, v2.2.25 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
                     <Button Grid.Column="1"
                             Margin="0,0,10,0"
                             Height="40"

@@ -30,6 +30,7 @@ Astral'ın güvenlik hedefi, seçili hedefler dışında kalan trafiği kapsam d
 - WireSock resmi kurucu hash, Authenticode imzası, yayıncı ve sürüm bilgisiyle doğrulanır.
 - wgcf sabit SHA-256 özetiyle doğrulanır.
 - Güncelleme paketi GitHub release yolu, asset digest, `.sha256.txt` ve manifest eşleşmesiyle doğrulanır.
+- Arka plan videosu release paketi hazırlanırken sabit SHA-256 ile doğrulanır ve uygulama çalışma anında yalnız yerel `Assets/background.mp4` dosyasını oynatır.
 
 ## Log ve Tanılama
 
@@ -41,6 +42,7 @@ Loglarda şunlar yazılmamalıdır:
 - Kullanıcının gereksiz kişisel verisi.
 
 Debug tanılama isteğe bağlıdır. Normal tanılama paketi hafif tutulur ve redaksiyon uygular.
+`wgcf` gibi yardımcı araçların hata çıktıları exception ve log yoluna girmeden önce kısaltılır ve anahtar/token/cookie/Authorization benzeri değerler redakte edilir.
 
 ## Rollback
 

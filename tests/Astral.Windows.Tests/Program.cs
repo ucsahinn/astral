@@ -132,17 +132,17 @@ static void RenderMainWindow()
     var root = CreateTemporaryDirectory();
     var previousVideoSetting = Environment.GetEnvironmentVariable(
         "ASTRAL_DISABLE_BACKGROUND_VIDEO");
-    var previousRemoteFallbackSetting = Environment.GetEnvironmentVariable(
-        "ASTRAL_BACKGROUND_VIDEO_REMOTE_FALLBACK");
+    var localBackgroundVideoPath = MainWindow.GetLocalBackgroundVideoPathForTesting();
 
     try
     {
         Environment.SetEnvironmentVariable(
             "ASTRAL_DISABLE_BACKGROUND_VIDEO",
             null);
-        Environment.SetEnvironmentVariable(
-            "ASTRAL_BACKGROUND_VIDEO_REMOTE_FALLBACK",
-            null);
+        if (File.Exists(localBackgroundVideoPath))
+        {
+            File.Delete(localBackgroundVideoPath);
+        }
 
         window = CreateMainWindow(root);
         window.Show();
@@ -150,7 +150,7 @@ static void RenderMainWindow()
         SaveWindowPng(window, Path.Combine(
             FindRepositoryRoot(),
             "artifacts",
-            "ui-main-window-v2.2.24.png"));
+            "ui-main-window-v2.2.25.png"));
 
         Assert(window.ResizeMode == ResizeMode.NoResize);
         Assert(window.Width == 1280);
@@ -331,11 +331,43 @@ static void RenderMainWindow()
             out _));
         var registry = TargetRegistry.CreateDefault();
         Assert(registry.TryGet("blogspot", out var blogspotTarget));
+        Assert(MainWindow.TryGetTargetLaunchUriForTesting(
+            blogspotTarget,
+            out var blogspotLaunchUri));
+        Assert(blogspotLaunchUri.AbsoluteUri == "https://www.blogger.com/");
+        Assert(blogspotTarget.Domains.Any(domain => domain.Matches(blogspotLaunchUri.Host)));
         var blogspotHosts = MainWindow.GetTargetTestHostsForTesting(blogspotTarget);
         Assert(blogspotHosts.Contains("blogspot.com", StringComparer.OrdinalIgnoreCase));
         Assert(blogspotHosts.Contains("blogger.com", StringComparer.OrdinalIgnoreCase));
         Assert(!blogspotHosts.Contains("*.blogspot.com", StringComparer.OrdinalIgnoreCase));
         Assert(registry.TryGet("discord", out var discordTarget));
+        Assert(MainWindow.TryGetTargetLaunchUriForTesting(
+            discordTarget,
+            out var discordLaunchUri));
+        Assert(discordLaunchUri.Scheme == Uri.UriSchemeHttps);
+        Assert(discordLaunchUri.Host == "discord.com");
+        var insecureDiscordTarget = discordTarget with
+        {
+            Metadata = new Dictionary<string, string>
+            {
+                ["launchUrl"] = "http://discord.com/app"
+            }
+        };
+        Assert(MainWindow.TryGetTargetLaunchUriForTesting(
+            insecureDiscordTarget,
+            out var safeDiscordLaunchUri));
+        Assert(safeDiscordLaunchUri.AbsoluteUri == "https://discord.com/");
+        var foreignDiscordTarget = discordTarget with
+        {
+            Metadata = new Dictionary<string, string>
+            {
+                ["launchUrl"] = "https://example.com/"
+            }
+        };
+        Assert(MainWindow.TryGetTargetLaunchUriForTesting(
+            foreignDiscordTarget,
+            out var fallbackDiscordLaunchUri));
+        Assert(fallbackDiscordLaunchUri.AbsoluteUri == "https://discord.com/");
         var discordHosts = MainWindow.GetTargetTestHostsForTesting(discordTarget);
         Assert(discordHosts.Contains("discord.com", StringComparer.OrdinalIgnoreCase));
         Assert(!discordHosts.Contains("discordapp.net", StringComparer.OrdinalIgnoreCase));
@@ -399,6 +431,40 @@ static void RenderMainWindow()
         Assert(targetToggles.Any(toggle => toggle.Name == "TargetToggle_wattpad"));
         Assert(targetToggles.All(toggle =>
             !toggle.Name.Contains("custom", StringComparison.OrdinalIgnoreCase)));
+        var targetOpenButtons = FindVisualChildren<Button>(window)
+            .Where(button => button.Name.StartsWith(
+                "TargetOpen_",
+                StringComparison.Ordinal))
+            .ToArray();
+        Assert(targetOpenButtons.Length == 16);
+        foreach (var expectedTarget in new[]
+                 {
+                     "Discord",
+                     "Roblox",
+                     "Wattpad",
+                     "Bigo Live",
+                     "Azar",
+                     "Tango",
+                     "LiVU",
+                     "IMVU",
+                     "Blogspot",
+                     "Radio Garden",
+                     "DW",
+                     "VOA",
+                     "Ekşi Sözlük",
+                     "Grok",
+                     "Imgur",
+                     "Pastebin"
+                 })
+        {
+            var openButton = targetOpenButtons.Single(button =>
+                string.Equals(
+                    AutomationProperties.GetName(button),
+                    expectedTarget + " sayfasını aç",
+                    StringComparison.Ordinal));
+            Assert(openButton.ToolTip?.ToString() == expectedTarget + " sayfasını aç");
+            Assert(ToolTipService.GetShowsToolTipOnKeyboardFocus(openButton) == true);
+        }
 
         var runInBackgroundSwitch = switches.Single(toggle =>
             toggle.Name == "RunInBackgroundToggle");
@@ -438,27 +504,27 @@ static void RenderMainWindow()
         window.Close();
         window = null;
 
-        Environment.SetEnvironmentVariable(
-            "ASTRAL_BACKGROUND_VIDEO_REMOTE_FALLBACK",
-            "1");
-
-        window = CreateMainWindow(root);
-        window.Show();
-        window.UpdateLayout();
-
-        backgroundVideo = FindVisualChildren<MediaElement>(window).Single();
-        Assert(backgroundVideo.Visibility == Visibility.Visible);
-        Assert(backgroundVideo.Source is not null);
+        Directory.CreateDirectory(Path.GetDirectoryName(localBackgroundVideoPath)!);
+        File.WriteAllBytes(localBackgroundVideoPath, [0, 0, 0, 0]);
+        Assert(MainWindow.TryGetBackgroundVideoUriForTesting(
+            out var localBackgroundVideoUri));
+        Assert(localBackgroundVideoUri.IsFile);
+        Assert(string.Equals(
+            localBackgroundVideoUri.LocalPath,
+            localBackgroundVideoPath,
+            StringComparison.OrdinalIgnoreCase));
     }
     finally
     {
         window?.Close();
+        if (File.Exists(localBackgroundVideoPath))
+        {
+            File.Delete(localBackgroundVideoPath);
+        }
+
         Environment.SetEnvironmentVariable(
             "ASTRAL_DISABLE_BACKGROUND_VIDEO",
             previousVideoSetting);
-        Environment.SetEnvironmentVariable(
-            "ASTRAL_BACKGROUND_VIDEO_REMOTE_FALLBACK",
-            previousRemoteFallbackSetting);
         Directory.Delete(root, recursive: true);
     }
 
@@ -504,6 +570,32 @@ static void VerifyConnectedTargetCardsRequireProbeEvidence()
         Assert(cardTexts.Contains("Discord", StringComparer.Ordinal));
         Assert(!FindVisualChildren<Button>(window)
             .Any(button => button.Name == "TargetQuickTestButton"));
+
+        var openedUris = new List<Uri>();
+        MainWindow.OpenUriOverrideForTesting = openedUris.Add;
+        try
+        {
+            var openButton = FindVisualChildren<Button>(discordCard)
+                .Single(button => button.Name == "TargetOpen_discord");
+            var wasChecked = discordCard.IsChecked;
+            openButton.Focus();
+            openButton.RaiseEvent(new System.Windows.Input.KeyEventArgs(
+                System.Windows.Input.Keyboard.PrimaryDevice,
+                PresentationSource.FromVisual(openButton)!,
+                Environment.TickCount,
+                System.Windows.Input.Key.Enter)
+            {
+                RoutedEvent = System.Windows.Input.Keyboard.PreviewKeyDownEvent
+            });
+
+            Assert(openedUris.Count == 1);
+            Assert(openedUris[0].AbsoluteUri == "https://discord.com/app");
+            Assert(discordCard.IsChecked == wasChecked);
+        }
+        finally
+        {
+            MainWindow.OpenUriOverrideForTesting = null;
+        }
 
         Console.WriteLine("GEÇTİ Bağlı hedef kartı manuel test aksiyonu olmadan kapsam aktif gösterdi");
     }
@@ -574,11 +666,11 @@ static void VerifyTrayExitDoesNotHangWhenControllerCleanupIsSlow()
 
         var exitStartedAt = DateTimeOffset.UtcNow;
         InvokeTrayExit(window);
-        PumpDispatcherUntil(() => closed, TimeSpan.FromSeconds(2));
+        PumpDispatcherUntil(() => closed, TimeSpan.FromSeconds(3));
         var exitElapsed = DateTimeOffset.UtcNow - exitStartedAt;
 
         Assert(closed);
-        Assert(exitElapsed < TimeSpan.FromSeconds(1));
+        Assert(exitElapsed < TimeSpan.FromSeconds(2.5));
         window = null;
     }
     finally

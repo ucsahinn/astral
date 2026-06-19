@@ -8,8 +8,8 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <AssemblyName>Astral.Updater</AssemblyName>
     <RootNamespace>Astral.Updater</RootNamespace>
-    <Version>2.2.24</Version>
-    <FileVersion>2.2.24.0</FileVersion>
+    <Version>2.2.25</Version>
+    <FileVersion>2.2.25.0</FileVersion>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Astral.Core\Astral.Core.csproj" />

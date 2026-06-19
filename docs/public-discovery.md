@@ -12,7 +12,7 @@ Astral, Windows'ta yalnız seçilen uygulama veya web hedeflerini dar kapsamlı 
 
 ## Tek Cümlelik Özet
 
-Astral, Discord, Wattpad, Blogspot ve diğer hazır hedefleri ana ekrandan seçerek dar kapsamlı bağlantı planı oluşturmaya yardımcı olan portable Windows uygulamasıdır.
+Astral, Discord, Roblox, Wattpad, Blogspot, medya/haber/araç presetleri ve diğer hazır hedefleri ana ekrandan seçerek dar kapsamlı bağlantı planı oluşturmaya yardımcı olan portable Windows uygulamasıdır.
 
 ## Özellik Mesajları
 
@@ -26,7 +26,7 @@ Astral, Discord, Wattpad, Blogspot ve diğer hazır hedefleri ana ekrandan seçe
 - Tüm PC'yi, tüm tarayıcıyı veya sistem genelini VPN'e almayı amaçlamaz.
 - HTTPS içeriğini çözmez, sertifika kurmaz ve web trafiğini okumaz.
 - Uygulama içi otomatik güncelleme paketlerini GitHub release yolu, asset digest, SHA-256 ve manifest kontrolleriyle doğrular.
-- Discord, Wattpad, Cloudflare veya WireSock tarafından üretilen resmi bir ürün olduğunu iddia etmez.
+- Discord, Roblox, Wattpad, Cloudflare, WireSock veya diğer marka sahipleri tarafından üretilen resmi bir ürün olduğunu iddia etmez.
 
 ## Kurulum ve Güncelleme Mesajları
 

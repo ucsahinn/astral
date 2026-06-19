@@ -46,6 +46,7 @@ Astral, seçili hedef/preset tabanlı bir bağlantı yöneticisidir. Kullanıcı
 Başlangıç presetleri:
 
 - Discord: Uygulama + Web
+- Roblox: Uygulama + Web
 - Wattpad: Web
 - Bigo Live: Web
 - Azar: Uygulama + Web
@@ -53,13 +54,20 @@ Başlangıç presetleri:
 - LiVU: Uygulama + Web
 - IMVU: Uygulama + Web
 - Blogspot: Web
+- Radio Garden: Web
+- DW: Web
+- VOA: Web
+- Ekşi Sözlük: Web
+- Grok: Web
+- Imgur: Web
+- Pastebin: Web
 
 ## Ne İşe Yarar?
 
 | Özellik | Kullanıcıya etkisi |
 | --- | --- |
 | Tek tuşla bağlantı | Seçili hedefler için bağlantıyı açıp kapatmayı kolaylaştırır. |
-| İlk ekranda hedef kartları | Discord, Wattpad ve diğer hazır hedefler ana ekrandan seçilir. |
+| İlk ekranda hedef kartları | Discord, Wattpad, Blogspot, medya/haber/araç presetleri ve diğer hazır hedefler ana ekrandan seçilir. |
 | Domain kapsamı | Web hedeflerinde yalnızca seçili domainler Astral.WebProxy üzerinden gider; diğer domainler DIRECT kalır. |
 | Canlı durum kartları | DNS, bağlantı durumu ve hedef kapsamını sade biçimde gösterir. |
 | Tanılama paketi | Bağlantı sorunlarını incelemek için paylaşıma uygun rapor hazırlar. |
@@ -72,6 +80,7 @@ Başlangıç presetleri:
 - Genel tarayıcı exe'lerini WireSock `AllowedApps` kapsamına almaz.
 - HTTPS içeriğini çözmez, TLS MITM yapmaz ve sertifika kurmaz; proxy yalnızca CONNECT host/Host allowlist kontrolü yapar.
 - WireSock ve wgcf ikili dosyalarını repoya gömmez; release paketindeki WireSock fallback kurucusu varsa hash, imza, yayıncı ve sürümle doğrulanır.
+- Arka plan videosu release paketine SHA-256 ile doğrulanmış repo-local `Assets/background.mp4` olarak eklenir; release build ve runtime kör CDN oynatması yapmaz.
 - Otomatik güncelleme paketini GitHub release asset bilgisi, `.sha256.txt`, GitHub digest ve manifest kontrolleriyle eşleştirir.
 - Gizli profil, hesap ve log dosyalarını repoya veya release arşivine eklemez.
 
@@ -98,7 +107,7 @@ Release sayfasındaki ZIP paketini manuel indirdiğinizde yanında verilen SHA-2
 | Sorun giderme | [docs/sorun-giderme.md](docs/sorun-giderme.md) |
 | Mimari | [docs/mimari.md](docs/mimari.md) |
 | Kaynak sorun denetimi | [docs/kaynak-sorun-denetimi.md](docs/kaynak-sorun-denetimi.md) |
-| v2.2.24 release notu | [docs/releases/v2.2.24.md](docs/releases/v2.2.24.md) |
+| v2.2.25 release notu | [docs/releases/v2.2.25.md](docs/releases/v2.2.25.md) |
 
 ## Geliştirme
 

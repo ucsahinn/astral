@@ -58,7 +58,7 @@ Seçili web domainlerini taşıyan küçük loopback proxy exe'sidir. `--allow <
 ## Hedef Modeli
 
 - `TargetDefinition`: id, ad, kategori, kapsam türü, domainler, executable ipuçları ve ikon anahtarını taşır.
-- `TargetRegistry`: Discord, Wattpad, Bigo Live, Azar, Tango, LiVU, IMVU ve Blogspot presetlerini sağlar.
+- `TargetRegistry`: Discord, Roblox, Wattpad, Bigo Live, Azar, Tango, LiVU, IMVU, Blogspot, Radio Garden, DW, VOA, Ekşi Sözlük, Grok, Imgur ve Pastebin presetlerini sağlar.
 - `TargetSelectionStore`: seçimi `settings.json` içinde saklar; eski özel hedef alanlarını sessizce yok sayar.
 - `TargetScopeResolver`: seçimi `RoutingPlan` haline getirir.
 - `RoutingPlan`: `AllowedApplications`, proxy domain kuralları ve kullanıcıya gösterilecek kapsam özetini içerir.

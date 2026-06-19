@@ -16,23 +16,26 @@ Bu doküman, GitHub Releases yüzeyindeki sürüm kararlarını ve yayın kapıs
 
 ## Güncel Sürüm Kararı
 
-Güncel patch hedef `v2.2.24` olarak belirlendi.
+Güncel patch hedef `v2.2.25` olarak belirlendi.
 
-Neden `v2.2.24`?
+Neden `v2.2.25`?
 
+- v2.2.24 release asset'i yayınlandıktan sonra arka plan video paketinin yerel doğrulanan build ile aynı olmadığı görüldü; aynı sürüm numarasına tekrar güncelleme yapılamayacağı için düzeltme zorunlu olarak `v2.2.25` hotfix'ine taşındı.
+- v2.2.25, istenen yeni arka plan videosunu SHA-256 doğrulamalı repo-local `Assets/background.mp4` olarak paketler; release build ve runtime uzak video fallback'i kullanmaz.
 - v2.2.21 tanı paketleri WireSock sürecinin ve Astral.WebProxy/PAC kapsamının başladığını, ancak transparent modda sanal adapter `Down` kaldığı için pasif readiness kapısının bağlantıyı yanlış başarısız saydığını gösterdi.
 - WireSock transparent mode sanal adapter `Up` kanıtına bağlı değildir; web hedefleri için doğru aktif kanıt, yalnız `Astral.WebProxy.exe` üzerinden seçili hedef hostlarına yapılan scoped `CONNECT` denemesidir.
 - v2.2.23, PAC uygulandıktan sonra seçili her web hedefi için scoped WebProxy kanıtı alır ve bu kanıtı transparent readiness kararına dahil eder.
 - Tarayıcı executable'ları yine WireSock `AllowedApps` içine girmez; proof trafiği yalnız `Astral.WebProxy.exe` sürecinden çıkar.
 - v2.2.21 yayınlandığı için bu bağlantı doğrulama düzeltmesi ayrı `v2.2.22` hotfix sürümü olarak çıkarılır; böylece 2.2.21 kullanıcıları otomatik güncelleme görür.
 - v2.2.22 yayınlandıktan sonra tek başarılı hostun yeterli olması daraltıldı; `v2.2.23` tüm seçili web hedefleri için hedef bazlı kanıt ister.
-- v2.2.24, hedef listeli canlı smoke proof kapısı, 16 preset, karttan web açma ve Astral VPN ürün yüzeyiyle bu hattı tamamlar.
+- v2.2.25, hedef listeli canlı smoke proof kapısı, 16 preset, karttan web açma, yeni arka plan videosu ve Astral VPN ürün yüzeyiyle bu hattı tamamlar.
 
 ## Public Release Yüzeyi
 
 | Release | Canlı durum | Asset durumu | Karar | Gerekçe |
 | --- | --- | --- | --- | --- |
-| `v2.2.24` | Aday | Bekleniyor | Yayına hazırsa oluştur | 16 hedef preset, karttan web açma, Astral VPN ürün yüzeyi ve hedef listeli canlı proof kapısı. |
+| `v2.2.25` | Aday | Bekleniyor | Yayına hazırsa oluştur | Yeni arka plan video paketi, hedef linkleri, Astral VPN ürün yüzeyi ve hedef listeli canlı proof kapısı. |
+| `v2.2.24` | Yayında | 4 asset | v2.2.25 ile üstlen | Yayın asset'i yerel doğrulanan yeni video build'iyle eşleşmediği için aynı sürüm yerine v2.2.25 hotfix'iyle ilerlenir. |
 | `v2.2.23` | Yayında | 4 asset | Koru | Transparent mode için seçili her web hedefinde scoped WebProxy aktif hedef kanıtı, tanı alanları ve kısmi başarıyı bağlı saymama hotfix'i. |
 | `v2.2.22` | Yayında | 4 asset | Koru | Transparent mode için scoped WebProxy aktif hedef kanıtı, tanı alanları ve v2.2.21 bağlantı başarısızlığı hotfix'i; v2.2.23 hedef bazlı kanıtla tamamlanır. |
 | `v2.2.21` | Yayında | 4 asset | Koru | Onarım timeout ayrımı, WireSock motor yenileme yolu, son süreç çıkışı tanısı ve hedef kartı rozet/layout hotfix'i; v2.2.22 tarafından scoped proof readiness ile tamamlanır. |
@@ -61,13 +64,13 @@ Neden `v2.2.24`?
 
 ## Yayın Kapısı
 
-`v2.2.24` yayınından önce tamamlanması gereken koşullar:
+`v2.2.25` yayınından önce tamamlanması gereken koşullar:
 
-- Proje, updater ve web proxy sürümü `2.2.24` ile aynı.
+- Proje, updater ve web proxy sürümü `2.2.25` ile aynı.
 - `src/Astral.App/app.manifest` kimlik sürümü proje sürümüyle aynı.
-- `Astral-2.2.24-win-x64.zip` ve sabit `Astral-win-x64.zip` aynı içeriği gösterir.
+- `Astral-2.2.25-win-x64.zip` ve sabit `Astral-win-x64.zip` aynı içeriği gösterir.
 - ZIP içinde `Astral.exe`, `Astral.Updater.exe`, `Astral.WebProxy.exe`, update manifest'i ve gerekli runtime dosyaları bulunur.
-- ZIP içindeki update manifest sürümü `2.2.24`.
+- ZIP içindeki update manifest sürümü `2.2.25`.
 - Astral release içinde eski isimli uyumluluk ZIP'i yayınlanmaz.
 - Kod imzalama sertifikası yapılandırılmadıysa paket imzasız olduğu açıkça not edilir.
 - `dotnet build`, Core tests, Windows tests, `scripts/verify.ps1`, `scripts/build-release.ps1`, `git diff --check` ve Gitleaks geçer.

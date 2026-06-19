@@ -18,6 +18,7 @@ Hedef seçimi ana ekranın sağ panelindedir. Kartlar ayrı bir pencere açmadan
 Hazır hedefler:
 
 - Discord
+- Roblox
 - Wattpad
 - Bigo Live
 - Azar
@@ -25,8 +26,17 @@ Hazır hedefler:
 - LiVU
 - IMVU
 - Blogspot
+- Radio Garden
+- DW
+- VOA
+- Ekşi Sözlük
+- Grok
+- Imgur
+- Pastebin
 
-Kartlardaki `Uygulama + Web`, `Web` ve `Uygulama` etiketleri yalnız kapsam türünü anlatır. Erişim durumunu, çalışma garantisini veya servislerin güncel durumunu iddia etmez.
+Kart seçimi yalnız kapsam türünü belirler. Erişim durumunu, çalışma garantisini veya servislerin güncel durumunu iddia etmez.
+
+Kart üzerindeki küçük dış bağlantı ikonu hedefin kendi web giriş sayfasını açar. Bu ikon görsel asset dosyasına gitmez ve kartın seçili/pasif durumunu değiştirmez.
 
 Bağlantı açıkken hedef seçimi kilitlenir. Kapsamı değiştirmek için önce **Bağlantıyı Kes** düğmesine basın, sonra hedef kartlarını güncelleyin.
 

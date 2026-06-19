@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Astral.Core.Configuration;
 using Astral.Core.Infrastructure;
 using Astral.Core.Profiles;
@@ -8,6 +9,21 @@ public sealed class WgcfProvisioner : IProfileProvisioner
 {
     private const long ProgressByteInterval = 1024 * 1024;
     private const double ProgressPercentInterval = 5;
+    private const int FailureDiagnosticMaxLength = 320;
+    private static readonly Regex SensitiveFailureAssignmentPattern = new(
+        @"(?ix)
+        \b(
+            privatekey|private[_-]?key|presharedkey|preshared[_-]?key|
+            token|access[_-]?token|refresh[_-]?token|password|passwd|
+            secret|client[_-]?secret|cookie|authorization|api[_-]?key|
+            x-api-key|session|jwt|set-cookie|connection[_-]?string
+        )\b
+        \s*[:=]\s*
+        [^\r\n]+",
+        RegexOptions.Compiled);
+    private static readonly Regex BearerFailurePattern = new(
+        @"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{8,}",
+        RegexOptions.Compiled);
 
     public const string Version = "2.2.31";
     public const long WindowsX64MaxBytes = 32L * 1024 * 1024;
@@ -142,7 +158,36 @@ public sealed class WgcfProvisioner : IProfileProvisioner
 
         throw new InvalidOperationException(
             $"{operation} çıkış kodu {result.ExitCode} ile başarısız oldu: " +
-            diagnostic.Trim().ReplaceLineEndings(" "));
+            SanitizeFailureDiagnostic(diagnostic));
+    }
+
+    private static string SanitizeFailureDiagnostic(string diagnostic)
+    {
+        var sanitized = SensitiveFailureAssignmentPattern.Replace(
+            diagnostic,
+            match =>
+            {
+                var equalsIndex = match.Value.IndexOf('=');
+                var colonIndex = match.Value.IndexOf(':');
+                var separatorIndex = equalsIndex < 0
+                    ? colonIndex
+                    : colonIndex < 0
+                        ? equalsIndex
+                        : Math.Min(equalsIndex, colonIndex);
+
+                var key = separatorIndex < 0
+                    ? match.Value.Trim()
+                    : match.Value[..separatorIndex].TrimEnd();
+                return key + " = [REDACTED]";
+            });
+        sanitized = BearerFailurePattern.Replace(sanitized, "Bearer [REDACTED]");
+        sanitized = sanitized.Trim().ReplaceLineEndings(" ");
+        if (sanitized.Length <= FailureDiagnosticMaxLength)
+        {
+            return sanitized;
+        }
+
+        return sanitized[..FailureDiagnosticMaxLength].TrimEnd() + " ...";
     }
 
     private static bool ShouldReportDownloadProgress(

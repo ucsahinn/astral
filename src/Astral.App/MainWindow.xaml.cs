@@ -31,6 +31,7 @@ using MediaColor = System.Windows.Media.Color;
 using MessageBox = System.Windows.MessageBox;
 using WpfBrush = System.Windows.Media.Brush;
 using WpfBrushes = System.Windows.Media.Brushes;
+using WpfButton = System.Windows.Controls.Button;
 using WpfCheckBox = System.Windows.Controls.CheckBox;
 using WpfImage = System.Windows.Controls.Image;
 using WpfPath = System.Windows.Shapes.Path;
@@ -48,13 +49,12 @@ public partial class MainWindow : Window, IDisposable
 
     private static readonly TimeSpan LiveDnsRefreshInterval = TimeSpan.FromSeconds(15);
     private static readonly char[] SvgViewBoxSeparators = new[] { ' ', ',' };
+    internal static Action<Uri>? OpenUriOverrideForTesting { get; set; }
 
     private static readonly Uri RepositoryUri = new(
         "https://github.com/ucsahinn/astral");
     private static readonly Uri ReleaseNotesUri = new(
-        "https://github.com/ucsahinn/astral/releases/tag/v2.2.24");
-    private static readonly Uri BackgroundVideoUri = new(
-        "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260606_154941_df1a96e1-a06f-450c-bd02-d863414cc1a0.mp4");
+        "https://github.com/ucsahinn/astral/releases/tag/v2.2.25");
     private static readonly string LocalBackgroundVideoPath = Path.Combine(
         AppContext.BaseDirectory,
         "Assets",
@@ -98,7 +98,6 @@ public partial class MainWindow : Window, IDisposable
     private readonly Dictionary<string, TargetProbeResult> _targetProbeResults =
         new(StringComparer.OrdinalIgnoreCase);
     private AppUpdateCheckResult? _pendingUpdate;
-    private bool _backgroundVideoRemoteFallbackTried;
     private bool _isBackgroundVideoStarted;
     private DateTimeOffset _lastDnsRefreshUtc = DateTimeOffset.MinValue;
     private (string Summary, string Detail) _cachedDnsStatus = ("Okunuyor", "Makinenin aldığı DNS");
@@ -863,10 +862,55 @@ public partial class MainWindow : Window, IDisposable
         object sender,
         MouseButtonEventArgs e)
     {
+        if (TryGetTargetOpenButton(e.OriginalSource, out var openTarget))
+        {
+            OpenTargetWebsite(openTarget);
+            e.Handled = true;
+            return;
+        }
+
         if (HandleLockedTargetActivation(sender))
         {
             e.Handled = true;
         }
+    }
+
+    private static bool TryGetTargetOpenButton(
+        object originalSource,
+        out TargetDefinition target)
+    {
+        target = null!;
+        var current = originalSource as DependencyObject;
+        while (current is not null)
+        {
+            if (current is WpfButton { Tag: TargetDefinition buttonTarget } button
+                && button.Name.StartsWith("TargetOpen_", StringComparison.Ordinal))
+            {
+                target = buttonTarget;
+                return true;
+            }
+
+            current = GetParentObject(current);
+        }
+
+        return false;
+    }
+
+    private static DependencyObject? GetParentObject(DependencyObject current)
+    {
+        try
+        {
+            var visualParent = VisualTreeHelper.GetParent(current);
+            if (visualParent is not null)
+            {
+                return visualParent;
+            }
+        }
+        catch (InvalidOperationException)
+        {
+        }
+
+        return LogicalTreeHelper.GetParent(current);
     }
 
     private void TargetToggle_PreviewKeyDown(
@@ -875,6 +919,13 @@ public partial class MainWindow : Window, IDisposable
     {
         if (e.Key is not (System.Windows.Input.Key.Enter or System.Windows.Input.Key.Space))
         {
+            return;
+        }
+
+        if (TryGetTargetOpenButton(e.OriginalSource, out var openTarget))
+        {
+            OpenTargetWebsite(openTarget);
+            e.Handled = true;
             return;
         }
 
@@ -1748,6 +1799,7 @@ public partial class MainWindow : Window, IDisposable
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
         var iconBadge = new Border
         {
@@ -1786,10 +1838,30 @@ public partial class MainWindow : Window, IDisposable
             FontWeight = FontWeights.SemiBold,
             Foreground = WpfBrushes.White,
             TextTrimming = TextTrimming.CharacterEllipsis,
-            MaxWidth = 92,
+            MaxWidth = 74,
             VerticalAlignment = VerticalAlignment.Center
         });
         grid.Children.Add(textStack);
+
+        var openButton = new WpfButton
+        {
+            Name = "TargetOpen_" + CreateSafeTargetName(target.Id),
+            Tag = target,
+            Width = 18,
+            Height = 18,
+            Margin = new Thickness(2, 0, 0, 0),
+            Padding = new Thickness(0),
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Top,
+            Style = (Style)FindResource("TargetLinkButtonStyle"),
+            ToolTip = $"{target.Label} sayfasını aç",
+            Content = CreateExternalLinkIcon(new SolidColorBrush(MediaColor.FromRgb(198, 244, 255)))
+        };
+        AutomationProperties.SetName(openButton, $"{target.Label} sayfasını aç");
+        ToolTipService.SetShowsToolTipOnKeyboardFocus(openButton, true);
+        openButton.Click += TargetOpenButton_Click;
+        Grid.SetColumn(openButton, 2);
+        grid.Children.Add(openButton);
 
         var warningBadge = new Border
         {
@@ -1813,11 +1885,21 @@ public partial class MainWindow : Window, IDisposable
                 TextAlignment = TextAlignment.Center
             }
         };
-        Grid.SetColumn(warningBadge, 1);
+        Grid.SetColumn(warningBadge, 2);
+        warningBadge.Margin = new Thickness(0, 16, 2, 0);
         grid.Children.Add(warningBadge);
         _targetWarningBadges[target.Id] = warningBadge;
 
         return grid;
+    }
+
+    private void TargetOpenButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is WpfButton { Tag: TargetDefinition target })
+        {
+            OpenTargetWebsite(target);
+            e.Handled = true;
+        }
     }
 
     private static FrameworkElement CreateTargetMark(
@@ -2082,6 +2164,20 @@ public partial class MainWindow : Window, IDisposable
             ClipToBounds = false,
             HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center
+        };
+    }
+
+    private static Viewbox CreateExternalLinkIcon(WpfBrush foreground)
+    {
+        return new Viewbox
+        {
+            Width = 12,
+            Height = 12,
+            Stretch = Stretch.Uniform,
+            Child = CreatePathIcon(
+                "M18 6H26V14 M26 6L14 18 M12 9H8C6.9 9 6 9.9 6 11V24C6 25.1 6.9 26 8 26H21C22.1 26 23 25.1 23 24V20",
+                foreground,
+                fill: false)
         };
     }
 
@@ -2536,27 +2632,6 @@ public partial class MainWindow : Window, IDisposable
             return;
         }
 
-        if (IsBackgroundVideoRemoteFallbackEnabled()
-            && !_backgroundVideoRemoteFallbackTried
-            && BackgroundVideo.Source is not null
-            && BackgroundVideo.Source.IsFile)
-        {
-            _backgroundVideoRemoteFallbackTried = true;
-            _isBackgroundVideoStarted = false;
-            _diagnostics.Warning(
-                "ui.backgroundVideo",
-                "Yerel arka plan videosu oynatılamadı, uzak video deneniyor.",
-                new Dictionary<string, string?>
-                {
-                    ["path"] = LocalBackgroundVideoPath,
-                    ["error"] = e.ErrorException?.Message
-                });
-            BackgroundVideo.Source = BackgroundVideoUri;
-            BackgroundVideo.Play();
-            _isBackgroundVideoStarted = true;
-            return;
-        }
-
         _isBackgroundVideoStarted = false;
         BackgroundVideo.Visibility = Visibility.Collapsed;
         _diagnostics.Warning(
@@ -2576,17 +2651,9 @@ public partial class MainWindow : Window, IDisposable
             StringComparison.Ordinal);
     }
 
-    private static bool IsBackgroundVideoRemoteFallbackEnabled()
-    {
-        return string.Equals(
-            Environment.GetEnvironmentVariable("ASTRAL_BACKGROUND_VIDEO_REMOTE_FALLBACK"),
-            "1",
-            StringComparison.Ordinal);
-    }
-
     private bool ShouldPlayBackgroundVideo(TunnelSnapshot snapshot)
     {
-        if (IsBackgroundVideoDisabled())
+        if (IsBackgroundVideoDisabled() || IsReducedMotionPreferred())
         {
             return false;
         }
@@ -2597,6 +2664,11 @@ public partial class MainWindow : Window, IDisposable
         }
 
         return true;
+    }
+
+    private static bool IsReducedMotionPreferred()
+    {
+        return !SystemParameters.ClientAreaAnimation;
     }
 
     private void UpdateBackgroundVideoForSnapshot(TunnelSnapshot snapshot)
@@ -2652,7 +2724,6 @@ public partial class MainWindow : Window, IDisposable
             return;
         }
 
-        _backgroundVideoRemoteFallbackTried = false;
         BackgroundVideo.Visibility = Visibility.Visible;
         BackgroundVideo.Source ??= videoUri;
 
@@ -2670,9 +2741,25 @@ public partial class MainWindow : Window, IDisposable
             return new Uri(LocalBackgroundVideoPath, UriKind.Absolute);
         }
 
-        return IsBackgroundVideoRemoteFallbackEnabled()
-            ? BackgroundVideoUri
-            : null;
+        return null;
+    }
+
+    internal static string GetLocalBackgroundVideoPathForTesting()
+    {
+        return LocalBackgroundVideoPath;
+    }
+
+    internal static bool TryGetBackgroundVideoUriForTesting(out Uri uri)
+    {
+        var videoUri = GetBackgroundVideoUri();
+        if (videoUri is null)
+        {
+            uri = RepositoryUri;
+            return false;
+        }
+
+        uri = videoUri;
+        return true;
     }
 
     public void HideToTrayOnStartup()
@@ -2906,8 +2993,8 @@ public partial class MainWindow : Window, IDisposable
         uri = RepositoryUri;
         if (target.Metadata.TryGetValue("launchUrl", out var rawLaunchUrl)
             && Uri.TryCreate(rawLaunchUrl, UriKind.Absolute, out var launchUri)
-            && launchUri.Scheme is "https" or "http"
-            && !string.IsNullOrWhiteSpace(launchUri.Host))
+            && launchUri.Scheme == Uri.UriSchemeHttps
+            && IsLaunchHostAllowed(target, launchUri.Host))
         {
             uri = launchUri;
             return true;
@@ -2928,6 +3015,23 @@ public partial class MainWindow : Window, IDisposable
 
         uri = fallbackUri;
         return true;
+    }
+
+    internal static bool TryGetTargetLaunchUriForTesting(
+        TargetDefinition target,
+        out Uri uri)
+    {
+        return TryGetTargetLaunchUri(target, out uri);
+    }
+
+    private static bool IsLaunchHostAllowed(TargetDefinition target, string host)
+    {
+        if (string.IsNullOrWhiteSpace(host))
+        {
+            return false;
+        }
+
+        return target.Domains.Any(domain => domain.Matches(host));
     }
 
     private void OpenReleaseNotes_Click(object sender, RoutedEventArgs e)
@@ -3469,6 +3573,12 @@ public partial class MainWindow : Window, IDisposable
 
     private static void OpenUri(Uri uri)
     {
+        if (OpenUriOverrideForTesting is { } openUriForTesting)
+        {
+            openUriForTesting(uri);
+            return;
+        }
+
         Process.Start(new ProcessStartInfo
         {
             FileName = uri.AbsoluteUri,
