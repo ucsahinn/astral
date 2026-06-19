@@ -97,6 +97,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Denetleyici transparent modda eksik probe'u tunnel-started loguyla kabul eder", ControllerAcceptsUnavailableWireSockProbeInTransparentModeAsync),
     ("Denetleyici transparent modda trafik kanıtıyla eksik handshake logunu kabul eder", ControllerAcceptsTrafficProofWithoutWireSockHandshakeLogAsync),
     ("Denetleyici transparent modda scoped web proxy kanıtıyla pasif adaptörü kabul eder", ControllerAcceptsScopedWebProxyProofInTransparentModeAsync),
+    ("Denetleyici uygulama hedeflerinde sadece web proxy kanıtıyla bağlı saymaz", ControllerRejectsAppTargetWhenOnlyScopedWebProxyProofExistsAsync),
     ("Denetleyici transparent modda handshake ve trafik kanıtı yokken bağlı raporlamaz", ControllerRejectsMissingWireSockHandshakeInTransparentModeAsync),
     ("Denetleyici son WireSock çıkışını tanılama detayına yazar", ControllerReportsWireSockExitAfterFinalReadinessProbeAsync),
     ("Denetleyici WireSock tunnel-started loguyla bağlı raporlar", ControllerAcceptsWireSockTunnelStartedLogAsync),
@@ -3608,6 +3609,82 @@ static async Task ControllerAcceptsScopedWebProxyProofInTransparentModeAsync()
             StringComparison.Ordinal));
         Assert(health.Contains(
             "scoped web proxy target proof confirmed readiness",
+            StringComparison.OrdinalIgnoreCase));
+    }
+    finally
+    {
+        await controller.DisposeAsync();
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task ControllerRejectsAppTargetWhenOnlyScopedWebProxyProofExistsAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var process = new FakeManagedProcess();
+    var accessLock = new FakeDiscordAccessLock();
+    var paths = new AppPaths(root);
+    var diagnostics = new AstralDiagnostics(
+        paths,
+        TimeSpan.Zero);
+    var discordManager = new FakeDiscordProcessManager(
+        new DiscordProcessSnapshot(
+            1,
+            [Path.Combine(root, "Discord", "app-1.0.9999", "Discord.exe")],
+            [100]));
+    var readinessProbe = new FakeTunnelReadinessProbe(
+        TunnelReadinessSnapshot.Ready(
+            "Up",
+            128,
+            256,
+            "wt0",
+            "WireGuard Tunnel"));
+    var webProxy = new FakeScopedWebProxyService
+    {
+        Proof = ScopedWebProxyProof.Verified(
+            "discord.com",
+            18088,
+            "Fake scoped web proxy target proof succeeded.")
+    };
+    var controller = new DiscordTunnelController(
+        paths,
+        new DiscordAppScope(root, root, root),
+        new FakeWireSockBootstrapper(Path.Combine(
+            root,
+            "WireSock VPN Client",
+            "bin",
+            WireSockPackage.CliExecutableFileName)),
+        new FakeProfileProvisioner(Path.Combine(root, "discord.conf")),
+        new FakeProcessLauncher(process, "WireSock started"),
+        TimeSpan.Zero,
+        accessLock,
+        diagnostics,
+        discordManager,
+        readinessProbe,
+        tunnelReadinessRetryDelay: TimeSpan.Zero,
+        webProxyService: webProxy);
+    controller.TrySetTargetSelection(new TargetSelection([TargetIds.Discord]));
+
+    try
+    {
+        await controller.ConnectAsync();
+
+        Assert(controller.Snapshot.State == TunnelState.Error);
+        Assert(process.HasExited);
+        Assert(webProxy.VerifyTargetAccessCount > 0);
+
+        var details = controller.CreateDiagnosticDetails();
+        Assert(details["wireSockMode"] == "transparent");
+        Assert(details["wireSockConnectionEstablished"] == "False");
+        Assert(details["webProxyProof.verified"] == "True");
+        Assert(details["wireSockHandshakeDiagnostic"]!.Contains(
+            "application targets still require WireSock handshake or adapter traffic proof",
+            StringComparison.OrdinalIgnoreCase));
+
+        var health = await File.ReadAllTextAsync(paths.HealthReport);
+        Assert(health.Contains("\"status\":\"hata\"", StringComparison.Ordinal));
+        Assert(health.Contains(
+            "application targets still require WireSock handshake or adapter traffic proof",
             StringComparison.OrdinalIgnoreCase));
     }
     finally

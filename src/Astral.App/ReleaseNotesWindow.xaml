@@ -82,11 +82,11 @@
                                 VerticalAlignment="Center">
                         <TextBlock FontSize="22"
                                    FontWeight="SemiBold"
-                                   Text="Astral VPN v2.2.26" />
+                                   Text="Astral VPN v2.2.27" />
                         <TextBlock Margin="0,5,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
-                                   Text="Arka plan video, hedef listesi ve paket hotfix'i" />
+                                   Text="Video görünürlüğü, hedef testi ve bağlantı kanıtı hotfix'i" />
                     </StackPanel>
                 </Grid>
 
@@ -109,7 +109,7 @@
                                            FontSize="14"
                                            LineHeight="21"
                                            TextWrapping="Wrap"
-                                           Text="Bu sürüm v2.2.24 yayın asset'inde eski arka plan videosunun kalması ihtimalini gideren hattı tamamlar. Astral VPN artık istenen arka plan videosunu yalnız SHA-256 ile doğrulanmış yerel paket asset'i olarak kullanır ve aktif hedef listesini Roblox olmadan 15 hazır preset'e indirir." />
+                                           Text="Bu sürüm v2.2.26 üzerinde kalan video görünürlüğü, hedef testi geri bildirimi ve hedef açma gecikmesi sorunlarını düzeltir. Astral VPN hâlâ yalnız seçili hedefleri kapsar; genel sistem VPN'i gibi davranmaz." />
                             </StackPanel>
                         </Border>
 
@@ -132,7 +132,7 @@
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Runtime uzak video fallback'i kaldırıldı; uygulama yalnız paketin içindeki Assets/background.mp4 dosyasını oynatır." />
+                                           Text="&#x2022; Yerel video yüklenemezse aynı doğrulanmış CloudFront kaynağı tanılamalı CDN fallback olarak denenir." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
@@ -160,11 +160,23 @@
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
+                                           Text="&#x2022; Hedef testi kartı artık doğru işletim merkezi kartını renklendirir; hedef kartlarında OK, ..., ! rozetleriyle test akışı görünür." />
+                                <TextBlock FontSize="13"
+                                           LineHeight="22"
+                                           TextWrapping="Wrap"
+                                           Text="&#x2022; Hedef ikonundan web açma test sonucunu beklemez; sayfa hemen açılır, kapsam testi arka planda güncellenir." />
+                                <TextBlock FontSize="13"
+                                           LineHeight="22"
+                                           TextWrapping="Wrap"
+                                           Text="&#x2022; Discord gibi uygulama kapsamlı hedeflerde Astral uygulamayı kendisi başlatmaz; app trafiği için WireSock kapsamı hazırlanır, dış-link butonu yalnız güvenli web girişini açar." />
+                                <TextBlock FontSize="13"
+                                           LineHeight="22"
+                                           TextWrapping="Wrap"
                                            Text="&#x2022; Wgcf/WireGuard yardımcı komut hatalarında private key, authorization, cookie ve token benzeri değerler loga yazılmadan maskelenir." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Windows animasyon azaltma tercihi açıksa arka plan videosu oynatılmaz; arayüz okunabilir overlay ile kalır." />
+                                           Text="&#x2022; Windows animasyon azaltma tercihi açıksa arka plan videosu görünür kalır, daha sakin hızla oynar; yalnız ASTRAL_DISABLE_BACKGROUND_VIDEO=1 videoyu kapatır." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
@@ -176,11 +188,11 @@
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; v2.2.24'te yayımlanan eski video asset'i aynı sürüm numarasıyla tekrar kullanılmaz; v2.2.26 gerçek güncelleme olarak gelir." />
+                                           Text="&#x2022; v2.2.26 üstüne yeni düzeltmeler aynı sürüm numarasıyla tekrar kullanılmaz; v2.2.27 gerçek güncelleme olarak gelir." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Sürüm metadata'sı, updater, web proxy ve uygulama içi release bağlantısı v2.2.26 ile hizalandı." />
+                                           Text="&#x2022; Sürüm metadata'sı, updater, web proxy ve uygulama içi release bağlantısı v2.2.27 ile hizalandı." />
                             </StackPanel>
                         </Border>
 
@@ -226,7 +238,7 @@
                     <TextBlock VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource MutedTextBrush}"
-                                   Text="Bu not, v2.2.26 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
+                                   Text="Bu not, v2.2.27 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
                     <Button Grid.Column="1"
                             Margin="0,0,10,0"
                             Height="40"

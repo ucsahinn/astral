@@ -52,11 +52,14 @@ public partial class MainWindow : Window, IDisposable
     private static readonly TimeSpan LiveDnsRefreshInterval = TimeSpan.FromSeconds(15);
     private static readonly char[] SvgViewBoxSeparators = new[] { ' ', ',' };
     internal static Action<Uri>? OpenUriOverrideForTesting { get; set; }
+    internal static Func<bool>? IsReducedMotionPreferredOverrideForTesting { get; set; }
 
     private static readonly Uri RepositoryUri = new(
         "https://github.com/ucsahinn/astral");
     private static readonly Uri ReleaseNotesUri = new(
-        "https://github.com/ucsahinn/astral/releases/tag/v2.2.26");
+        "https://github.com/ucsahinn/astral/releases/tag/v2.2.27");
+    private static readonly Uri BackgroundVideoCdnUri = new(
+        "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260328_105406_16f4600d-7a92-4292-b96e-b19156c7830a.mp4");
     private static readonly string LocalBackgroundVideoPath = Path.Combine(
         AppContext.BaseDirectory,
         "Assets",
@@ -92,6 +95,8 @@ public partial class MainWindow : Window, IDisposable
         new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Border> _targetWarningBadges =
         new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, TextBlock> _targetResultTexts =
+        new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, int> _targetOrder =
         new(StringComparer.OrdinalIgnoreCase);
     private bool _isApplyingSettings;
@@ -109,6 +114,8 @@ public partial class MainWindow : Window, IDisposable
         new(StringComparer.OrdinalIgnoreCase);
     private AppUpdateCheckResult? _pendingUpdate;
     private bool _isBackgroundVideoStarted;
+    private bool _backgroundVideoFallbackAttempted;
+    private string? _lastBackgroundVideoStatusKey;
     private DateTimeOffset _lastDnsRefreshUtc = DateTimeOffset.MinValue;
     private (string Summary, string Detail) _cachedDnsStatus = ("Okunuyor", "Makinenin aldığı DNS");
     private Forms.NotifyIcon? _trayIcon;
@@ -884,6 +891,7 @@ public partial class MainWindow : Window, IDisposable
         _targetStatusDots.Clear();
         _targetIconBadges.Clear();
         _targetWarningBadges.Clear();
+        _targetResultTexts.Clear();
         _targetOrder.Clear();
 
         var targets = _targetRegistry.GetBuiltInTargets();
@@ -1151,6 +1159,7 @@ public partial class MainWindow : Window, IDisposable
         {
             return probe.Status switch
             {
+                TargetProbeStatus.Queued => TargetCardState.Selected,
                 TargetProbeStatus.Running => TargetCardState.Connecting,
                 TargetProbeStatus.Success or TargetProbeStatus.ProfileScope => TargetCardState.InScope,
                 TargetProbeStatus.Failed => TargetCardState.Problem,
@@ -1196,11 +1205,7 @@ public partial class MainWindow : Window, IDisposable
 
         if (_targetWarningBadges.GetValueOrDefault(target.Id) is { } warningBadge)
         {
-            warningBadge.Visibility = state is TargetCardState.Problem
-                && _targetProbeResults.TryGetValue(target.Id, out var probe)
-                && probe.Status is TargetProbeStatus.Failed
-                ? Visibility.Visible
-                : Visibility.Collapsed;
+            ApplyTargetResultBadgeState(target, state, snapshot, warningBadge);
         }
 
         if (_targetIconBadges.GetValueOrDefault(target.Id) is not { } iconBadge)
@@ -1249,6 +1254,94 @@ public partial class MainWindow : Window, IDisposable
         }
 
         ApplyTargetToggleState(target, state);
+    }
+
+    private void ApplyTargetResultBadgeState(
+        TargetDefinition target,
+        TargetCardState state,
+        TunnelSnapshot snapshot,
+        Border badge)
+    {
+        if (!_targetResultTexts.TryGetValue(target.Id, out var text))
+        {
+            badge.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        badge.BeginAnimation(OpacityProperty, null);
+        if (!_targetProbeResults.TryGetValue(target.Id, out var probe)
+            || state is TargetCardState.Passive)
+        {
+            badge.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        var (label, background, border, foreground, pulse) = probe.Status switch
+        {
+            TargetProbeStatus.Queued => (
+                "...",
+                MediaColor.FromRgb(39, 80, 110),
+                MediaColor.FromRgb(125, 235, 255),
+                MediaColor.FromRgb(226, 244, 255),
+                false),
+            TargetProbeStatus.Running => (
+                "...",
+                MediaColor.FromRgb(255, 217, 85),
+                MediaColor.FromRgb(255, 232, 148),
+                MediaColor.FromRgb(19, 20, 28),
+                true),
+            TargetProbeStatus.Success or TargetProbeStatus.ProfileScope => (
+                "OK",
+                MediaColor.FromRgb(93, 255, 146),
+                MediaColor.FromRgb(185, 255, 213),
+                MediaColor.FromRgb(12, 36, 26),
+                false),
+            TargetProbeStatus.Failed => (
+                "!",
+                MediaColor.FromRgb(255, 122, 122),
+                MediaColor.FromRgb(255, 205, 205),
+                MediaColor.FromRgb(37, 12, 18),
+                false),
+            TargetProbeStatus.Skipped => (
+                "-",
+                MediaColor.FromRgb(120, 148, 166),
+                MediaColor.FromRgb(170, 211, 226),
+                MediaColor.FromRgb(11, 27, 38),
+                false),
+            _ => (
+                snapshot.IsConnected ? "..." : string.Empty,
+                MediaColor.FromRgb(39, 80, 110),
+                MediaColor.FromRgb(125, 235, 255),
+                MediaColor.FromRgb(226, 244, 255),
+                false)
+        };
+
+        if (string.IsNullOrWhiteSpace(label))
+        {
+            badge.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        text.Text = label;
+        text.Foreground = new SolidColorBrush(foreground);
+        badge.Background = new SolidColorBrush(background);
+        badge.BorderBrush = new SolidColorBrush(border);
+        badge.Visibility = Visibility.Visible;
+        badge.Opacity = 1;
+        badge.ToolTip = $"{target.Label}: {GetTargetProbeStatusText(probe.Status)}";
+        if (pulse)
+        {
+            badge.BeginAnimation(
+                OpacityProperty,
+                new DoubleAnimation
+                {
+                    From = 0.55,
+                    To = 1,
+                    Duration = TimeSpan.FromMilliseconds(420),
+                    AutoReverse = true,
+                    RepeatBehavior = RepeatBehavior.Forever
+                });
+        }
     }
 
     private void ApplyTargetToggleState(TargetDefinition target, TargetCardState state)
@@ -1330,6 +1423,7 @@ public partial class MainWindow : Window, IDisposable
     {
         return status switch
         {
+            TargetProbeStatus.Queued => "sırada",
             TargetProbeStatus.Running => "test ediliyor",
             TargetProbeStatus.Success => "başarılı",
             TargetProbeStatus.Failed => "sorunlu",
@@ -1376,6 +1470,7 @@ public partial class MainWindow : Window, IDisposable
 
         return result.Status switch
         {
+            TargetProbeStatus.Queued => "Sırada",
             TargetProbeStatus.Running => "Doğrulanıyor",
             TargetProbeStatus.Success or TargetProbeStatus.ProfileScope => "Kapsam aktif",
             TargetProbeStatus.Failed => "Sorunlu",
@@ -1388,6 +1483,7 @@ public partial class MainWindow : Window, IDisposable
     {
         return status switch
         {
+            TargetProbeStatus.Queued => new SolidColorBrush(MediaColor.FromRgb(125, 235, 255)),
             TargetProbeStatus.Running => new SolidColorBrush(MediaColor.FromRgb(255, 217, 85)),
             TargetProbeStatus.Success or TargetProbeStatus.ProfileScope
                 => new SolidColorBrush(MediaColor.FromRgb(93, 255, 146)),
@@ -1493,14 +1589,18 @@ public partial class MainWindow : Window, IDisposable
         if (HasSelectedTargetProbeFailure())
         {
             TargetTestSummary.Text =
-                "Hedef testi: kontrol gerekiyor. Kırmızı hedeflerde çıkış kanıtı alınamadı.";
+                _lastTargetTestSummary.Contains("kontrol gerekli", StringComparison.OrdinalIgnoreCase)
+                    ? "Hedef testi: " + _lastTargetTestSummary
+                    : "Hedef testi: kontrol gerekiyor. Kırmızı hedeflerde çıkış kanıtı alınamadı.";
             return;
         }
 
         if (HasSelectedTargetProbeSuccess())
         {
             TargetTestSummary.Text =
-                "Hedef testi: seçili hedefler doğrulandı.";
+                _lastTargetTestSummary.Contains("rota OK", StringComparison.OrdinalIgnoreCase)
+                    ? "Hedef testi: " + _lastTargetTestSummary
+                    : "Hedef testi: seçili hedefler doğrulandı.";
             return;
         }
 
@@ -1528,11 +1628,21 @@ public partial class MainWindow : Window, IDisposable
         var hasSelected = selectedCount > 0;
         var hasFailure = HasSelectedTargetProbeFailure();
         var hasSuccess = HasSelectedTargetProbeSuccess();
+        var verifiedCount = GetSelectedTargetProbeCount(
+            TargetProbeStatus.Success,
+            TargetProbeStatus.ProfileScope);
+        var failedCount = GetSelectedTargetProbeCount(TargetProbeStatus.Failed);
         TargetTestButton.IsEnabled = snapshot.IsConnected
             && !snapshot.IsBusy
             && !_isTargetTestRunning
             && hasSelected;
-        TargetTestButton.Content = _isTargetTestRunning ? "Test..." : "Test Et";
+        TargetTestButton.Content = _isTargetTestRunning
+            ? "Ölçülüyor"
+            : hasFailure
+                ? "Tekrar Dene"
+                : hasSuccess
+                    ? "Tekrar Test Et"
+                    : "Test Et";
         TargetTestButton.ToolTip = !hasSelected
             ? "Test edilecek hedef seçili değil."
             : snapshot.IsBusy
@@ -1542,11 +1652,22 @@ public partial class MainWindow : Window, IDisposable
                     : "Seçili hedeflerde bağlantı testini başlat";
         ToolTipService.SetShowOnDisabled(TargetTestButton, true);
         ToolTipService.SetShowsToolTipOnKeyboardFocus(TargetTestButton, true);
-
-        var borderColor = hasFailure
-            ? MediaColor.FromRgb(255, 122, 122)
+        var statusText = !hasSelected
+            ? "Yok"
             : _isTargetTestRunning
-                ? MediaColor.FromRgb(255, 217, 85)
+                ? "Ölçülüyor"
+                : hasFailure
+                    ? $"{failedCount} sorun"
+                    : hasSuccess
+                        ? $"{verifiedCount}/{selectedCount} OK"
+                        : snapshot.IsConnected
+                            ? "Hazır"
+                            : "Bekliyor";
+
+        var borderColor = _isTargetTestRunning
+            ? MediaColor.FromRgb(255, 217, 85)
+            : hasFailure
+                ? MediaColor.FromRgb(255, 122, 122)
                 : hasSuccess
                     ? MediaColor.FromRgb(93, 255, 146)
                     : snapshot.IsConnected
@@ -1557,6 +1678,26 @@ public partial class MainWindow : Window, IDisposable
             hasFailure || hasSuccess ? 28 : 16,
             hasFailure || hasSuccess || _isTargetTestRunning ? 0.52 : 0.20,
             borderColor);
+        TargetTestStatusBadge.BorderBrush = new SolidColorBrush(borderColor);
+        TargetTestStatusBadge.Background = new SolidColorBrush(MediaColor.FromArgb(
+            hasFailure || hasSuccess || _isTargetTestRunning ? (byte)102 : (byte)52,
+            borderColor.R,
+            borderColor.G,
+            borderColor.B));
+        TargetTestStatusText.Foreground = new SolidColorBrush(hasFailure
+            ? MediaColor.FromRgb(255, 232, 202)
+            : hasSuccess
+                ? MediaColor.FromRgb(221, 255, 232)
+                : MediaColor.FromRgb(226, 244, 255));
+        TargetTestStatusText.Text = statusText;
+    }
+
+    private int GetSelectedTargetProbeCount(params TargetProbeStatus[] statuses)
+    {
+        return _controller.CurrentRoutingPlan
+            .SelectedTargets
+            .Count(target => _targetProbeResults.TryGetValue(target.Id, out var result)
+                && statuses.Contains(result.Status));
     }
 
     private bool HasSelectedTargetProbeFailure()
@@ -1614,9 +1755,19 @@ public partial class MainWindow : Window, IDisposable
         }
 
         _isTargetTestRunning = true;
+        _targetProbeResults.Clear();
+        foreach (var target in selectedTargets)
+        {
+            _targetProbeResults[target.Id] = new TargetProbeResult(
+                TargetProbeStatus.Queued,
+                null,
+                "Hedef test sırasına alındı.",
+                DateTimeOffset.Now);
+        }
         TargetTestSummary.Text =
             "Kapsam doğrulaması başladı; seçili hedefler sırayla ölçülüyor.";
         _lastTargetTestSummary = "Kapsam doğrulaması çalışıyor.";
+        RefreshTargetScopeView(locked: true);
         ApplyTargetTestCardState(snapshot);
         _diagnostics.Info(
             "ui.targetTest.autoStart",
@@ -1636,7 +1787,7 @@ public partial class MainWindow : Window, IDisposable
             return;
         }
 
-        using var timeoutSource = new CancellationTokenSource(TimeSpan.FromSeconds(75));
+        using var timeoutSource = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         using var linkedSource = CancellationTokenSource.CreateLinkedTokenSource(
             timeoutSource.Token,
             lifetimeToken);
@@ -1835,13 +1986,13 @@ public partial class MainWindow : Window, IDisposable
         var startedAt = DateTimeOffset.Now;
         try
         {
-            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(6));
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(4));
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(
                 cancellationToken,
                 timeout.Token);
             using var client = new TcpClient();
             await client.ConnectAsync(IPAddress.Loopback, proxyPort)
-                .WaitAsync(TimeSpan.FromSeconds(3), linked.Token);
+                .WaitAsync(TimeSpan.FromMilliseconds(1500), linked.Token);
             await using var stream = client.GetStream();
             var request = Encoding.ASCII.GetBytes(
                 $"CONNECT {host}:443 HTTP/1.1\r\nHost: {host}:443\r\nProxy-Connection: close\r\n\r\n");
@@ -2084,6 +2235,7 @@ public partial class MainWindow : Window, IDisposable
     private enum TargetProbeStatus
     {
         NotTested,
+        Queued,
         Running,
         Success,
         ProfileScope,
@@ -2186,32 +2338,35 @@ public partial class MainWindow : Window, IDisposable
         Grid.SetColumn(openButton, 2);
         grid.Children.Add(openButton);
 
+        var resultText = new TextBlock
+        {
+            Text = "!",
+            FontSize = 8.8,
+            FontWeight = FontWeights.Black,
+            Foreground = new SolidColorBrush(MediaColor.FromRgb(19, 20, 28)),
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            TextAlignment = TextAlignment.Center
+        };
         var warningBadge = new Border
         {
-            Width = 14,
-            Height = 14,
+            MinWidth = 18,
+            Height = 16,
+            Padding = new Thickness(4, 0, 4, 0),
             HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Bottom,
-            CornerRadius = new CornerRadius(7),
+            CornerRadius = new CornerRadius(8),
             Background = new SolidColorBrush(MediaColor.FromRgb(255, 199, 89)),
             BorderBrush = WpfBrushes.White,
             BorderThickness = new Thickness(1),
             Visibility = Visibility.Collapsed,
-            Child = new TextBlock
-            {
-                Text = "!",
-                FontSize = 9,
-                FontWeight = FontWeights.Black,
-                Foreground = new SolidColorBrush(MediaColor.FromRgb(19, 20, 28)),
-                HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center,
-                TextAlignment = TextAlignment.Center
-            }
+            Child = resultText
         };
         Grid.SetColumn(warningBadge, 2);
-        warningBadge.Margin = new Thickness(0, 16, 2, 0);
+        warningBadge.Margin = new Thickness(0, 16, 0, 0);
         grid.Children.Add(warningBadge);
         _targetWarningBadges[target.Id] = warningBadge;
+        _targetResultTexts[target.Id] = resultText;
 
         return grid;
     }
@@ -2971,6 +3126,19 @@ public partial class MainWindow : Window, IDisposable
         UpdateBackgroundVideoForSnapshot(_controller.Snapshot);
     }
 
+    private void BackgroundVideo_MediaOpened(object sender, RoutedEventArgs e)
+    {
+        if (!ShouldPlayBackgroundVideo(_controller.Snapshot))
+        {
+            StopBackgroundVideo();
+            return;
+        }
+
+        BackgroundVideo.Visibility = Visibility.Visible;
+        BackgroundVideo.Play();
+        _isBackgroundVideoStarted = true;
+    }
+
     private void BackgroundVideo_MediaEnded(object sender, RoutedEventArgs e)
     {
         if (!ShouldPlayBackgroundVideo(_controller.Snapshot))
@@ -2991,6 +3159,32 @@ public partial class MainWindow : Window, IDisposable
         if (!ShouldPlayBackgroundVideo(_controller.Snapshot))
         {
             StopBackgroundVideo();
+            return;
+        }
+
+        if (!_backgroundVideoFallbackAttempted
+            && BackgroundVideo.Source is not null
+            && BackgroundVideo.Source.IsFile)
+        {
+            _backgroundVideoFallbackAttempted = true;
+            _isBackgroundVideoStarted = false;
+            _diagnostics.Warning(
+                "ui.backgroundVideo",
+                "Yerel arka plan videosu yuklenemedi; CDN fallback deneniyor.",
+                new Dictionary<string, string?>
+                {
+                    ["error"] = e.ErrorException?.Message,
+                    ["sourceKind"] = "local-file"
+                });
+            BackgroundVideo.Stop();
+            BackgroundVideo.Source = BackgroundVideoCdnUri;
+            BackgroundVideo.Visibility = Visibility.Visible;
+            if (BackgroundVideo.IsLoaded)
+            {
+                BackgroundVideo.Play();
+                _isBackgroundVideoStarted = true;
+            }
+
             return;
         }
 
@@ -3015,13 +3209,19 @@ public partial class MainWindow : Window, IDisposable
 
     private bool ShouldPlayBackgroundVideo(TunnelSnapshot snapshot)
     {
-        if (IsBackgroundVideoDisabled() || IsReducedMotionPreferred())
+        if (IsBackgroundVideoDisabled())
         {
+            LogBackgroundVideoStatusOnce(
+                "disabled-env",
+                "Arka plan videosu ortam ayariyla kapatildi.");
             return false;
         }
 
         if (!IsVisible || WindowState == WindowState.Minimized)
         {
+            LogBackgroundVideoStatusOnce(
+                "window-hidden",
+                "Arka plan videosu pencere gorunur degilken durduruldu.");
             return false;
         }
 
@@ -3030,7 +3230,34 @@ public partial class MainWindow : Window, IDisposable
 
     private static bool IsReducedMotionPreferred()
     {
+        if (IsReducedMotionPreferredOverrideForTesting is { } overrideForTesting)
+        {
+            return overrideForTesting();
+        }
+
         return !SystemParameters.ClientAreaAnimation;
+    }
+
+    private void LogBackgroundVideoStatusOnce(
+        string key,
+        string message,
+        IReadOnlyDictionary<string, string?>? details = null)
+    {
+        if (string.Equals(_lastBackgroundVideoStatusKey, key, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _lastBackgroundVideoStatusKey = key;
+        _diagnostics.Info(
+            "ui.backgroundVideo",
+            message,
+            details is null
+                ? new Dictionary<string, string?>
+                {
+                    ["status"] = key
+                }
+                : details.ToDictionary(pair => pair.Key, pair => pair.Value));
     }
 
     private void UpdateBackgroundVideoForSnapshot(TunnelSnapshot snapshot)
@@ -3088,6 +3315,15 @@ public partial class MainWindow : Window, IDisposable
 
         BackgroundVideo.Visibility = Visibility.Visible;
         BackgroundVideo.Source ??= videoUri;
+        BackgroundVideo.SpeedRatio = IsReducedMotionPreferred() ? 0.82 : 1.0;
+        LogBackgroundVideoStatusOnce(
+            "playing:" + (videoUri.IsFile ? "local" : "cdn"),
+            "Arka plan videosu baslatildi.",
+            new Dictionary<string, string?>
+            {
+                ["sourceKind"] = videoUri.IsFile ? "local-file" : "cdn",
+                ["reducedMotionPreferred"] = IsReducedMotionPreferred().ToString()
+            });
 
         if (BackgroundVideo.IsLoaded)
         {
@@ -3108,7 +3344,7 @@ public partial class MainWindow : Window, IDisposable
             return new Uri(SourceBackgroundVideoPath, UriKind.Absolute);
         }
 
-        return null;
+        return BackgroundVideoCdnUri;
     }
 
     internal static string GetLocalBackgroundVideoPathForTesting()
@@ -3335,37 +3571,11 @@ public partial class MainWindow : Window, IDisposable
             return;
         }
 
-        if (target.HasWebScope
+        var shouldRefreshTargetProof = target.HasWebScope
             && (!_targetProbeResults.TryGetValue(target.Id, out var result)
                 || result.Status is TargetProbeStatus.Failed
                     or TargetProbeStatus.NotTested
-                    or TargetProbeStatus.Skipped))
-        {
-            TargetTestSummary.Text =
-                $"{target.Label} için önce hedef testi çalıştırılıyor.";
-            _ = Dispatcher.BeginInvoke(
-                new Action(async () =>
-                {
-                    try
-                    {
-                        await RunSelectedTargetsProbeAsync();
-                        if (_targetProbeResults.TryGetValue(target.Id, out var verified)
-                            && (verified.Status is TargetProbeStatus.Success
-                                or TargetProbeStatus.ProfileScope))
-                        {
-                            OpenTargetWebsite(target);
-                        }
-                    }
-                    catch (OperationCanceledException)
-                    {
-                    }
-                    catch (ObjectDisposedException)
-                    {
-                    }
-                }),
-                DispatcherPriority.Background);
-            return;
-        }
+                    or TargetProbeStatus.Skipped);
 
         if (!TryGetTargetLaunchUri(target, out var uri))
         {
@@ -3382,6 +3592,27 @@ public partial class MainWindow : Window, IDisposable
         try
         {
             OpenUri(uri);
+            if (shouldRefreshTargetProof && !_isTargetTestRunning)
+            {
+                TargetTestSummary.Text =
+                    $"{target.Label} açıldı; kapsam testi arka planda güncelleniyor.";
+                _ = Dispatcher.BeginInvoke(
+                    new Action(async () =>
+                    {
+                        try
+                        {
+                            await RunSelectedTargetsProbeAsync();
+                        }
+                        catch (OperationCanceledException)
+                        {
+                        }
+                        catch (ObjectDisposedException)
+                        {
+                        }
+                    }),
+                    DispatcherPriority.Background);
+            }
+
             _diagnostics.Info(
                 "ui.targetOpen",
                 "Hedef web girişi açıldı.",
@@ -4050,7 +4281,7 @@ public partial class MainWindow : Window, IDisposable
         e.Cancel = true;
         await CloseAfterShutdownCleanupAsync(
             "window-close",
-            recoverOnFailure: true,
+            recoverOnFailure: false,
             deferClose: true);
     }
 
@@ -4078,9 +4309,14 @@ public partial class MainWindow : Window, IDisposable
 
         try
         {
-            await DisposeControllerForShutdownAsync(
-                operation,
-                ShutdownCleanupTimeout);
+            if (!await DisposeControllerForShutdownAsync(
+                    operation,
+                    ShutdownCleanupTimeout))
+            {
+                throw new TimeoutException(
+                    "Shutdown cleanup did not complete before the UI timeout.");
+            }
+
             SetMaintenanceProgress(
                 100,
                 "Kapanış tamamlandı",

@@ -18,8 +18,8 @@
     <AssemblyCompany>ucsahinn</AssemblyCompany>
     <AssemblyProduct>Astral VPN</AssemblyProduct>
     <Copyright>Copyright (c) 2026 ucsahinn</Copyright>
-    <Version>2.2.26</Version>
-    <FileVersion>2.2.26.0</FileVersion>
+    <Version>2.2.27</Version>
+    <FileVersion>2.2.27.0</FileVersion>
     <RepositoryUrl>https://github.com/ucsahinn/astral</RepositoryUrl>
     <PublishTrimmed>false</PublishTrimmed>
     <PublishSingleFile>false</PublishSingleFile>
@@ -32,6 +32,10 @@
                       ReferenceOutputAssembly="false" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="Assets\background.mp4">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
     <Resource Include="Assets\astral-mark.png" />
     <Resource Include="Assets\astral-v2.ico" />
     <Resource Include="Assets\targets\discord.svg" />

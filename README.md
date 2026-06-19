@@ -79,7 +79,7 @@ Başlangıç presetleri:
 - Genel tarayıcı exe'lerini WireSock `AllowedApps` kapsamına almaz.
 - HTTPS içeriğini çözmez, TLS MITM yapmaz ve sertifika kurmaz; proxy yalnızca CONNECT host/Host allowlist kontrolü yapar.
 - WireSock ve wgcf ikili dosyalarını repoya gömmez; release paketindeki WireSock fallback kurucusu varsa hash, imza, yayıncı ve sürümle doğrulanır.
-- Arka plan videosu release paketine SHA-256 ile doğrulanmış repo-local `Assets/background.mp4` olarak eklenir; release build ve runtime kör CDN oynatması yapmaz.
+- Arka plan videosu release paketine SHA-256 ile doğrulanmış repo-local `Assets/background.mp4` olarak eklenir; normal akışta yerel dosya oynatılır, yerel asset yüklenemezse tanılamaya yazılarak aynı doğrulanmış CloudFront kaynağı CDN fallback olarak denenir. Windows azaltılmış hareket tercihinde video gizlenmez, daha sakin hızla oynatılır; manuel kapatma için `ASTRAL_DISABLE_BACKGROUND_VIDEO=1` kullanılabilir.
 - Otomatik güncelleme paketini GitHub release asset bilgisi, `.sha256.txt`, GitHub digest ve manifest kontrolleriyle eşleştirir.
 - Gizli profil, hesap ve log dosyalarını repoya veya release arşivine eklemez.
 
@@ -106,7 +106,7 @@ Release sayfasındaki ZIP paketini manuel indirdiğinizde yanında verilen SHA-2
 | Sorun giderme | [docs/sorun-giderme.md](docs/sorun-giderme.md) |
 | Mimari | [docs/mimari.md](docs/mimari.md) |
 | Kaynak sorun denetimi | [docs/kaynak-sorun-denetimi.md](docs/kaynak-sorun-denetimi.md) |
-| v2.2.26 release notu | [docs/releases/v2.2.26.md](docs/releases/v2.2.26.md) |
+| v2.2.27 release notu | [docs/releases/v2.2.27.md](docs/releases/v2.2.27.md) |
 
 ## Geliştirme
 

@@ -22,6 +22,8 @@
         StateChanged="Window_StateChanged">
     <Grid ClipToBounds="True">
         <MediaElement x:Name="BackgroundVideo"
+                      HorizontalAlignment="Stretch"
+                      VerticalAlignment="Stretch"
                       LoadedBehavior="Manual"
                       UnloadedBehavior="Close"
                       Stretch="UniformToFill"
@@ -29,6 +31,7 @@
                       Opacity="1"
                       IsHitTestVisible="False"
                       Loaded="BackgroundVideo_Loaded"
+                      MediaOpened="BackgroundVideo_MediaOpened"
                       MediaEnded="BackgroundVideo_MediaEnded"
                       MediaFailed="BackgroundVideo_MediaFailed" />
 
@@ -39,15 +42,15 @@
         <Rectangle IsHitTestVisible="False">
             <Rectangle.Fill>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                    <GradientStop Color="#32040710" Offset="0" />
-                    <GradientStop Color="#1A091322" Offset="0.34" />
-                    <GradientStop Color="#07071120" Offset="0.72" />
-                    <GradientStop Color="#0E040710" Offset="1" />
+                    <GradientStop Color="#26040710" Offset="0" />
+                    <GradientStop Color="#12091322" Offset="0.34" />
+                    <GradientStop Color="#03071120" Offset="0.72" />
+                    <GradientStop Color="#08040710" Offset="1" />
                 </LinearGradientBrush>
             </Rectangle.Fill>
         </Rectangle>
 
-        <Rectangle IsHitTestVisible="False" Opacity="0.045">
+        <Rectangle IsHitTestVisible="False" Opacity="0.035">
             <Rectangle.Fill>
                 <RadialGradientBrush Center="0.72,0.42"
                                      GradientOrigin="0.72,0.38"
@@ -61,7 +64,7 @@
             </Rectangle.Fill>
         </Rectangle>
 
-        <Rectangle IsHitTestVisible="False" Opacity="0.10">
+        <Rectangle IsHitTestVisible="False" Opacity="0.075">
             <Rectangle.Fill>
                 <LinearGradientBrush StartPoint="0,1" EndPoint="0,0">
                     <GradientStop Color="#88040710" Offset="0" />
@@ -71,7 +74,7 @@
             </Rectangle.Fill>
         </Rectangle>
 
-        <Rectangle IsHitTestVisible="False" Opacity="0.025">
+        <Rectangle IsHitTestVisible="False" Opacity="0.02">
             <Rectangle.Fill>
                 <RadialGradientBrush Center="0.26,0.44"
                                      GradientOrigin="0.22,0.36"
@@ -84,7 +87,7 @@
             </Rectangle.Fill>
         </Rectangle>
 
-        <Rectangle IsHitTestVisible="False" Opacity="0.018">
+        <Rectangle IsHitTestVisible="False" Opacity="0.014">
             <Rectangle.Fill>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
                     <GradientStop Color="#307DEBFF" Offset="0" />
@@ -620,8 +623,7 @@
                                          Margin="-4,7,-4,0"
                                          Rows="1"
                                          Columns="4">
-                                <Border x:Name="TargetTestCardBorder"
-                                        Margin="4,0"
+                                <Border Margin="4,0"
                                         Padding="9,7"
                                         CornerRadius="8"
                                         BorderBrush="#429CD4FF"
@@ -721,7 +723,8 @@
                                     </Grid>
                                 </Border>
 
-                                <Border Margin="4,0"
+                                <Border x:Name="TargetTestCardBorder"
+                                        Margin="4,0"
                                         Padding="9,7"
                                         CornerRadius="8"
                                         BorderBrush="#429CD4FF"
@@ -733,25 +736,49 @@
                                             <RowDefinition Height="30" />
                                             <RowDefinition Height="Auto" />
                                         </Grid.RowDefinitions>
-                                        <StackPanel Orientation="Horizontal">
-                                            <Viewbox Width="15"
-                                                     Height="15"
-                                                     Margin="0,0,7,0"
-                                                     Stretch="Uniform">
-                                                <Canvas Width="24" Height="24">
-                                                    <Path Stroke="{StaticResource AccentCyanBrush}"
-                                                          StrokeThickness="1.8"
-                                                          StrokeStartLineCap="Round"
-                                                          StrokeEndLineCap="Round"
-                                                          StrokeLineJoin="Round"
-                                                          Fill="Transparent"
-                                                          Data="M4,12 A8,8 0 1 1 12,20 A8,8 0 0 1 4,12 Z M8.5,12.2 L11,14.7 L15.8,9.8" />
-                                                </Canvas>
-                                            </Viewbox>
-                                            <TextBlock FontSize="12.2"
-                                                       FontWeight="SemiBold"
-                                                       Text="Hedef testi" />
-                                        </StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Orientation="Horizontal">
+                                                <Viewbox Width="15"
+                                                         Height="15"
+                                                         Margin="0,0,7,0"
+                                                         Stretch="Uniform">
+                                                    <Canvas Width="24" Height="24">
+                                                        <Path Stroke="{StaticResource AccentCyanBrush}"
+                                                              StrokeThickness="1.8"
+                                                              StrokeStartLineCap="Round"
+                                                              StrokeEndLineCap="Round"
+                                                              StrokeLineJoin="Round"
+                                                              Fill="Transparent"
+                                                              Data="M4,12 A8,8 0 1 1 12,20 A8,8 0 0 1 4,12 Z M8.5,12.2 L11,14.7 L15.8,9.8" />
+                                                    </Canvas>
+                                                </Viewbox>
+                                                <TextBlock FontSize="12.2"
+                                                           FontWeight="SemiBold"
+                                                           Text="Hedef testi" />
+                                            </StackPanel>
+                                            <Border Grid.Column="1"
+                                                    x:Name="TargetTestStatusBadge"
+                                                    MinWidth="42"
+                                                    Height="18"
+                                                    Padding="6,0"
+                                                    CornerRadius="6"
+                                                    BorderBrush="#509CD4FF"
+                                                    BorderThickness="1"
+                                                    Background="#33101D31"
+                                                    VerticalAlignment="Center">
+                                                <TextBlock x:Name="TargetTestStatusText"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"
+                                                           FontSize="9.6"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{StaticResource SecondaryTextBrush}"
+                                                           Text="Bekliyor" />
+                                            </Border>
+                                        </Grid>
                                         <TextBlock Grid.Row="1"
                                                    x:Name="TargetTestSummary"
                                                    Margin="0,4,0,4"
@@ -1092,7 +1119,7 @@
                                VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource SecondaryTextBrush}"
-                               Text="v2.2.26" />
+                               Text="v2.2.27" />
 
                     <Button Grid.Column="4"
                             x:Name="AutoUpdateButton"

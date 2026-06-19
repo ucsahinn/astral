@@ -15,6 +15,7 @@ using Astral.App.Installation;
 using Astral.App.Security;
 using Astral.Core.Configuration;
 using Astral.Core.Connection;
+using Astral.Core.Diagnostics;
 using Astral.Core.Discord;
 using Astral.Core.Firewall;
 using Astral.Core.Infrastructure;
@@ -92,6 +93,7 @@ static void RenderWindows()
                 try
                 {
                     RenderMainWindow();
+                    VerifyBackgroundVideoRespectsReducedMotion();
                     VerifyConnectedTargetCardsRequireProbeEvidence();
                     VerifyStartupUpdateCheckShowsAvailableUpdate();
                     VerifyWindowLifetimeBehavior();
@@ -138,7 +140,7 @@ static void RenderMainWindow()
     {
         Environment.SetEnvironmentVariable(
             "ASTRAL_DISABLE_BACKGROUND_VIDEO",
-            null);
+            "1");
         if (File.Exists(localBackgroundVideoPath))
         {
             File.Delete(localBackgroundVideoPath);
@@ -150,7 +152,7 @@ static void RenderMainWindow()
         SaveWindowPng(window, Path.Combine(
             FindRepositoryRoot(),
             "artifacts",
-            "ui-main-window-v2.2.26.png"));
+            "ui-main-window-v2.2.27.png"));
 
         Assert(window.ResizeMode == ResizeMode.NoResize);
         Assert(window.Width == 1280);
@@ -222,6 +224,13 @@ static void RenderMainWindow()
         Assert(targetTestButton.ToolTip?.ToString() == "Önce Astral bağlantısını açın.");
         Assert(ToolTipService.GetShowOnDisabled(targetTestButton) == true);
         Assert(ToolTipService.GetShowsToolTipOnKeyboardFocus(targetTestButton) == true);
+        var targetTestStatusText = FindVisualChildren<TextBlock>(window)
+            .Single(block => block.Name == "TargetTestStatusText");
+        Assert(targetTestStatusText.Text == "Bekliyor");
+        var targetTestCard = FindVisualChildren<Border>(window)
+            .Single(border => border.Name == "TargetTestCardBorder");
+        Assert(FindVisualChildren<TextBlock>(targetTestCard)
+            .Any(block => block.Text == "Hedef testi"));
         var releaseNotesButton = FindVisualChildren<Button>(window)
             .Single(button => button.Name == "ReleaseNotesButton");
         var releaseNotesButtonText = FindVisualChildren<TextBlock>(releaseNotesButton)
@@ -507,6 +516,15 @@ static void RenderMainWindow()
         window.Close();
         window = null;
 
+        Assert(MainWindow.TryGetBackgroundVideoUriForTesting(
+            out var fallbackBackgroundVideoUri));
+        Assert(fallbackBackgroundVideoUri.IsFile
+            || fallbackBackgroundVideoUri.Scheme == Uri.UriSchemeHttps);
+        if (!fallbackBackgroundVideoUri.IsFile)
+        {
+            Assert(fallbackBackgroundVideoUri.Host == "d8j0ntlcm91z4.cloudfront.net");
+        }
+
         Directory.CreateDirectory(Path.GetDirectoryName(localBackgroundVideoPath)!);
         File.WriteAllBytes(localBackgroundVideoPath, [0, 0, 0, 0]);
         Assert(MainWindow.TryGetBackgroundVideoUriForTesting(
@@ -534,11 +552,55 @@ static void RenderMainWindow()
     Console.WriteLine("GEÇTİ Ana pencere çizildi");
 }
 
+static void VerifyBackgroundVideoRespectsReducedMotion()
+{
+    MainWindow? window = null;
+    var root = CreateTemporaryDirectory();
+    var previousVideoSetting = Environment.GetEnvironmentVariable(
+        "ASTRAL_DISABLE_BACKGROUND_VIDEO");
+    try
+    {
+        Environment.SetEnvironmentVariable(
+            "ASTRAL_DISABLE_BACKGROUND_VIDEO",
+            null);
+        MainWindow.IsReducedMotionPreferredOverrideForTesting = () => true;
+
+        window = CreateMainWindow(root);
+        window.Show();
+        window.UpdateLayout();
+
+        var backgroundVideo = FindVisualChildren<MediaElement>(window).Single();
+        Assert(backgroundVideo.Visibility == Visibility.Visible);
+        Assert(backgroundVideo.Source is not null);
+        Assert(backgroundVideo.SpeedRatio < 1);
+        PumpDispatcherUntil(
+            () => backgroundVideo.Visibility == Visibility.Visible
+                && backgroundVideo.Source is not null,
+            TimeSpan.FromSeconds(3));
+        SaveWindowPng(window, Path.Combine(
+            FindRepositoryRoot(),
+            "artifacts",
+            "ui-main-window-video-v2.2.27.png"));
+    }
+    finally
+    {
+        MainWindow.IsReducedMotionPreferredOverrideForTesting = null;
+        ForceCloseWindow(window);
+        Environment.SetEnvironmentVariable(
+            "ASTRAL_DISABLE_BACKGROUND_VIDEO",
+            previousVideoSetting);
+        Directory.Delete(root, recursive: true);
+    }
+
+    Console.WriteLine("GEÇTİ Arka plan videosu azaltılmış harekette sakin hızla görünür kaldı");
+}
+
 static void VerifyWindowLifetimeBehavior()
 {
     VerifyCloseHidesToTrayWhenRunInBackgroundIsEnabled();
     VerifyTrayExitDisposesActiveConnectionWhenRunInBackgroundIsEnabled();
     VerifyTrayExitDoesNotHangWhenControllerCleanupIsSlow();
+    VerifyWindowCloseDoesNotRecoverWhenControllerCleanupIsSlow();
 
     Console.WriteLine("GEÇTİ Pencere kapanış ve arka plan davranışı doğrulandı");
 }
@@ -552,7 +614,12 @@ static void VerifyConnectedTargetCardsRequireProbeEvidence()
 
     try
     {
-        window = CreateMainWindow(root, launcher);
+        window = CreateMainWindow(
+            root,
+            launcher,
+            diagnostics: new AstralDiagnostics(
+                new AppPaths(root),
+                TimeSpan.Zero));
         window.Show();
         window.UpdateLayout();
 
@@ -592,7 +659,8 @@ static void VerifyConnectedTargetCardsRequireProbeEvidence()
                 RoutedEvent = System.Windows.Input.Keyboard.PreviewKeyDownEvent
             });
 
-            Assert(openedUris.Count == 0);
+            Assert(openedUris.Count == 1);
+            Assert(openedUris.Single().Host == "discord.com");
             Assert(discordCard.IsChecked == wasChecked);
         }
         finally
@@ -656,7 +724,12 @@ static void VerifyTrayExitDoesNotHangWhenControllerCleanupIsSlow()
         MainWindow.ShutdownCleanupTimeout = TimeSpan.FromMilliseconds(75);
         new AppSettingsStore(new AppPaths(root))
             .SetRunInBackgroundOnCloseEnabled(true);
-        window = CreateMainWindow(root, launcher);
+        window = CreateMainWindow(
+            root,
+            launcher,
+            diagnostics: new AstralDiagnostics(
+                new AppPaths(root),
+                TimeSpan.Zero));
         var controller = GetController(window);
         window.Show();
         window.UpdateLayout();
@@ -674,6 +747,54 @@ static void VerifyTrayExitDoesNotHangWhenControllerCleanupIsSlow()
 
         Assert(closed);
         Assert(exitElapsed < TimeSpan.FromSeconds(2.5));
+        var health = File.ReadAllText(new AppPaths(root).HealthReport);
+        Assert(health.Contains("tray-exit", StringComparison.Ordinal));
+        Assert(health.Contains("timeoutMs", StringComparison.Ordinal));
+        window = null;
+    }
+    finally
+    {
+        MainWindow.ShutdownCleanupTimeout = previousTimeout;
+        ForceCloseWindow(window);
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static void VerifyWindowCloseDoesNotRecoverWhenControllerCleanupIsSlow()
+{
+    MainWindow? window = null;
+    var root = CreateTemporaryDirectory();
+    var launcher = new FakeProcessLauncher(
+        TimeSpan.FromSeconds(5),
+        ["Wireguard tunnel has been started."]);
+    var previousTimeout = MainWindow.ShutdownCleanupTimeout;
+
+    try
+    {
+        MainWindow.ShutdownCleanupTimeout = TimeSpan.FromMilliseconds(75);
+        window = CreateMainWindow(
+            root,
+            launcher,
+            diagnostics: new AstralDiagnostics(
+                new AppPaths(root),
+                TimeSpan.Zero));
+        var controller = GetController(window);
+        window.Show();
+        window.UpdateLayout();
+        RunDispatcherTask(
+            controller.ConnectAsync(CancellationToken.None),
+            TimeSpan.FromSeconds(3));
+        Assert(launcher.LastProcess is { HasExited: false });
+
+        var closed = false;
+        window.Closed += (_, _) => closed = true;
+        window.Close();
+        PumpDispatcherUntil(() => closed, TimeSpan.FromSeconds(3));
+
+        Assert(closed);
+        var health = File.ReadAllText(new AppPaths(root).HealthReport);
+        Assert(health.Contains("window-close", StringComparison.Ordinal));
+        Assert(health.Contains("timeoutMs", StringComparison.Ordinal));
         window = null;
     }
     finally
@@ -813,7 +934,8 @@ static void ForceCloseWindow(MainWindow? window)
 static MainWindow CreateMainWindow(
     string root,
     FakeProcessLauncher? processLauncher = null,
-    AppUpdateService? updateService = null)
+    AppUpdateService? updateService = null,
+    IAstralDiagnostics? diagnostics = null)
 {
     var paths = new AppPaths(root);
     var bootstrapper = new FakeWireSockBootstrapper(
@@ -842,7 +964,8 @@ static MainWindow CreateMainWindow(
             new HttpClient(),
             paths,
             new FakeVerifiedDownloader(),
-            requireUpdateAuthenticode: false));
+            requireUpdateAuthenticode: false),
+        diagnostics);
 }
 
 static AppUpdateService CreateFakeUpdateService(string root)

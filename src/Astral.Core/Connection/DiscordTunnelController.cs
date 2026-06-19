@@ -40,6 +40,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
     ];
     private static readonly TimeSpan TunnelReadinessRetryDelay =
         TimeSpan.FromMilliseconds(500);
+    private static readonly TimeSpan CleanupPhaseTimeout = TimeSpan.FromSeconds(6);
 
     private readonly AppPaths _paths;
     private readonly DiscordAppScope _discordScope;
@@ -816,12 +817,38 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
         if (_lastWebProxyProof.Required && _lastWebProxyProof.IsVerified)
         {
+            var hasApplicationTargets = CurrentRoutingPlan.SelectedTargets
+                .Any(target => target.HasApplicationScope);
+            if (hasApplicationTargets && !IsWireSockHandshakeReady())
+            {
+                if (!_lastTunnelReadiness.BlocksConnection
+                    && HasWireSockTrafficDelta())
+                {
+                    _lastTunnelReadiness = TunnelReadinessSnapshot.TransparentProcessRunning(
+                        _lastTunnelReadiness,
+                        "WireSock transparent mode is running; adapter traffic and scoped web proxy target proof were observed.");
+
+                    _lastWireSockHandshakeDiagnostic =
+                        "WireSock log marker was not observed; adapter traffic plus scoped web proxy proof confirmed app/web readiness.";
+
+                    return true;
+                }
+
+                _lastWireSockHandshakeDiagnostic =
+                    "Scoped web proxy proof confirmed web routes; application targets still require WireSock handshake or adapter traffic proof.";
+                return false;
+            }
+
             _lastTunnelReadiness = TunnelReadinessSnapshot.TransparentProcessRunning(
                 _lastTunnelReadiness,
-                "WireSock transparent mode is running; scoped web proxy target proof was observed.");
+                hasApplicationTargets
+                    ? "WireSock transparent mode is running; adapter readiness and scoped web proxy target proof were observed."
+                    : "WireSock transparent mode is running; scoped web proxy target proof was observed.");
 
             _lastWireSockHandshakeDiagnostic =
-                "WireSock log marker was not observed; scoped web proxy target proof confirmed readiness.";
+                hasApplicationTargets
+                    ? "WireSock log marker was not observed; adapter readiness plus scoped web proxy proof confirmed app/web readiness."
+                    : "WireSock log marker was not observed; scoped web proxy target proof confirmed readiness.";
 
             return true;
         }
@@ -1451,14 +1478,28 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             return;
         }
 
-        await _operationGate.WaitAsync();
+        if (!await _operationGate.WaitAsync(CleanupPhaseTimeout))
+        {
+            _diagnostics.Warning(
+                "controller.cleanup.timeout",
+                "Denetleyici kapanisi devam eden islem nedeniyle zaman asimina ugradi.",
+                new Dictionary<string, string?>
+                {
+                    ["operation"] = "dispose",
+                    ["phase"] = "operation-gate",
+                    ["timeoutMs"] = CleanupPhaseTimeout.TotalMilliseconds
+                        .ToString(CultureInfo.InvariantCulture)
+                });
+            throw new TimeoutException(
+                "Controller cleanup could not acquire the operation gate before timeout.");
+        }
+        var cleanupComplete = false;
         try
         {
             var requiresTunnelCleanup = _wireSockProcess is not null
                 || _snapshot.State is not TunnelState.Disconnected;
             var requiresAccessLockRefresh = requiresTunnelCleanup
                 || !_accessLockConfirmed;
-            _disposed = true;
             _intentionalStop = true;
 
             if (_wireSockProcess is not null)
@@ -1479,11 +1520,17 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             {
                 await TryEnableAccessLockAsync("Dispose");
             }
+
+            _disposed = true;
+            cleanupComplete = true;
         }
         finally
         {
             _operationGate.Release();
-            _operationGate.Dispose();
+            if (cleanupComplete)
+            {
+                _operationGate.Dispose();
+            }
         }
     }
 
@@ -1564,8 +1611,27 @@ public sealed class DiscordTunnelController : IAsyncDisposable
     {
         try
         {
-            await _accessLock.EnableAsync(CurrentRoutingPlan, CancellationToken.None);
+            using var timeout = new CancellationTokenSource(CleanupPhaseTimeout);
+            await _accessLock.EnableAsync(CurrentRoutingPlan, timeout.Token);
             _accessLockConfirmed = true;
+        }
+        catch (OperationCanceledException)
+        {
+            WriteDiagnostic(operation + "AccessLockTimeout", "Access lock cleanup timed out.");
+            _diagnostics.Warning(
+                "controller.cleanup.timeout",
+                "Erisim kilidi temizleme fazi zaman asimina ugradi.",
+                new Dictionary<string, string?>
+                {
+                    ["operation"] = operation,
+                    ["phase"] = "access-lock",
+                    ["timeoutMs"] = CleanupPhaseTimeout.TotalMilliseconds
+                        .ToString(CultureInfo.InvariantCulture)
+                });
+            if (string.Equals(operation, "Dispose", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new TimeoutException("Access lock cleanup timed out.");
+            }
         }
         catch (Exception exception)
         {
@@ -1577,7 +1643,26 @@ public sealed class DiscordTunnelController : IAsyncDisposable
     {
         try
         {
-            await _accessLock.ClearTunnelScopeAsync(CancellationToken.None);
+            using var timeout = new CancellationTokenSource(CleanupPhaseTimeout);
+            await _accessLock.ClearTunnelScopeAsync(timeout.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            WriteDiagnostic(operation + "TunnelScopeTimeout", "Tunnel scope cleanup timed out.");
+            _diagnostics.Warning(
+                "controller.cleanup.timeout",
+                "Tunel kapsami temizleme fazi zaman asimina ugradi.",
+                new Dictionary<string, string?>
+                {
+                    ["operation"] = operation,
+                    ["phase"] = "tunnel-scope",
+                    ["timeoutMs"] = CleanupPhaseTimeout.TotalMilliseconds
+                        .ToString(CultureInfo.InvariantCulture)
+                });
+            if (string.Equals(operation, "Dispose", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new TimeoutException("Tunnel scope cleanup timed out.");
+            }
         }
         catch (Exception exception)
         {
@@ -1589,7 +1674,26 @@ public sealed class DiscordTunnelController : IAsyncDisposable
     {
         try
         {
-            await _webProxyService.ClearAsync(CancellationToken.None);
+            using var timeout = new CancellationTokenSource(CleanupPhaseTimeout);
+            await _webProxyService.ClearAsync(timeout.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            WriteDiagnostic(operation + "WebProxyScopeTimeout", "Web proxy cleanup timed out.");
+            _diagnostics.Warning(
+                "controller.cleanup.timeout",
+                "Web proxy temizleme fazi zaman asimina ugradi.",
+                new Dictionary<string, string?>
+                {
+                    ["operation"] = operation,
+                    ["phase"] = "web-proxy",
+                    ["timeoutMs"] = CleanupPhaseTimeout.TotalMilliseconds
+                        .ToString(CultureInfo.InvariantCulture)
+                });
+            if (string.Equals(operation, "Dispose", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new TimeoutException("Web proxy cleanup timed out.");
+            }
         }
         catch (Exception exception)
         {
