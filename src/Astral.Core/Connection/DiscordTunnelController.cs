@@ -24,6 +24,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
     private const int MaxWireSockLogReadBytes = 64 * 1024;
     private const string WireSockTransparentMode = "transparent";
     private const string WireSockVirtualAdapterMode = "virtual-adapter";
+    private const string ScopedWebProxyExecutableName = "Astral.WebProxy.exe";
     private static readonly string[] WireSockConnectionEstablishedMessages =
     [
         "Connection established",
@@ -262,7 +263,9 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             ["tunnelLog"] = _paths.TunnelLog,
             ["routingSummaryKind"] = "last-applied-or-pending-profile",
             ["routingScope"] = CreateRoutingScopeDescription(routingPlan),
-            ["routingSummary"] = FormatRoutingSummary(_lastRoutingSummary)
+            ["routingSummary"] = FormatRoutingSummary(_lastRoutingSummary),
+            ["applicationTunnelProofRequired"] =
+                RoutingPlanRequiresApplicationTunnelProof(routingPlan).ToString()
         };
 
         foreach (var webProxyDetail in _lastWebProxyStatus.ToDiagnosticDetails())
@@ -522,6 +525,8 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     ["selectedTargets"] = routingPlan.Summary,
                     ["routingScope"] = CreateRoutingScopeDescription(routingPlan),
                     ["routingSummary"] = FormatRoutingSummary(_lastRoutingSummary),
+                    ["applicationTunnelProofRequired"] =
+                        RoutingPlanRequiresApplicationTunnelProof(routingPlan).ToString(),
                     ["targetLaunchPolicy"] = targetLaunchPolicy,
                     ["nextAction"] = nextAction,
                     ["connectElapsedMs"] = connectStopwatch.ElapsedMilliseconds
@@ -540,6 +545,8 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     ["selectedTargets"] = routingPlan.Summary,
                     ["routingScope"] = CreateRoutingScopeDescription(routingPlan),
                     ["routingSummary"] = FormatRoutingSummary(_lastRoutingSummary),
+                    ["applicationTunnelProofRequired"] =
+                        RoutingPlanRequiresApplicationTunnelProof(routingPlan).ToString(),
                     ["targetLaunchPolicy"] = targetLaunchPolicy,
                     ["nextAction"] = nextAction,
                     ["profilePath"] = profilePath,
@@ -729,15 +736,26 @@ public sealed class DiscordTunnelController : IAsyncDisposable
     private Dictionary<string, string?> CreateTunnelReadinessDetails()
     {
         var details = _lastTunnelReadiness.ToDiagnosticDetails();
+        var receivedDelta = CalculateCounterDelta(
+            _wireSockTrafficBaselineBytesReceived,
+            _lastTunnelReadiness.WireSockAdapterBytesReceived);
+        var sentDelta = CalculateCounterDelta(
+            _wireSockTrafficBaselineBytesSent,
+            _lastTunnelReadiness.WireSockAdapterBytesSent);
+        var trafficDeltaObserved =
+            _lastWireSockTrafficDeltaObserved
+            || receivedDelta > 0
+            || sentDelta > 0;
+
         details["wireSockMode"] = _lastWireSockMode;
         details["wireSockConnectionEstablished"] =
             _lastWireSockConnectionEstablished.ToString();
         details["wireSockHandshakeDiagnostic"] =
             _lastWireSockHandshakeDiagnostic;
         details["wireSockTrafficDeltaObserved"] =
-            _lastWireSockTrafficDeltaObserved.ToString();
+            trafficDeltaObserved.ToString();
         details["wireSockTrafficDiagnostic"] =
-            _lastWireSockTrafficDiagnostic;
+            trafficDeltaObserved ? null : _lastWireSockTrafficDiagnostic;
         if (_wireSockTrafficBaselineBytesReceived is not null)
         {
             details["wireSockTrafficBaselineBytesReceived"] =
@@ -756,20 +774,14 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             && _wireSockTrafficBaselineBytesReceived is not null)
         {
             details["wireSockTrafficDeltaBytesReceived"] =
-                CalculateCounterDelta(
-                        _wireSockTrafficBaselineBytesReceived,
-                        _lastTunnelReadiness.WireSockAdapterBytesReceived)
-                    .ToString(CultureInfo.InvariantCulture);
+                receivedDelta.ToString(CultureInfo.InvariantCulture);
         }
 
         if (_lastTunnelReadiness.WireSockAdapterBytesSent is not null
             && _wireSockTrafficBaselineBytesSent is not null)
         {
             details["wireSockTrafficDeltaBytesSent"] =
-                CalculateCounterDelta(
-                        _wireSockTrafficBaselineBytesSent,
-                        _lastTunnelReadiness.WireSockAdapterBytesSent)
-                    .ToString(CultureInfo.InvariantCulture);
+                sentDelta.ToString(CultureInfo.InvariantCulture);
         }
 
         if (!string.IsNullOrWhiteSpace(_lastWireSockProcessId))
@@ -817,9 +829,10 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
         if (_lastWebProxyProof.Required && _lastWebProxyProof.IsVerified)
         {
-            var hasApplicationTargets = CurrentRoutingPlan.SelectedTargets
-                .Any(target => target.HasApplicationScope);
-            if (hasApplicationTargets && !IsWireSockHandshakeReady())
+            var routingPlan = CurrentRoutingPlan;
+            var requiresApplicationTunnelProof =
+                RoutingPlanRequiresApplicationTunnelProof(routingPlan);
+            if (requiresApplicationTunnelProof && !IsWireSockHandshakeReady())
             {
                 if (!_lastTunnelReadiness.BlocksConnection
                     && HasWireSockTrafficDelta())
@@ -841,12 +854,12 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
             _lastTunnelReadiness = TunnelReadinessSnapshot.TransparentProcessRunning(
                 _lastTunnelReadiness,
-                hasApplicationTargets
+                requiresApplicationTunnelProof
                     ? "WireSock transparent mode is running; adapter readiness and scoped web proxy target proof were observed."
                     : "WireSock transparent mode is running; scoped web proxy target proof was observed.");
 
             _lastWireSockHandshakeDiagnostic =
-                hasApplicationTargets
+                requiresApplicationTunnelProof
                     ? "WireSock log marker was not observed; adapter readiness plus scoped web proxy proof confirmed app/web readiness."
                     : "WireSock log marker was not observed; scoped web proxy target proof confirmed readiness.";
 
@@ -1332,6 +1345,8 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         var discordPathCount = allowedApplications.Count(IsDiscordExecutable);
         var broadBrowserNameCount = allowedApplications.Count(app =>
             !Path.IsPathRooted(app) && RoutingPlan.IsBrowserExecutable(app));
+        var applicationTunnelProofRequired =
+            RoutingPlanRequiresApplicationTunnelProof(routingPlan);
 
         return new Dictionary<string, string?>
         {
@@ -1351,15 +1366,47 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             ["webProxy"] = routingPlan.RequiresWebProxy ? "included" : "not-required",
             ["proxyRuleCount"] =
                 routingPlan.ProxyRules.Count.ToString(CultureInfo.InvariantCulture),
+            ["applicationTunnelProofRequired"] =
+                applicationTunnelProofRequired.ToString(),
             ["browserProcessScope"] = "excluded"
         };
     }
 
     private static string CreateRoutingScopeDescription(RoutingPlan routingPlan)
     {
-        return routingPlan.RequiresWebProxy
-            ? $"{routingPlan.Summary}: uygulama hedefleri ve Astral.WebProxy kapsamda; genel tarayıcı süreçleri profile eklenmez."
-            : $"{routingPlan.Summary}: yalnızca seçili uygulama hedefleri kapsamda.";
+        var requiresApplicationTunnelProof =
+            RoutingPlanRequiresApplicationTunnelProof(routingPlan);
+
+        if (routingPlan.RequiresWebProxy)
+        {
+            return requiresApplicationTunnelProof
+                ? $"{routingPlan.Summary}: seçili uygulama hedefleri ve Astral.WebProxy kapsamda; genel tarayıcı süreçleri profile eklenmez."
+                : $"{routingPlan.Summary}: yalnızca Astral.WebProxy kapsamda; genel tarayıcı süreçleri profile eklenmez.";
+        }
+
+        return requiresApplicationTunnelProof
+            ? $"{routingPlan.Summary}: yalnızca seçili uygulama hedefleri kapsamda."
+            : $"{routingPlan.Summary}: web proxy dışı uygulama hedefi yok.";
+    }
+
+    private static bool RoutingPlanRequiresApplicationTunnelProof(
+        RoutingPlan routingPlan)
+    {
+        return routingPlan.AllowedApplications.Any(IsApplicationTunnelExecutable);
+    }
+
+    private static bool IsApplicationTunnelExecutable(string application)
+    {
+        if (string.IsNullOrWhiteSpace(application))
+        {
+            return false;
+        }
+
+        var fileName = Path.GetFileName(application.Trim().Trim('"'));
+        return !string.Equals(
+            fileName,
+            ScopedWebProxyExecutableName,
+            StringComparison.OrdinalIgnoreCase);
     }
 
     private static string FormatRoutingSummary(

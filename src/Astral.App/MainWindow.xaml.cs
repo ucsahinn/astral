@@ -57,7 +57,7 @@ public partial class MainWindow : Window, IDisposable
     private static readonly Uri RepositoryUri = new(
         "https://github.com/ucsahinn/astral");
     private static readonly Uri ReleaseNotesUri = new(
-        "https://github.com/ucsahinn/astral/releases/tag/v2.2.27");
+        "https://github.com/ucsahinn/astral/releases/tag/v2.2.28");
     private static readonly Uri BackgroundVideoCdnUri = new(
         "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260328_105406_16f4600d-7a92-4292-b96e-b19156c7830a.mp4");
     private static readonly string LocalBackgroundVideoPath = Path.Combine(
@@ -1290,11 +1290,17 @@ public partial class MainWindow : Window, IDisposable
                 MediaColor.FromRgb(255, 232, 148),
                 MediaColor.FromRgb(19, 20, 28),
                 true),
-            TargetProbeStatus.Success or TargetProbeStatus.ProfileScope => (
+            TargetProbeStatus.Success => (
                 "OK",
                 MediaColor.FromRgb(93, 255, 146),
                 MediaColor.FromRgb(185, 255, 213),
                 MediaColor.FromRgb(12, 36, 26),
+                false),
+            TargetProbeStatus.ProfileScope => (
+                "APP",
+                MediaColor.FromRgb(125, 235, 255),
+                MediaColor.FromRgb(180, 236, 255),
+                MediaColor.FromRgb(9, 32, 43),
                 false),
             TargetProbeStatus.Failed => (
                 "!",
@@ -1472,7 +1478,8 @@ public partial class MainWindow : Window, IDisposable
         {
             TargetProbeStatus.Queued => "Sırada",
             TargetProbeStatus.Running => "Doğrulanıyor",
-            TargetProbeStatus.Success or TargetProbeStatus.ProfileScope => "Kapsam aktif",
+            TargetProbeStatus.Success => "Web rota OK",
+            TargetProbeStatus.ProfileScope => "Profil hazır",
             TargetProbeStatus.Failed => "Sorunlu",
             TargetProbeStatus.Skipped => "Kapsam hazır",
             _ => snapshot.IsConnected ? "Test bekliyor" : "Kapsam hazır"
@@ -1598,7 +1605,7 @@ public partial class MainWindow : Window, IDisposable
         if (HasSelectedTargetProbeSuccess())
         {
             TargetTestSummary.Text =
-                _lastTargetTestSummary.Contains("rota OK", StringComparison.OrdinalIgnoreCase)
+                IsTargetTestSummaryReusable(_lastTargetTestSummary)
                     ? "Hedef testi: " + _lastTargetTestSummary
                     : "Hedef testi: seçili hedefler doğrulandı.";
             return;
@@ -1721,6 +1728,23 @@ public partial class MainWindow : Window, IDisposable
                     or TargetProbeStatus.ProfileScope));
     }
 
+    private static bool IsTargetTestSummaryReusable(string summary)
+    {
+        return summary.Contains("web rota OK", StringComparison.OrdinalIgnoreCase)
+            || summary.Contains("app kapsam hazır", StringComparison.OrdinalIgnoreCase)
+            || summary.Contains("kontrol gerekli", StringComparison.OrdinalIgnoreCase)
+            || summary.Contains("atlandı", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string CreateTargetTestSummary(
+        int webRouteSuccessCount,
+        int appScopeReadyCount,
+        int failedCount,
+        int skippedCount)
+    {
+        return $"{webRouteSuccessCount} web rota OK, {appScopeReadyCount} app kapsam hazır, {failedCount} kontrol gerekli, {skippedCount} atlandı.";
+    }
+
     private async Task RunSelectedTargetsProbeAsync()
     {
         if (_disposed || _isClosing || _windowLifetimeCancellation.IsCancellationRequested)
@@ -1808,7 +1832,7 @@ public partial class MainWindow : Window, IDisposable
                         var scoped = new TargetProbeResult(
                             TargetProbeStatus.ProfileScope,
                             null,
-                            "Uygulama kapsamı WireSock profilinde doğrulandı.",
+                            "Uygulama kapsamı WireSock profilinde hazırlandı; uygulama açma kanıtı değildir.",
                             DateTimeOffset.Now);
                         _targetProbeResults[target.Id] = scoped;
                         results.Add(scoped);
@@ -1847,7 +1871,7 @@ public partial class MainWindow : Window, IDisposable
                     var scoped = new TargetProbeResult(
                         TargetProbeStatus.ProfileScope,
                         null,
-                        "Uygulama kapsamı WireSock profilinde doğrulandı.",
+                        "Uygulama kapsamı WireSock profilinde hazırlandı; uygulama açma kanıtı değildir.",
                         DateTimeOffset.Now);
                     _targetProbeResults[target.Id] = scoped;
                     results.Add(scoped);
@@ -1875,15 +1899,21 @@ public partial class MainWindow : Window, IDisposable
                 RefreshTargetScopeView(locked: true);
             }
 
-            var successCount = results.Count(result =>
-                result.Status is TargetProbeStatus.Success
-                    or TargetProbeStatus.ProfileScope);
+            var webRouteSuccessCount = selectedTargets.Count(target =>
+                _targetProbeResults.TryGetValue(target.Id, out var result)
+                && IsTargetWebRouteVerified(target, result));
+            var appScopeReadyCount = selectedTargets.Count(target =>
+                _targetProbeResults.TryGetValue(target.Id, out var result)
+                && IsTargetApplicationScopeReady(target, result));
             var failedCount = results.Count(result =>
                 result.Status is TargetProbeStatus.Failed);
             var skippedCount = results.Count(result =>
                 result.Status is TargetProbeStatus.Skipped);
-            _lastTargetTestSummary =
-                $"{successCount} rota OK, {failedCount} kontrol gerekli, {skippedCount} atlandı.";
+            _lastTargetTestSummary = CreateTargetTestSummary(
+                webRouteSuccessCount,
+                appScopeReadyCount,
+                failedCount,
+                skippedCount);
             TargetTestSummary.Text = "Kapsam doğrulaması: " + _lastTargetTestSummary;
             _diagnostics.Info(
                 "ui.targetTest.complete",
@@ -2152,6 +2182,35 @@ public partial class MainWindow : Window, IDisposable
             .ToArray();
     }
 
+    private static bool IsTargetWebRouteVerified(
+        TargetDefinition target,
+        TargetProbeResult result)
+    {
+        return target.HasWebScope
+            && result.Status is TargetProbeStatus.Success;
+    }
+
+    private static bool IsTargetApplicationScopeReady(
+        TargetDefinition target,
+        TargetProbeResult result)
+    {
+        return target.HasApplicationScope
+            && (result.Status is TargetProbeStatus.Success
+                or TargetProbeStatus.ProfileScope);
+    }
+
+    internal static bool IsSuccessfulTargetProbeApplicationScopeReadyForTesting(
+        TargetDefinition target)
+    {
+        return IsTargetApplicationScopeReady(
+            target,
+            new TargetProbeResult(
+                TargetProbeStatus.Success,
+                null,
+                string.Empty,
+                DateTimeOffset.Now));
+    }
+
     private Dictionary<string, string?> CreateTargetTestDiagnosticDetails(
         IReadOnlyList<TargetProbeResult> results)
     {
@@ -2162,6 +2221,16 @@ public partial class MainWindow : Window, IDisposable
             .Where(target => _targetProbeResults.TryGetValue(target.Id, out var result)
                 && (result.Status is TargetProbeStatus.Success
                     or TargetProbeStatus.ProfileScope))
+            .Select(target => target.Id)
+            .ToArray();
+        var webRouteVerifiedTargetIds = selectedTargets
+            .Where(target => _targetProbeResults.TryGetValue(target.Id, out var result)
+                && IsTargetWebRouteVerified(target, result))
+            .Select(target => target.Id)
+            .ToArray();
+        var appScopeReadyTargetIds = selectedTargets
+            .Where(target => _targetProbeResults.TryGetValue(target.Id, out var result)
+                && IsTargetApplicationScopeReady(target, result))
             .Select(target => target.Id)
             .ToArray();
         var failedTargetIds = selectedTargets
@@ -2189,11 +2258,15 @@ public partial class MainWindow : Window, IDisposable
             ["selectedTargets"] = _controller.CurrentRoutingPlan.Summary,
             ["selectedTargetCount"] = selectedTargets.Length.ToString(CultureInfo.InvariantCulture),
             ["verifiedTargetCount"] = verifiedTargetIds.Length.ToString(CultureInfo.InvariantCulture),
+            ["webRouteVerifiedTargetCount"] = webRouteVerifiedTargetIds.Length.ToString(CultureInfo.InvariantCulture),
+            ["appScopeReadyTargetCount"] = appScopeReadyTargetIds.Length.ToString(CultureInfo.InvariantCulture),
             ["failedTargetCount"] = failedTargetIds.Length.ToString(CultureInfo.InvariantCulture),
             ["skippedTargetCount"] = skippedTargetIds.Length.ToString(CultureInfo.InvariantCulture),
             ["runningTargetCount"] = runningTargetIds.Length.ToString(CultureInfo.InvariantCulture),
             ["untestedTargetCount"] = untestedTargetIds.Length.ToString(CultureInfo.InvariantCulture),
             ["verifiedTargets"] = string.Join(", ", verifiedTargetIds),
+            ["webRouteVerifiedTargets"] = string.Join(", ", webRouteVerifiedTargetIds),
+            ["appScopeReadyTargets"] = string.Join(", ", appScopeReadyTargetIds),
             ["failedTargets"] = string.Join(", ", failedTargetIds),
             ["skippedTargets"] = string.Join(", ", skippedTargetIds),
             ["runningTargets"] = string.Join(", ", runningTargetIds),
@@ -2890,7 +2963,6 @@ public partial class MainWindow : Window, IDisposable
 
         IsEnabled = false;
         _operationCancellation?.Cancel();
-        StopBackgroundVideo();
         StatusMessage.Text = "Profil temizliği çalışıyor";
         StatusDetail.Text = "Bağlantı kapatılıyor; Astral profili, ayarları ve kilidi temizleniyor.";
         SetMaintenanceProgress(24, "Bağlantı kapatılıyor");
@@ -3709,7 +3781,6 @@ public partial class MainWindow : Window, IDisposable
         {
             IsEnabled = false;
             _operationCancellation?.Cancel();
-            StopBackgroundVideo();
             StatusMessage.Text = "Astral yeniden başlatılıyor";
             StatusDetail.Text = "Bağlantı ve koruma durumu kapatılıyor.";
             SetMaintenanceProgress(

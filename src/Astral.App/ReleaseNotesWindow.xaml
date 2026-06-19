@@ -82,11 +82,11 @@
                                 VerticalAlignment="Center">
                         <TextBlock FontSize="22"
                                    FontWeight="SemiBold"
-                                   Text="Astral VPN v2.2.27" />
+                                   Text="Astral VPN v2.2.28" />
                         <TextBlock Margin="0,5,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
-                                   Text="Video görünürlüğü, hedef testi ve bağlantı kanıtı hotfix'i" />
+                                   Text="Bağlantı kanıtı, hedef testi ve video görünürlüğü hotfix'i" />
                     </StackPanel>
                 </Grid>
 
@@ -109,7 +109,7 @@
                                            FontSize="14"
                                            LineHeight="21"
                                            TextWrapping="Wrap"
-                                           Text="Bu sürüm v2.2.26 üzerinde kalan video görünürlüğü, hedef testi geri bildirimi ve hedef açma gecikmesi sorunlarını düzeltir. Astral VPN hâlâ yalnız seçili hedefleri kapsar; genel sistem VPN'i gibi davranmaz." />
+                                           Text="Bu sürüm v2.2.27 üzerinde kalan app/web kanıt ayrımı, hedef testi özeti, tanılama netliği ve bakım akışı sırasında video görünürlüğü sorunlarını düzeltir. Astral VPN hâlâ yalnız seçili hedefleri kapsar; genel sistem VPN'i gibi davranmaz." />
                             </StackPanel>
                         </Border>
 
@@ -156,11 +156,11 @@
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Hedef doğrulama tanılaması seçili, doğrulanmış, sorunlu, atlanan ve bekleyen hedefleri ayrı ayrı yazar." />
+                                           Text="&#x2022; Hedef doğrulama tanılaması web rota kanıtı, app profil kapsamı, sorunlu, atlanan ve bekleyen hedefleri ayrı ayrı yazar." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Hedef testi kartı artık doğru işletim merkezi kartını renklendirir; hedef kartlarında OK, ..., ! rozetleriyle test akışı görünür." />
+                                           Text="&#x2022; Hedef testi kartı web hedeflerinde OK, uygulama-only kapsamda APP, çalışan testlerde ... ve sorunlarda ! rozetleriyle daha net ayrım yapar." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
@@ -168,7 +168,7 @@
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Discord gibi uygulama kapsamlı hedeflerde Astral uygulamayı kendisi başlatmaz; app trafiği için WireSock kapsamı hazırlanır, dış-link butonu yalnız güvenli web girişini açar." />
+                                           Text="&#x2022; Discord gibi uygulama kapsamlı hedeflerde Astral uygulamayı kendisi başlatmaz; app trafiği için WireSock kapsamı ve adapter trafik kanıtı ayrı doğrulanır, dış-link butonu yalnız güvenli web girişini açar." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
@@ -188,11 +188,11 @@
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; v2.2.26 üstüne yeni düzeltmeler aynı sürüm numarasıyla tekrar kullanılmaz; v2.2.27 gerçek güncelleme olarak gelir." />
+                                           Text="&#x2022; Profil temizleme ve yeniden başlatma sırasında pencere açık kaldığı sürece arka plan videosu gereksiz yere durdurulmaz." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Sürüm metadata'sı, updater, web proxy ve uygulama içi release bağlantısı v2.2.27 ile hizalandı." />
+                                           Text="&#x2022; Sürüm metadata'sı, updater, web proxy ve uygulama içi release bağlantısı v2.2.28 ile hizalandı." />
                             </StackPanel>
                         </Border>
 
@@ -238,7 +238,7 @@
                     <TextBlock VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource MutedTextBrush}"
-                                   Text="Bu not, v2.2.27 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
+                                   Text="Bu not, v2.2.28 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
                     <Button Grid.Column="1"
                             Margin="0,0,10,0"
                             Height="40"

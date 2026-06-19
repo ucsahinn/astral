@@ -98,6 +98,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Denetleyici transparent modda trafik kanıtıyla eksik handshake logunu kabul eder", ControllerAcceptsTrafficProofWithoutWireSockHandshakeLogAsync),
     ("Denetleyici transparent modda scoped web proxy kanıtıyla pasif adaptörü kabul eder", ControllerAcceptsScopedWebProxyProofInTransparentModeAsync),
     ("Denetleyici uygulama hedeflerinde sadece web proxy kanıtıyla bağlı saymaz", ControllerRejectsAppTargetWhenOnlyScopedWebProxyProofExistsAsync),
+    ("Denetleyici uygulama ve web hedeflerinde adapter trafik kanıtını tanılamaya yazar", ControllerAcceptsAppWebTargetWithTrafficProofAsync),
     ("Denetleyici transparent modda handshake ve trafik kanıtı yokken bağlı raporlamaz", ControllerRejectsMissingWireSockHandshakeInTransparentModeAsync),
     ("Denetleyici son WireSock çıkışını tanılama detayına yazar", ControllerReportsWireSockExitAfterFinalReadinessProbeAsync),
     ("Denetleyici WireSock tunnel-started loguyla bağlı raporlar", ControllerAcceptsWireSockTunnelStartedLogAsync),
@@ -3686,6 +3687,94 @@ static async Task ControllerRejectsAppTargetWhenOnlyScopedWebProxyProofExistsAsy
         Assert(health.Contains(
             "application targets still require WireSock handshake or adapter traffic proof",
             StringComparison.OrdinalIgnoreCase));
+    }
+    finally
+    {
+        await controller.DisposeAsync();
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task ControllerAcceptsAppWebTargetWithTrafficProofAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var process = new FakeManagedProcess();
+    var accessLock = new FakeDiscordAccessLock();
+    var paths = new AppPaths(root);
+    var diagnostics = new AstralDiagnostics(
+        paths,
+        TimeSpan.Zero);
+    var discordManager = new FakeDiscordProcessManager(
+        new DiscordProcessSnapshot(
+            1,
+            [Path.Combine(root, "Discord", "app-1.0.9999", "Discord.exe")],
+            [100]));
+    var readinessProbe = new FakeTunnelReadinessProbe(
+        TunnelReadinessSnapshot.Ready(
+            "Up",
+            128,
+            256,
+            "wt0",
+            "WireGuard Tunnel"),
+        TunnelReadinessSnapshot.Ready(
+            "Up",
+            128,
+            512,
+            "wt0",
+            "WireGuard Tunnel"));
+    var webProxy = new FakeScopedWebProxyService
+    {
+        Proof = ScopedWebProxyProof.Verified(
+            "discord.com",
+            18088,
+            "Fake scoped web proxy target proof succeeded.")
+    };
+    var controller = new DiscordTunnelController(
+        paths,
+        new DiscordAppScope(root, root, root),
+        new FakeWireSockBootstrapper(Path.Combine(
+            root,
+            "WireSock VPN Client",
+            "bin",
+            WireSockPackage.CliExecutableFileName)),
+        new FakeProfileProvisioner(Path.Combine(root, "discord.conf")),
+        new FakeProcessLauncher(process, "WireSock started"),
+        TimeSpan.Zero,
+        accessLock,
+        diagnostics,
+        discordManager,
+        readinessProbe,
+        tunnelReadinessRetryDelay: TimeSpan.Zero,
+        webProxyService: webProxy);
+    controller.TrySetTargetSelection(new TargetSelection([TargetIds.Discord]));
+
+    try
+    {
+        await controller.ConnectAsync();
+
+        Assert(controller.Snapshot.State == TunnelState.Connected);
+        Assert(!process.HasExited);
+        Assert(webProxy.VerifyTargetAccessCount == 1);
+
+        var details = controller.CreateDiagnosticDetails();
+        Assert(details["wireSockMode"] == "transparent");
+        Assert(details["wireSockConnectionEstablished"] == "False");
+        Assert(details["wireSockTrafficDeltaObserved"] == "True");
+        Assert(details["wireSockTrafficDeltaBytesSent"] == "256");
+        Assert(details["applicationTunnelProofRequired"] == "True");
+        Assert(details["webProxyProof.verified"] == "True");
+        Assert(details["wireSockHandshakeDiagnostic"]!.Contains(
+            "adapter traffic plus scoped web proxy proof",
+            StringComparison.OrdinalIgnoreCase));
+
+        var health = await File.ReadAllTextAsync(paths.HealthReport);
+        Assert(health.Contains("\"status\":\"bağlantı hazır\"", StringComparison.Ordinal));
+        Assert(health.Contains(
+            "\"wireSockTrafficDeltaObserved\":\"True\"",
+            StringComparison.Ordinal));
+        Assert(health.Contains(
+            "\"applicationTunnelProofRequired\":\"True\"",
+            StringComparison.Ordinal));
     }
     finally
     {
