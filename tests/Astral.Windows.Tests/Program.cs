@@ -95,8 +95,10 @@ static void RenderWindows()
                     RenderMainWindow();
                     VerifyBackgroundVideoRespectsReducedMotion();
                     VerifyConnectedTargetCardsRequireProbeEvidence();
+                    VerifyQueuedSnapshotsDoNotOverwriteDirectUiState();
                     VerifyStartupUpdateCheckShowsAvailableUpdate();
                     VerifyWindowLifetimeBehavior();
+                    VerifySingleInstanceMessageIncludesProcessHint();
                     VerifyPortableInstallDiagnosticsSanitizesLegacyBrand();
                     RenderConsentWindow();
                 }
@@ -152,7 +154,7 @@ static void RenderMainWindow()
         SaveWindowPng(window, Path.Combine(
             FindRepositoryRoot(),
             "artifacts",
-            "ui-main-window-v2.2.28.png"));
+            "ui-main-window-v2.2.29.png"));
 
         Assert(window.ResizeMode == ResizeMode.NoResize);
         Assert(window.Width == 1280);
@@ -166,6 +168,10 @@ static void RenderMainWindow()
         var backgroundVideo = FindVisualChildren<MediaElement>(window).Single();
         Assert(backgroundVideo.Visibility == Visibility.Collapsed);
         Assert(backgroundVideo.Source is null);
+        Assert(MainWindow.BackgroundVideoStartPriorityForTesting == DispatcherPriority.ContextIdle);
+        Assert(FindVisualChildren<System.Windows.Shapes.Rectangle>(window)
+            .Count(rectangle => !rectangle.IsHitTestVisible
+                && rectangle.CacheMode is BitmapCache) >= 5);
 
         var text = string.Join(
             "\n",
@@ -382,6 +388,14 @@ static void RenderMainWindow()
         Assert(discordHosts.Contains("discord.com", StringComparer.OrdinalIgnoreCase));
         Assert(!discordHosts.Contains("discordapp.net", StringComparer.OrdinalIgnoreCase));
         Assert(MainWindow.IsSuccessfulTargetProbeApplicationScopeReadyForTesting(discordTarget));
+        Assert(MainWindow.MaxConcurrentTargetTestProbesForTesting == 8);
+        Assert(MainWindow.TargetTestHostTimeoutForTesting <= TimeSpan.FromSeconds(12));
+        Assert(MainWindow.TargetTestProxyConnectTimeoutForTesting <= TimeSpan.FromSeconds(10));
+        Assert(MainWindow.TargetPulseFrameRateForTesting == 30);
+        Assert(MainWindow.ShutdownCleanupTimeout >= TimeSpan.FromSeconds(22));
+        Assert(MainWindow.ShutdownCleanupTimeout <= TimeSpan.FromSeconds(24));
+        Assert(MainWindow.BackgroundShutdownCleanupTimeout >= TimeSpan.FromSeconds(30));
+        Assert(App.ExitControllerDisposeTimeoutForTesting <= TimeSpan.FromSeconds(2));
         Assert(registry.TryGet("azar", out var azarTarget));
         Assert(!MainWindow.GetTargetTestHostsForTesting(azarTarget)
             .Contains("api.azarlive.io", StringComparer.OrdinalIgnoreCase));
@@ -571,17 +585,18 @@ static void VerifyBackgroundVideoRespectsReducedMotion()
         window.UpdateLayout();
 
         var backgroundVideo = FindVisualChildren<MediaElement>(window).Single();
-        Assert(backgroundVideo.Visibility == Visibility.Visible);
-        Assert(backgroundVideo.Source is not null);
-        Assert(backgroundVideo.SpeedRatio < 1);
         PumpDispatcherUntil(
             () => backgroundVideo.Visibility == Visibility.Visible
                 && backgroundVideo.Source is not null,
             TimeSpan.FromSeconds(3));
+        Assert(backgroundVideo.Visibility == Visibility.Visible);
+        Assert(backgroundVideo.Source is not null);
+        Assert(backgroundVideo.SpeedRatio < 1);
+        Assert(!window.IsBackgroundVideoStartQueuedForTesting);
         SaveWindowPng(window, Path.Combine(
             FindRepositoryRoot(),
             "artifacts",
-            "ui-main-window-video-v2.2.28.png"));
+            "ui-main-window-video-v2.2.29.png"));
     }
     finally
     {
@@ -604,6 +619,25 @@ static void VerifyWindowLifetimeBehavior()
     VerifyWindowCloseDoesNotRecoverWhenControllerCleanupIsSlow();
 
     Console.WriteLine("GEÇTİ Pencere kapanış ve arka plan davranışı doğrulandı");
+}
+
+static void VerifySingleInstanceMessageIncludesProcessHint()
+{
+    var message = App.CreateSingleInstanceMessageForTesting(
+    [
+        new App.RunningAstralInstanceInfo(
+            43280,
+            new DateTime(2026, 6, 19, 16, 35, 55),
+            true,
+            false,
+            null)
+    ]);
+
+    Assert(message.Contains("PID 43280", StringComparison.Ordinal));
+    Assert(message.Contains("pencere yok", StringComparison.OrdinalIgnoreCase));
+    Assert(message.Contains("Görev Yöneticisi", StringComparison.Ordinal));
+
+    Console.WriteLine("GEÇTİ Tekil örnek blokajı görünmeyen süreç için yönlendirme verdi");
 }
 
 static void VerifyConnectedTargetCardsRequireProbeEvidence()
@@ -670,6 +704,40 @@ static void VerifyConnectedTargetCardsRequireProbeEvidence()
         }
 
         Console.WriteLine("GEÇTİ Bağlı hedef kartı kanıt olmadan kapsam aktif göstermedi");
+    }
+    finally
+    {
+        ForceCloseWindow(window);
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static void VerifyQueuedSnapshotsDoNotOverwriteDirectUiState()
+{
+    MainWindow? window = null;
+    var root = CreateTemporaryDirectory();
+
+    try
+    {
+        window = CreateMainWindow(root);
+        window.Show();
+        window.UpdateLayout();
+
+        window.QueuePendingSnapshotForTesting(new TunnelSnapshot(
+            TunnelState.Error,
+            "Eski hata",
+            DateTimeOffset.Now));
+        Assert(window.HasPendingSnapshotForTesting);
+
+        window.OnStatusChangedForTesting(new TunnelSnapshot(
+            TunnelState.Connected,
+            "Yeni durum",
+            DateTimeOffset.Now));
+
+        Assert(!window.HasPendingSnapshotForTesting);
+        Assert(window.LastObservedTunnelStateForTesting == TunnelState.Connected);
+
+        Console.WriteLine("GEÇTİ Kuyrukta kalan eski durum yeni UI durumunu ezmedi");
     }
     finally
     {
@@ -751,6 +819,14 @@ static void VerifyTrayExitDoesNotHangWhenControllerCleanupIsSlow()
         var health = File.ReadAllText(new AppPaths(root).HealthReport);
         Assert(health.Contains("tray-exit", StringComparison.Ordinal));
         Assert(health.Contains("timeoutMs", StringComparison.Ordinal));
+        var errors = File.ReadAllText(new AppPaths(root).ErrorLog);
+        Assert(errors.Contains("\"source\":\"ui.shutdown.timeout\"", StringComparison.Ordinal));
+        Assert(!errors.Contains("\"source\":\"ui.shutdown\"", StringComparison.Ordinal));
+        Assert(!window.HasCompletedControllerShutdownCleanup);
+        PumpDispatcherUntil(
+            () => launcher.LastProcess is { HasExited: true }
+                && window.HasCompletedControllerShutdownCleanup,
+            TimeSpan.FromSeconds(7));
         window = null;
     }
     finally
@@ -796,6 +872,14 @@ static void VerifyWindowCloseDoesNotRecoverWhenControllerCleanupIsSlow()
         var health = File.ReadAllText(new AppPaths(root).HealthReport);
         Assert(health.Contains("window-close", StringComparison.Ordinal));
         Assert(health.Contains("timeoutMs", StringComparison.Ordinal));
+        var errors = File.ReadAllText(new AppPaths(root).ErrorLog);
+        Assert(errors.Contains("\"source\":\"ui.shutdown.timeout\"", StringComparison.Ordinal));
+        Assert(!errors.Contains("\"source\":\"ui.shutdown\"", StringComparison.Ordinal));
+        Assert(!window.HasCompletedControllerShutdownCleanup);
+        PumpDispatcherUntil(
+            () => launcher.LastProcess is { HasExited: true }
+                && window.HasCompletedControllerShutdownCleanup,
+            TimeSpan.FromSeconds(7));
         window = null;
     }
     finally
@@ -895,7 +979,7 @@ static void PumpDispatcherUntil(Func<bool> condition, TimeSpan timeout)
     {
         var frame = new DispatcherFrame();
         Dispatcher.CurrentDispatcher.BeginInvoke(
-            DispatcherPriority.Background,
+            DispatcherPriority.SystemIdle,
             new Action(() => frame.Continue = false));
         Dispatcher.PushFrame(frame);
     }

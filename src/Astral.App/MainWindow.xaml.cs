@@ -42,22 +42,36 @@ namespace Astral.App;
 public partial class MainWindow : Window, IDisposable
 {
     internal static TimeSpan ShutdownCleanupTimeout { get; set; } =
-        TimeSpan.FromSeconds(8);
+        TimeSpan.FromSeconds(22);
     internal static TimeSpan InteractiveCleanupTimeout { get; set; } =
         TimeSpan.FromSeconds(18);
     internal static TimeSpan MaintenanceCleanupTimeout { get; set; } =
         TimeSpan.FromSeconds(90);
+    internal static TimeSpan BackgroundShutdownCleanupTimeout { get; set; } =
+        TimeSpan.FromSeconds(30);
     internal bool HasAttemptedControllerShutdownCleanup { get; private set; }
+    internal bool HasCompletedControllerShutdownCleanup { get; private set; }
+    internal Task? ControllerShutdownCleanupTaskForExit => _controllerShutdownCleanupTask;
 
     private static readonly TimeSpan LiveDnsRefreshInterval = TimeSpan.FromSeconds(15);
     private static readonly char[] SvgViewBoxSeparators = new[] { ' ', ',' };
     internal static Action<Uri>? OpenUriOverrideForTesting { get; set; }
     internal static Func<bool>? IsReducedMotionPreferredOverrideForTesting { get; set; }
+    private const int MaxConcurrentTargetTestProbes = 8;
+    private const int TargetPulseFrameRate = 30;
+    private static readonly TimeSpan TargetTestHostTimeout = TimeSpan.FromSeconds(12);
+    private static readonly TimeSpan TargetTestProxyConnectTimeout = TimeSpan.FromSeconds(10);
+    internal static int MaxConcurrentTargetTestProbesForTesting => MaxConcurrentTargetTestProbes;
+    internal static TimeSpan TargetTestHostTimeoutForTesting => TargetTestHostTimeout;
+    internal static TimeSpan TargetTestProxyConnectTimeoutForTesting => TargetTestProxyConnectTimeout;
+    internal static int TargetPulseFrameRateForTesting => TargetPulseFrameRate;
+    internal static DispatcherPriority BackgroundVideoStartPriorityForTesting =>
+        DispatcherPriority.ContextIdle;
 
     private static readonly Uri RepositoryUri = new(
         "https://github.com/ucsahinn/astral");
     private static readonly Uri ReleaseNotesUri = new(
-        "https://github.com/ucsahinn/astral/releases/tag/v2.2.28");
+        "https://github.com/ucsahinn/astral/releases/tag/v2.2.29");
     private static readonly Uri BackgroundVideoCdnUri = new(
         "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260328_105406_16f4600d-7a92-4292-b96e-b19156c7830a.mp4");
     private static readonly string LocalBackgroundVideoPath = Path.Combine(
@@ -110,10 +124,18 @@ public partial class MainWindow : Window, IDisposable
     private string? _lastLoggedUpdateProgressKey;
     private int _lastLoggedUpdateProgressPercent = -1;
     private string _lastTargetTestSummary = "Kapsam doğrulaması UI'da gösterilmez.";
+    private long _lastTargetTestElapsedMilliseconds;
     private readonly Dictionary<string, TargetProbeResult> _targetProbeResults =
         new(StringComparer.OrdinalIgnoreCase);
+    private readonly object _snapshotQueueLock = new();
+    private Task? _controllerShutdownCleanupTask;
     private AppUpdateCheckResult? _pendingUpdate;
+    private TunnelSnapshot? _pendingSnapshot;
+    private bool _snapshotApplyQueued;
     private bool _isBackgroundVideoStarted;
+    private bool _isBackgroundVideoOpening;
+    private bool _backgroundVideoStartQueued;
+    private bool _shutdownAfterCleanupQueued;
     private bool _backgroundVideoFallbackAttempted;
     private string? _lastBackgroundVideoStatusKey;
     private DateTimeOffset _lastDnsRefreshUtc = DateTimeOffset.MinValue;
@@ -245,11 +267,79 @@ public partial class MainWindow : Window, IDisposable
     {
         if (!Dispatcher.CheckAccess())
         {
-            Dispatcher.Invoke(() => ApplySnapshot(snapshot));
+            lock (_snapshotQueueLock)
+            {
+                _pendingSnapshot = snapshot;
+                if (_snapshotApplyQueued)
+                {
+                    return;
+                }
+
+                _snapshotApplyQueued = true;
+            }
+
+            _ = Dispatcher.BeginInvoke(
+                DispatcherPriority.Background,
+                new Action(ApplyPendingSnapshot));
+            return;
+        }
+
+        ClearPendingSnapshot();
+        ApplySnapshot(snapshot);
+    }
+
+    private void ClearPendingSnapshot()
+    {
+        lock (_snapshotQueueLock)
+        {
+            _pendingSnapshot = null;
+            _snapshotApplyQueued = false;
+        }
+    }
+
+    private void ApplyPendingSnapshot()
+    {
+        TunnelSnapshot? snapshot;
+        lock (_snapshotQueueLock)
+        {
+            snapshot = _pendingSnapshot;
+            _pendingSnapshot = null;
+            _snapshotApplyQueued = false;
+        }
+
+        if (snapshot is null || _disposed)
+        {
             return;
         }
 
         ApplySnapshot(snapshot);
+    }
+
+    internal void QueuePendingSnapshotForTesting(TunnelSnapshot snapshot)
+    {
+        lock (_snapshotQueueLock)
+        {
+            _pendingSnapshot = snapshot;
+            _snapshotApplyQueued = true;
+        }
+    }
+
+    internal bool HasPendingSnapshotForTesting
+    {
+        get
+        {
+            lock (_snapshotQueueLock)
+            {
+                return _pendingSnapshot is not null || _snapshotApplyQueued;
+            }
+        }
+    }
+
+    internal TunnelState LastObservedTunnelStateForTesting => _lastObservedTunnelState;
+
+    internal void OnStatusChangedForTesting(TunnelSnapshot snapshot)
+    {
+        OnStatusChanged(this, snapshot);
     }
 
     private void ApplySnapshot(TunnelSnapshot snapshot)
@@ -1236,15 +1326,11 @@ public partial class MainWindow : Window, IDisposable
                     : TimeSpan.Zero;
                 iconBadge.BeginAnimation(
                     OpacityProperty,
-                    new DoubleAnimation
-                    {
-                        From = 0.72,
-                        To = 1,
-                        Duration = TimeSpan.FromMilliseconds(700),
-                        AutoReverse = true,
-                        RepeatBehavior = RepeatBehavior.Forever,
-                        BeginTime = beginDelay
-                    });
+                    CreatePulseOpacityAnimation(
+                        from: 0.72,
+                        to: 1,
+                        duration: TimeSpan.FromMilliseconds(700),
+                        beginTime: beginDelay));
             }
         }
         else
@@ -1339,15 +1425,30 @@ public partial class MainWindow : Window, IDisposable
         {
             badge.BeginAnimation(
                 OpacityProperty,
-                new DoubleAnimation
-                {
-                    From = 0.55,
-                    To = 1,
-                    Duration = TimeSpan.FromMilliseconds(420),
-                    AutoReverse = true,
-                    RepeatBehavior = RepeatBehavior.Forever
-                });
+                CreatePulseOpacityAnimation(
+                    from: 0.55,
+                    to: 1,
+                    duration: TimeSpan.FromMilliseconds(420)));
         }
+    }
+
+    private static DoubleAnimation CreatePulseOpacityAnimation(
+        double from,
+        double to,
+        TimeSpan duration,
+        TimeSpan? beginTime = null)
+    {
+        var animation = new DoubleAnimation
+        {
+            From = from,
+            To = to,
+            Duration = duration,
+            AutoReverse = true,
+            RepeatBehavior = RepeatBehavior.Forever,
+            BeginTime = beginTime
+        };
+        Timeline.SetDesiredFrameRate(animation, TargetPulseFrameRate);
+        return animation;
     }
 
     private void ApplyTargetToggleState(TargetDefinition target, TargetCardState state)
@@ -1572,7 +1673,7 @@ public partial class MainWindow : Window, IDisposable
         if (_isTargetTestRunning)
         {
             TargetTestSummary.Text =
-                "Kapsam doğrulaması çalışıyor; seçili hedefler sırayla ölçülüyor.";
+                "Seçili hedefler ölçülüyor.";
             return;
         }
 
@@ -1582,7 +1683,7 @@ public partial class MainWindow : Window, IDisposable
                 || target.HasApplicationScope);
         if (!hasSelectedTarget)
         {
-            TargetTestSummary.Text = "Hedef testi: seçili hedef yok.";
+            TargetTestSummary.Text = "Seçili hedef yok.";
             return;
         }
 
@@ -1595,19 +1696,13 @@ public partial class MainWindow : Window, IDisposable
 
         if (HasSelectedTargetProbeFailure())
         {
-            TargetTestSummary.Text =
-                _lastTargetTestSummary.Contains("kontrol gerekli", StringComparison.OrdinalIgnoreCase)
-                    ? "Hedef testi: " + _lastTargetTestSummary
-                    : "Hedef testi: kontrol gerekiyor. Kırmızı hedeflerde çıkış kanıtı alınamadı.";
+            TargetTestSummary.Text = "Kontrol gerekiyor.";
             return;
         }
 
         if (HasSelectedTargetProbeSuccess())
         {
-            TargetTestSummary.Text =
-                IsTargetTestSummaryReusable(_lastTargetTestSummary)
-                    ? "Hedef testi: " + _lastTargetTestSummary
-                    : "Hedef testi: seçili hedefler doğrulandı.";
+            TargetTestSummary.Text = "Seçili hedefler doğrulandı.";
             return;
         }
 
@@ -1619,12 +1714,32 @@ public partial class MainWindow : Window, IDisposable
                 "UI'da gösterilmez",
                 StringComparison.OrdinalIgnoreCase))
         {
-            TargetTestSummary.Text = "Hedef testi: " + _lastTargetTestSummary;
+            TargetTestSummary.Text = CreateCompactTargetTestSummary(
+                _lastTargetTestSummary);
             return;
         }
 
         TargetTestSummary.Text =
-            "Bağlantı açık. Test Et ile seçili hedef çıkışını doğrulayın.";
+            "Bağlı; test hazır.";
+    }
+
+    private static string CreateCompactTargetTestSummary(string summary)
+    {
+        if (summary.Contains("kontrol gerekli", StringComparison.OrdinalIgnoreCase)
+            || summary.Contains("hata", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Kontrol gerekiyor.";
+        }
+
+        if (summary.Contains("OK", StringComparison.OrdinalIgnoreCase)
+            || summary.Contains("doğrul", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Seçili hedefler doğrulandı.";
+        }
+
+        return summary.Length <= 42
+            ? summary
+            : summary[..39] + "...";
     }
 
     private void ApplyTargetTestCardState(TunnelSnapshot snapshot)
@@ -1816,6 +1931,7 @@ public partial class MainWindow : Window, IDisposable
             timeoutSource.Token,
             lifetimeToken);
 
+        var testStopwatch = Stopwatch.StartNew();
         var results = new List<TargetProbeResult>();
         try
         {
@@ -1852,6 +1968,7 @@ public partial class MainWindow : Window, IDisposable
 
                 _lastTargetTestSummary =
                     "Scoped web kapsamı doğrulanamadı: " + scopeStatus.Message;
+                _lastTargetTestElapsedMilliseconds = testStopwatch.ElapsedMilliseconds;
                 TargetTestSummary.Text = _lastTargetTestSummary;
                 _diagnostics.WriteHealth(
                     "kapsam doğrulaması scoped proxy kontrolünde durdu",
@@ -1862,17 +1979,42 @@ public partial class MainWindow : Window, IDisposable
                 return;
             }
 
+            if (!TryReadProxyPortFromPacFile(out var proxyPort))
+            {
+                foreach (var target in selectedTargets)
+                {
+                    var hosts = GetTargetTestHosts(target);
+                    var result = hosts.Length == 0
+                        ? CreateProfileScopeProbeResult()
+                        : new TargetProbeResult(
+                            TargetProbeStatus.Failed,
+                            string.Join(", ", hosts),
+                            "Aktif proxy portu bulunamadı.",
+                            DateTimeOffset.Now);
+                    _targetProbeResults[target.Id] = result;
+                    results.Add(result);
+                    LogTargetProbeResult(target, result);
+                }
+
+                _lastTargetTestSummary =
+                    "Kapsam doğrulaması proxy portu bulunamadığı için tamamlanamadı.";
+                _lastTargetTestElapsedMilliseconds = testStopwatch.ElapsedMilliseconds;
+                TargetTestSummary.Text = _lastTargetTestSummary;
+                _diagnostics.WriteHealth(
+                    "kapsam doğrulaması proxy portu bulunamadı",
+                    CreateTargetTestDiagnosticDetails(results));
+                RefreshTargetScopeView(locked: true);
+                return;
+            }
+
+            var networkTargets = new List<(TargetDefinition Target, string[] Hosts)>();
             foreach (var target in selectedTargets)
             {
                 linkedSource.Token.ThrowIfCancellationRequested();
                 var hosts = GetTargetTestHosts(target);
                 if (hosts.Length == 0)
                 {
-                    var scoped = new TargetProbeResult(
-                        TargetProbeStatus.ProfileScope,
-                        null,
-                        "Uygulama kapsamı WireSock profilinde hazırlandı; uygulama açma kanıtı değildir.",
-                        DateTimeOffset.Now);
+                    var scoped = CreateProfileScopeProbeResult();
                     _targetProbeResults[target.Id] = scoped;
                     results.Add(scoped);
                     LogTargetProbeResult(target, scoped);
@@ -1881,22 +2023,39 @@ public partial class MainWindow : Window, IDisposable
                     continue;
                 }
 
-                var running = new TargetProbeResult(
-                    TargetProbeStatus.Running,
-                    string.Join(", ", hosts),
-                    "Kapsam doğrulaması çalışıyor",
-                    DateTimeOffset.Now);
-                _targetProbeResults[target.Id] = running;
-                RefreshTargetScopeView(locked: true);
+                networkTargets.Add((target, hosts));
+            }
 
-                var result = await ProbeTargetHostsViaScopedProxyAsync(
-                    target,
-                    hosts,
-                    linkedSource.Token);
-                _targetProbeResults[target.Id] = result;
-                results.Add(result);
-                LogTargetProbeResult(target, result);
+            foreach (var batch in networkTargets.Chunk(MaxConcurrentTargetTestProbes))
+            {
+                linkedSource.Token.ThrowIfCancellationRequested();
+                foreach (var (target, hosts) in batch)
+                {
+                    _targetProbeResults[target.Id] = CreateRunningProbeResult(hosts);
+                }
+
                 RefreshTargetScopeView(locked: true);
+                ApplyTargetTestCardState(_controller.Snapshot);
+
+                var tasks = batch
+                    .Select(item => ProbeTargetHostsViaScopedProxyAsync(
+                        item.Target,
+                        item.Hosts,
+                        proxyPort,
+                        linkedSource.Token))
+                    .ToList();
+
+                while (tasks.Count > 0)
+                {
+                    var completedTask = await Task.WhenAny(tasks);
+                    tasks.Remove(completedTask);
+                    var (target, result) = await completedTask;
+                    _targetProbeResults[target.Id] = result;
+                    results.Add(result);
+                    LogTargetProbeResult(target, result);
+                    RefreshTargetScopeView(locked: true);
+                    ApplyTargetTestCardState(_controller.Snapshot);
+                }
             }
 
             var webRouteSuccessCount = selectedTargets.Count(target =>
@@ -1914,6 +2073,7 @@ public partial class MainWindow : Window, IDisposable
                 appScopeReadyCount,
                 failedCount,
                 skippedCount);
+            _lastTargetTestElapsedMilliseconds = testStopwatch.ElapsedMilliseconds;
             TargetTestSummary.Text = "Kapsam doğrulaması: " + _lastTargetTestSummary;
             _diagnostics.Info(
                 "ui.targetTest.complete",
@@ -1925,6 +2085,7 @@ public partial class MainWindow : Window, IDisposable
         }
         catch (OperationCanceledException)
         {
+            _lastTargetTestElapsedMilliseconds = testStopwatch.ElapsedMilliseconds;
             _lastTargetTestSummary = "Kapsam doğrulaması iptal edildi veya zaman aşımına uğradı.";
             TargetTestSummary.Text = _lastTargetTestSummary;
             _diagnostics.Warning(
@@ -1933,6 +2094,7 @@ public partial class MainWindow : Window, IDisposable
         }
         finally
         {
+            testStopwatch.Stop();
             _isTargetTestRunning = false;
             ApplyTargetTestSummaryState(_controller.Snapshot);
             ApplyTargetTestCardState(_controller.Snapshot);
@@ -1961,50 +2123,75 @@ public partial class MainWindow : Window, IDisposable
             });
     }
 
-    private async Task<TargetProbeResult> ProbeTargetHostsViaScopedProxyAsync(
+    private static TargetProbeResult CreateProfileScopeProbeResult()
+    {
+        return new TargetProbeResult(
+            TargetProbeStatus.ProfileScope,
+            null,
+            "Uygulama kapsamı WireSock profilinde hazırlandı; uygulama açma kanıtı değildir.",
+            DateTimeOffset.Now);
+    }
+
+    private static TargetProbeResult CreateRunningProbeResult(string[] hosts)
+    {
+        return new TargetProbeResult(
+            TargetProbeStatus.Running,
+            string.Join(", ", hosts),
+            "Kapsam doğrulaması çalışıyor",
+            DateTimeOffset.Now);
+    }
+
+    private static async Task<(TargetDefinition Target, TargetProbeResult Result)> ProbeTargetHostsViaScopedProxyAsync(
         TargetDefinition target,
         string[] hosts,
+        int proxyPort,
         CancellationToken cancellationToken)
     {
         var startedAt = DateTimeOffset.Now;
         var tested = 0;
+        var succeeded = 0;
+        var failures = new List<TargetProbeResult>();
         try
         {
-            if (!TryReadProxyPortFromPacFile(out var proxyPort))
-            {
-                return new TargetProbeResult(
-                    TargetProbeStatus.Failed,
-                    string.Join(", ", hosts),
-                    "Aktif proxy portu bulunamadı.",
-                    startedAt);
-            }
-
             foreach (var host in hosts)
             {
                 tested++;
                 var hostResult = await ProbeSingleTargetHostViaScopedProxyAsync(
                     host,
                     proxyPort,
-                    cancellationToken);
-                if (hostResult is not null)
+                    cancellationToken)
+                    .ConfigureAwait(false);
+                if (hostResult is null)
                 {
-                    return hostResult;
+                    succeeded++;
+                    continue;
                 }
+
+                failures.Add(hostResult);
             }
 
-            return new TargetProbeResult(
-                TargetProbeStatus.Success,
-                string.Join(", ", hosts),
-                $"CONNECT 443 rota OK: {tested.ToString(CultureInfo.InvariantCulture)}/{hosts.Length.ToString(CultureInfo.InvariantCulture)} host.",
-                startedAt);
+            if (succeeded > 0)
+            {
+                return (target, new TargetProbeResult(
+                    TargetProbeStatus.Success,
+                    string.Join(", ", hosts),
+                    $"CONNECT 443 rota OK: {succeeded.ToString(CultureInfo.InvariantCulture)}/{hosts.Length.ToString(CultureInfo.InvariantCulture)} host.",
+                    startedAt));
+            }
+
+            return (target, new TargetProbeResult(
+                TargetProbeStatus.Failed,
+                string.Join(", ", failures.Select(failure => failure.Host)),
+                failures.LastOrDefault()?.Message ?? "CONNECT 443 rota doÄŸrulanamadÄ±.",
+                startedAt));
         }
         catch (OperationCanceledException)
         {
-            return new TargetProbeResult(
+            return (target, new TargetProbeResult(
                 TargetProbeStatus.Failed,
                 string.Join(", ", hosts),
                 $"Kapsam doğrulaması zaman aşımına uğradı: {tested.ToString(CultureInfo.InvariantCulture)}/{hosts.Length.ToString(CultureInfo.InvariantCulture)} host denendi.",
-                startedAt);
+                startedAt));
         }
     }
 
@@ -2016,13 +2203,13 @@ public partial class MainWindow : Window, IDisposable
         var startedAt = DateTimeOffset.Now;
         try
         {
-            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(4));
+            using var timeout = new CancellationTokenSource(TargetTestHostTimeout);
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(
                 cancellationToken,
                 timeout.Token);
             using var client = new TcpClient();
             await client.ConnectAsync(IPAddress.Loopback, proxyPort)
-                .WaitAsync(TimeSpan.FromMilliseconds(1500), linked.Token);
+                .WaitAsync(TargetTestProxyConnectTimeout, linked.Token);
             await using var stream = client.GetStream();
             var request = Encoding.ASCII.GetBytes(
                 $"CONNECT {host}:443 HTTP/1.1\r\nHost: {host}:443\r\nProxy-Connection: close\r\n\r\n");
@@ -2257,6 +2444,8 @@ public partial class MainWindow : Window, IDisposable
             ["summary"] = _lastTargetTestSummary,
             ["selectedTargets"] = _controller.CurrentRoutingPlan.Summary,
             ["selectedTargetCount"] = selectedTargets.Length.ToString(CultureInfo.InvariantCulture),
+            ["elapsedMs"] = _lastTargetTestElapsedMilliseconds.ToString(CultureInfo.InvariantCulture),
+            ["maxConcurrentProbes"] = MaxConcurrentTargetTestProbes.ToString(CultureInfo.InvariantCulture),
             ["verifiedTargetCount"] = verifiedTargetIds.Length.ToString(CultureInfo.InvariantCulture),
             ["webRouteVerifiedTargetCount"] = webRouteVerifiedTargetIds.Length.ToString(CultureInfo.InvariantCulture),
             ["appScopeReadyTargetCount"] = appScopeReadyTargetIds.Length.ToString(CultureInfo.InvariantCulture),
@@ -3200,6 +3389,7 @@ public partial class MainWindow : Window, IDisposable
 
     private void BackgroundVideo_MediaOpened(object sender, RoutedEventArgs e)
     {
+        _isBackgroundVideoOpening = false;
         if (!ShouldPlayBackgroundVideo(_controller.Snapshot))
         {
             StopBackgroundVideo();
@@ -3240,6 +3430,7 @@ public partial class MainWindow : Window, IDisposable
         {
             _backgroundVideoFallbackAttempted = true;
             _isBackgroundVideoStarted = false;
+            _isBackgroundVideoOpening = false;
             _diagnostics.Warning(
                 "ui.backgroundVideo",
                 "Yerel arka plan videosu yuklenemedi; CDN fallback deneniyor.",
@@ -3251,16 +3442,17 @@ public partial class MainWindow : Window, IDisposable
             BackgroundVideo.Stop();
             BackgroundVideo.Source = BackgroundVideoCdnUri;
             BackgroundVideo.Visibility = Visibility.Visible;
+            _isBackgroundVideoOpening = true;
             if (BackgroundVideo.IsLoaded)
             {
                 BackgroundVideo.Play();
-                _isBackgroundVideoStarted = true;
             }
 
             return;
         }
 
         _isBackgroundVideoStarted = false;
+        _isBackgroundVideoOpening = false;
         BackgroundVideo.Visibility = Visibility.Collapsed;
         _diagnostics.Warning(
             "ui.backgroundVideo",
@@ -3336,32 +3528,62 @@ public partial class MainWindow : Window, IDisposable
     {
         if (ShouldPlayBackgroundVideo(snapshot))
         {
-            StartBackgroundVideo();
+            QueueBackgroundVideoStart();
             return;
         }
 
         StopBackgroundVideo();
     }
 
+    private void QueueBackgroundVideoStart()
+    {
+        if (_isBackgroundVideoStarted || _isBackgroundVideoOpening)
+        {
+            return;
+        }
+
+        if (_backgroundVideoStartQueued)
+        {
+            return;
+        }
+
+        _backgroundVideoStartQueued = true;
+        _ = Dispatcher.BeginInvoke(
+            BackgroundVideoStartPriorityForTesting,
+            new Action(() =>
+            {
+                _backgroundVideoStartQueued = false;
+                if (ShouldPlayBackgroundVideo(_controller.Snapshot))
+                {
+                    StartBackgroundVideo();
+                }
+            }));
+    }
+
     private void StopBackgroundVideo()
     {
         if (!_isBackgroundVideoStarted
+            && !_isBackgroundVideoOpening
+            && !_backgroundVideoStartQueued
             && BackgroundVideo.Source is null
             && BackgroundVideo.Visibility == Visibility.Collapsed)
         {
             return;
         }
 
+        _backgroundVideoStartQueued = false;
         try
         {
             BackgroundVideo.Stop();
             BackgroundVideo.Source = null;
             BackgroundVideo.Visibility = Visibility.Collapsed;
             _isBackgroundVideoStarted = false;
+            _isBackgroundVideoOpening = false;
         }
         catch (InvalidOperationException)
         {
             _isBackgroundVideoStarted = false;
+            _isBackgroundVideoOpening = false;
         }
     }
 
@@ -3373,7 +3595,8 @@ public partial class MainWindow : Window, IDisposable
             return;
         }
 
-        if (_isBackgroundVideoStarted && BackgroundVideo.Source is not null)
+        if ((_isBackgroundVideoStarted || _isBackgroundVideoOpening)
+            && BackgroundVideo.Source is not null)
         {
             return;
         }
@@ -3385,6 +3608,7 @@ public partial class MainWindow : Window, IDisposable
             return;
         }
 
+        _isBackgroundVideoOpening = true;
         BackgroundVideo.Visibility = Visibility.Visible;
         BackgroundVideo.Source ??= videoUri;
         BackgroundVideo.SpeedRatio = IsReducedMotionPreferred() ? 0.82 : 1.0;
@@ -3400,7 +3624,6 @@ public partial class MainWindow : Window, IDisposable
         if (BackgroundVideo.IsLoaded)
         {
             BackgroundVideo.Play();
-            _isBackgroundVideoStarted = true;
         }
     }
 
@@ -3437,11 +3660,104 @@ public partial class MainWindow : Window, IDisposable
         return true;
     }
 
+    internal bool IsBackgroundVideoOpeningForTesting => _isBackgroundVideoOpening;
+
+    internal bool IsBackgroundVideoStartQueuedForTesting => _backgroundVideoStartQueued;
+
     public void HideToTrayOnStartup()
     {
         if (_isRunInBackgroundEnabled)
         {
             HideToTray(showNotification: false);
+        }
+    }
+
+    public void RestoreFromExternalActivation()
+    {
+        ShowInTaskbar = true;
+        Show();
+        if (WindowState == WindowState.Minimized)
+        {
+            WindowState = WindowState.Normal;
+        }
+
+        Activate();
+        Topmost = true;
+        Topmost = false;
+        Focus();
+        UpdateBackgroundVideoForSnapshot(_controller.Snapshot);
+        _diagnostics.Info(
+            "ui.activation",
+            "Mevcut Astral penceresi ikinci baslatma istegiyle one alindi.");
+    }
+
+    public void BeginDiagnosticConnectSmoke()
+    {
+        Dispatcher.BeginInvoke(
+            new Action(async () => await RunDiagnosticConnectSmokeAsync()),
+            DispatcherPriority.ContextIdle);
+    }
+
+    public void BeginDiagnosticExitSmoke()
+    {
+        Dispatcher.BeginInvoke(
+            new Action(async () =>
+            {
+                _exitRequested = true;
+                _settingsStore.SetRunInBackgroundOnCloseEnabled(false);
+                ApplyRunInBackgroundSetting(enabled: false);
+                _diagnostics.Info(
+                    "ui.diagnosticExitSmoke",
+                    "Tanilama kapanis smoke istegi baslatildi.");
+                await CloseAfterShutdownCleanupAsync(
+                    "diagnostic-exit-smoke",
+                    recoverOnFailure: false,
+                    deferClose: false);
+            }),
+            DispatcherPriority.ContextIdle);
+    }
+
+    private async Task RunDiagnosticConnectSmokeAsync()
+    {
+        if (_controller.Snapshot.IsBusy || _controller.Snapshot.IsConnected)
+        {
+            _diagnostics.Info(
+                "ui.diagnosticConnectSmoke",
+                "Tanilama baglanti smoke istegi atlandi; baglanti zaten aktif veya mesgul.",
+                new Dictionary<string, string?>
+                {
+                    ["state"] = _controller.Snapshot.State.ToString()
+                });
+            return;
+        }
+
+        if (!_wireSockBootstrapper.IsSetupConsentAccepted)
+        {
+            _diagnostics.Warning(
+                "ui.diagnosticConnectSmoke",
+                "Tanilama baglanti smoke istegi consent kabul edilmedigi icin baslatilmadi.");
+            return;
+        }
+
+        _diagnostics.Info(
+            "ui.diagnosticConnectSmoke",
+            "Tanilama baglanti smoke istegi baslatildi.");
+        _operationCancellation?.Dispose();
+        _operationCancellation = new CancellationTokenSource();
+        _isToggleOperationRunning = true;
+        ToggleButton.IsEnabled = false;
+
+        try
+        {
+            await _controller.ConnectAsync(_operationCancellation.Token);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        finally
+        {
+            _isToggleOperationRunning = false;
+            ApplySnapshot(_controller.Snapshot);
         }
     }
 
@@ -4380,19 +4696,26 @@ public partial class MainWindow : Window, IDisposable
 
         try
         {
-            if (!await DisposeControllerForShutdownAsync(
-                    operation,
-                    ShutdownCleanupTimeout))
+            var cleanupCompleted = await DisposeControllerForShutdownAsync(
+                operation,
+                ShutdownCleanupTimeout);
+            if (!cleanupCompleted)
             {
-                throw new TimeoutException(
-                    "Shutdown cleanup did not complete before the UI timeout.");
+                QueueApplicationShutdownAfterControllerCleanup(operation);
+                SetMaintenanceProgress(
+                    100,
+                    "Kapanış arka planda sürüyor",
+                    "UI bekletilmeden kapatılıyor; geciken temizlik tanılamaya yazılır.",
+                    4);
             }
-
-            SetMaintenanceProgress(
-                100,
-                "Kapanış tamamlandı",
-                "PAC, proxy ve hedef kilidi temizleme isteği tamamlandı.",
-                4);
+            else
+            {
+                SetMaintenanceProgress(
+                    100,
+                    "Kapanış tamamlandı",
+                    "PAC, proxy ve hedef kilidi temizleme isteği tamamlandı.",
+                    4);
+            }
         }
         catch (Exception exception)
         {
@@ -4448,11 +4771,86 @@ public partial class MainWindow : Window, IDisposable
         TimeSpan timeout)
     {
         HasAttemptedControllerShutdownCleanup = true;
-        var disposeTask = _controller.DisposeAsync().AsTask();
-        return await AwaitControllerOperationAsync(
-            disposeTask,
+        _controllerShutdownCleanupTask ??= _controller.DisposeAsync().AsTask();
+        var completed = await AwaitControllerOperationAsync(
+            _controllerShutdownCleanupTask,
             operation,
             timeout);
+        if (completed)
+        {
+            HasCompletedControllerShutdownCleanup = true;
+        }
+
+        return completed;
+    }
+
+    private void QueueApplicationShutdownAfterControllerCleanup(string operation)
+    {
+        var cleanupTask = _controllerShutdownCleanupTask;
+        if (cleanupTask is null || _shutdownAfterCleanupQueued)
+        {
+            return;
+        }
+
+        var application = System.Windows.Application.Current;
+        if (application is null
+            || application.ShutdownMode == ShutdownMode.OnExplicitShutdown)
+        {
+            return;
+        }
+
+        application.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+        _shutdownAfterCleanupQueued = true;
+        _ = FinishApplicationShutdownAfterCleanupAsync(cleanupTask, operation);
+    }
+
+    private async Task FinishApplicationShutdownAfterCleanupAsync(
+        Task cleanupTask,
+        string operation)
+    {
+        try
+        {
+            var completed = await Task.WhenAny(
+                cleanupTask,
+                Task.Delay(BackgroundShutdownCleanupTimeout));
+            if (ReferenceEquals(completed, cleanupTask))
+            {
+                await cleanupTask;
+                HasCompletedControllerShutdownCleanup = true;
+                _diagnostics.Info(
+                    "ui.shutdown.delayedComplete",
+                    "Geciken kapanış temizliği tamamlandı; uygulama kapatılıyor.",
+                    new Dictionary<string, string?>
+                    {
+                        ["operation"] = operation
+                    });
+            }
+            else
+            {
+                _diagnostics.Warning(
+                    "ui.shutdown.delayedTimeout",
+                    "Geciken kapanış temizliği arka plan limitini aştı; uygulama kapatılıyor.",
+                    new Dictionary<string, string?>
+                    {
+                        ["operation"] = operation,
+                        ["timeoutMs"] = BackgroundShutdownCleanupTimeout
+                            .TotalMilliseconds
+                            .ToString("0", CultureInfo.InvariantCulture)
+                    });
+            }
+        }
+        catch (Exception exception)
+        {
+            _diagnostics.Failure(
+                "ui.shutdown.delayedComplete",
+                "Geciken kapanış temizliği hata ile bitti.",
+                exception);
+        }
+        finally
+        {
+            await Dispatcher.BeginInvoke(
+                new Action(() => System.Windows.Application.Current.Shutdown()));
+        }
     }
 
     private async Task<bool> AwaitControllerOperationAsync(
@@ -4468,7 +4866,36 @@ public partial class MainWindow : Window, IDisposable
 
         if (ReferenceEquals(completedTask, operationTask))
         {
-            await operationTask;
+            try
+            {
+                await operationTask;
+            }
+            catch (TimeoutException exception)
+            {
+                _diagnostics.Warning(
+                    "ui.shutdown.timeout",
+                    "Kapanış temizliği zaman aşımına uğradı; UI kilitlenmemesi için devam ediliyor.",
+                    new Dictionary<string, string?>
+                    {
+                        ["operation"] = operation,
+                        ["timeoutMs"] = timeout.TotalMilliseconds.ToString("0", CultureInfo.InvariantCulture),
+                        ["elapsedMs"] = stopwatch.ElapsedMilliseconds.ToString(CultureInfo.InvariantCulture),
+                        ["state"] = _controller.Snapshot.State.ToString(),
+                        ["message"] = exception.Message
+                    });
+                _diagnostics.WriteHealth(
+                    "kapanış temizliği zaman aşımı",
+                    new Dictionary<string, string?>
+                    {
+                        ["operation"] = operation,
+                        ["timeoutMs"] = timeout.TotalMilliseconds.ToString("0", CultureInfo.InvariantCulture),
+                        ["elapsedMs"] = stopwatch.ElapsedMilliseconds.ToString(CultureInfo.InvariantCulture),
+                        ["state"] = _controller.Snapshot.State.ToString(),
+                        ["message"] = exception.Message
+                    });
+                return false;
+            }
+
             _diagnostics.Info(
                 "ui.shutdown.complete",
                 "Kapanış/temizleme işlemi tamamlandı.",
@@ -4504,13 +4931,35 @@ public partial class MainWindow : Window, IDisposable
         _ = operationTask.ContinueWith(
             task =>
             {
-                if (task.Exception is not null)
+                if (task.IsFaulted && task.Exception is not null)
                 {
                     _diagnostics.Failure(
                         "ui.shutdown.timeout",
                         "Geciken kapanış temizliği hata ile bitti.",
                         task.Exception.GetBaseException());
+                    return;
                 }
+
+                if (task.IsCanceled)
+                {
+                    _diagnostics.Warning(
+                        "ui.shutdown.timeout",
+                        "Geciken kapanış temizliği iptal edildi.",
+                        new Dictionary<string, string?>
+                        {
+                            ["operation"] = operation
+                        });
+                    return;
+                }
+
+                HasCompletedControllerShutdownCleanup = true;
+                _diagnostics.Info(
+                    "ui.shutdown.delayedComplete",
+                    "Geciken kapanış temizliği tamamlandı.",
+                    new Dictionary<string, string?>
+                    {
+                        ["operation"] = operation
+                    });
             },
             TaskScheduler.Default);
 

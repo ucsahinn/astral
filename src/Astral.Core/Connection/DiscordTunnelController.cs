@@ -41,7 +41,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
     ];
     private static readonly TimeSpan TunnelReadinessRetryDelay =
         TimeSpan.FromMilliseconds(500);
-    private static readonly TimeSpan CleanupPhaseTimeout = TimeSpan.FromSeconds(6);
+    private static readonly TimeSpan CleanupPhaseTimeout = TimeSpan.FromSeconds(18);
 
     private readonly AppPaths _paths;
     private readonly DiscordAppScope _discordScope;
@@ -50,6 +50,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
     private readonly IProcessLauncher _processLauncher;
     private readonly IDiscordAccessLock _accessLock;
     private readonly IAstralDiagnostics _diagnostics;
+    private readonly IDiscordProcessManager _discordProcessManager;
     private readonly ITunnelReadinessProbe _tunnelReadinessProbe;
     private readonly TargetScopeResolver _targetScopeResolver;
     private readonly IScopedWebProxyService _webProxyService;
@@ -91,6 +92,8 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         ScopedWebProxyStatus.NotRequired("Web proxy kapsamı henüz denetlenmedi.");
     private ScopedWebProxyProof _lastWebProxyProof =
         ScopedWebProxyProof.NotRequired("Web proxy target proof has not run.");
+    private TargetProcessRefreshResult _lastTargetProcessRefresh =
+        TargetProcessRefreshResult.NotRun();
 
     public DiscordTunnelController(
         AppPaths paths,
@@ -116,7 +119,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             ?? throw new ArgumentNullException(nameof(processLauncher));
         _accessLock = accessLock ?? new NullDiscordAccessLock();
         _diagnostics = diagnostics ?? NullAstralDiagnostics.Instance;
-        _ = discordProcessManager;
+        _discordProcessManager = discordProcessManager ?? new NullDiscordProcessManager();
         _tunnelReadinessProbe = tunnelReadinessProbe
             ?? NullTunnelReadinessProbe.Instance;
         _targetScopeResolver = targetScopeResolver
@@ -256,7 +259,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             ["diagnostic"] = _snapshot.Diagnostic,
             ["wireSockRunning"] = wireSockRunning.ToString(),
             ["nextAction"] = _lastNextAction,
-            ["targetLaunchPolicy"] = "not-started-by-astral",
+            ["targetLaunchPolicy"] = _lastTargetProcessRefresh.Policy,
             ["profilePath"] = _lastProfilePath,
             ["routingProfileSha256"] = _lastRoutingProfileSha256,
             ["profileHashScope"] = "sanitized-routing-lines",
@@ -276,6 +279,11 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         foreach (var webProxyProofDetail in _lastWebProxyProof.ToDiagnosticDetails())
         {
             details[webProxyProofDetail.Key] = webProxyProofDetail.Value;
+        }
+
+        foreach (var targetProcessDetail in _lastTargetProcessRefresh.ToDiagnosticDetails())
+        {
+            details[targetProcessDetail.Key] = targetProcessDetail.Value;
         }
 
         foreach (var readinessDetail in CreateTunnelReadinessDetails())
@@ -401,6 +409,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             _lastWireSockMode = WireSockTransparentMode;
             _lastWebProxyProof =
                 ScopedWebProxyProof.NotRequired("Web proxy target proof has not run.");
+            _lastTargetProcessRefresh = TargetProcessRefreshResult.NotRun();
             var routingPlan = _targetScopeResolver.Resolve(_targetSelection);
             _lastRoutingPlan = routingPlan;
             _lastWebProxyStatus = routingPlan.RequiresWebProxy
@@ -418,11 +427,10 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     ["selectedTargets"] = routingPlan.Summary,
                     ["webProxy"] = routingPlan.RequiresWebProxy.ToString()
                 });
-            await _accessLock.DisableAsync(cancellationToken);
-            _accessLockConfirmed = false;
-            await _accessLock.ApplyTunnelScopeAsync(
+            await _accessLock.PrepareTunnelScopeAsync(
                 routingPlan,
                 cancellationToken);
+            _accessLockConfirmed = false;
             LogConnectPhase("access-lock-ready");
 
             SetStatus(TunnelState.Preparing, "Hedef bağlantısı açılıyor");
@@ -504,10 +512,19 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 cancellationToken);
             LogConnectPhase("tunnel-ready");
 
-            var finalState = TunnelState.Connected;
-            var nextAction = "Seçili hedefleri şimdi açabilirsiniz.";
-            var connectionMessage = "Sadece seçili hedefler tünelden çıkıyor";
-            const string targetLaunchPolicy = "not-started-by-astral";
+            _lastTargetProcessRefresh = await RefreshRunningTargetProcessesAsync(
+                routingPlan,
+                cancellationToken);
+            LogConnectPhase("target-process-refresh");
+
+            var finalState = _lastTargetProcessRefresh.RequiresManualAction
+                ? TunnelState.DiscordRestartRequired
+                : TunnelState.Connected;
+            var nextAction = _lastTargetProcessRefresh.NextAction;
+            var connectionMessage = _lastTargetProcessRefresh.RequiresManualAction
+                ? "Seçili uygulama bağlantısı yenilenemedi"
+                : "Sadece seçili hedefler tünelden çıkıyor";
+            var targetLaunchPolicy = _lastTargetProcessRefresh.Policy;
 
             _lastNextAction = nextAction;
             connectStopwatch.Stop();
@@ -534,6 +551,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     ["wireSockRunning"] = "True"
                 }.Concat(_lastWebProxyStatus.ToDiagnosticDetails())
                     .Concat(_lastWebProxyProof.ToDiagnosticDetails())
+                    .Concat(_lastTargetProcessRefresh.ToDiagnosticDetails())
                     .Concat(CreateTunnelReadinessDetails())
                     .ToDictionary(pair => pair.Key, pair => pair.Value));
             _diagnostics.WriteHealth(
@@ -558,6 +576,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     ["wireSockRunning"] = "True"
                 }.Concat(_lastWebProxyStatus.ToDiagnosticDetails())
                     .Concat(_lastWebProxyProof.ToDiagnosticDetails())
+                    .Concat(_lastTargetProcessRefresh.ToDiagnosticDetails())
                     .Concat(CreateTunnelReadinessDetails())
                     .ToDictionary(pair => pair.Key, pair => pair.Value));
         }
@@ -588,6 +607,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     ["diagnostic"] = exception.Message
                 }.Concat(_lastWebProxyStatus.ToDiagnosticDetails())
                     .Concat(_lastWebProxyProof.ToDiagnosticDetails())
+                    .Concat(_lastTargetProcessRefresh.ToDiagnosticDetails())
                     .Concat(CreateTunnelReadinessDetails())
                     .ToDictionary(pair => pair.Key, pair => pair.Value));
             SetStatus(
@@ -645,6 +665,83 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
         _lastTunnelLogStartPosition = tunnelLogStartPosition;
         return tunnelLogStartPosition;
+    }
+
+    private async Task<TargetProcessRefreshResult> RefreshRunningTargetProcessesAsync(
+        RoutingPlan routingPlan,
+        CancellationToken cancellationToken)
+    {
+        if (!RoutingPlanRequiresDiscordProcessRefresh(routingPlan))
+        {
+            return TargetProcessRefreshResult.NotRequired();
+        }
+
+        var snapshot = _discordProcessManager.Capture();
+        if (!snapshot.HasRunningProcesses)
+        {
+            var notRunning = TargetProcessRefreshResult.NotRunning(snapshot);
+            _diagnostics.Info(
+                "controller.targetProcess.refresh",
+                notRunning.Message,
+                notRunning.ToDiagnosticDetails());
+            return notRunning;
+        }
+
+        SetStatus(
+            TunnelState.Verifying,
+            "Çalışan Discord bağlantısı yenileniyor");
+        _diagnostics.Info(
+            "controller.targetProcess.refresh",
+            "Çalışan Discord tünel kapsamına alınmak için yenileniyor.",
+            new Dictionary<string, string?>
+            {
+                ["targetProcessRefresh.required"] = "True",
+                ["targetProcessRefresh.runningProcessCount"] =
+                    snapshot.RunningProcessCount.ToString(CultureInfo.InvariantCulture),
+                ["targetProcessRefresh.knownExecutablePathCount"] =
+                    snapshot.KnownExecutablePathCount.ToString(CultureInfo.InvariantCulture)
+            });
+
+        var restartResult = await _discordProcessManager.RestartAsync(
+            snapshot,
+            _startupGracePeriod,
+            cancellationToken);
+        if (!restartResult.Restarted)
+        {
+            var failure = TargetProcessRefreshResult.ManualActionRequired(
+                snapshot,
+                restartResult);
+            _diagnostics.Warning(
+                "controller.targetProcess.refresh",
+                failure.Message,
+                failure.ToDiagnosticDetails());
+            return failure;
+        }
+
+        var verifySnapshot = _discordProcessManager.Capture();
+        var verifyResult = await _discordProcessManager.VerifyReadyAsync(
+            verifySnapshot,
+            cancellationToken);
+        if (!verifyResult.Restarted)
+        {
+            var failure = TargetProcessRefreshResult.ManualActionRequired(
+                verifySnapshot.HasRunningProcesses ? verifySnapshot : snapshot,
+                verifyResult);
+            _diagnostics.Warning(
+                "controller.targetProcess.refresh",
+                failure.Message,
+                failure.ToDiagnosticDetails());
+            return failure;
+        }
+
+        var refreshed = TargetProcessRefreshResult.Succeeded(
+            verifySnapshot.HasRunningProcesses ? verifySnapshot : snapshot,
+            verifyResult.Message);
+        _diagnostics.Info(
+            "controller.targetProcess.refresh",
+            refreshed.Message,
+            refreshed.ToDiagnosticDetails());
+        return refreshed;
     }
 
     private async Task VerifyTunnelReadinessAsync(
@@ -847,9 +944,13 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     return true;
                 }
 
+                _lastTunnelReadiness = TunnelReadinessSnapshot.TransparentProcessRunning(
+                    _lastTunnelReadiness,
+                    "WireSock transparent mode is running; scoped web proxy target proof confirmed web routes and selected application targets are awaiting first app traffic.");
+
                 _lastWireSockHandshakeDiagnostic =
-                    "Scoped web proxy proof confirmed web routes; application targets still require WireSock handshake or adapter traffic proof.";
-                return false;
+                    "WireSock log marker was not observed; scoped web proxy proof confirmed web routes. Selected application targets are in the WireSock profile and will be exercised when their app traffic starts.";
+                return true;
             }
 
             _lastTunnelReadiness = TunnelReadinessSnapshot.TransparentProcessRunning(
@@ -1395,6 +1496,14 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         return routingPlan.AllowedApplications.Any(IsApplicationTunnelExecutable);
     }
 
+    private static bool RoutingPlanRequiresDiscordProcessRefresh(
+        RoutingPlan routingPlan)
+    {
+        return routingPlan.SelectedTargets.Any(target =>
+                target.Id.Equals(TargetIds.Discord, StringComparison.OrdinalIgnoreCase))
+            && routingPlan.AllowedApplications.Any(IsDiscordExecutable);
+    }
+
     private static bool IsApplicationTunnelExecutable(string application)
     {
         if (string.IsNullOrWhiteSpace(application))
@@ -1442,6 +1551,100 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             || name.Equals("DiscordDevelopment.exe", StringComparison.OrdinalIgnoreCase);
     }
 
+    private sealed record TargetProcessRefreshResult(
+        bool Required,
+        bool Refreshed,
+        bool RequiresManualAction,
+        string Policy,
+        string Message,
+        string NextAction,
+        int RunningProcessCount,
+        int KnownExecutablePathCount,
+        string? FailureKind = null,
+        string? Diagnostic = null)
+    {
+        public static TargetProcessRefreshResult NotRun() =>
+            new(
+                Required: false,
+                Refreshed: false,
+                RequiresManualAction: false,
+                Policy: "not-started-by-astral",
+                Message: "Target process refresh has not run.",
+                NextAction: "Seçili hedefleri şimdi açabilirsiniz.",
+                RunningProcessCount: 0,
+                KnownExecutablePathCount: 0);
+
+        public static TargetProcessRefreshResult NotRequired() =>
+            new(
+                Required: false,
+                Refreshed: false,
+                RequiresManualAction: false,
+                Policy: "not-required",
+                Message: "Seçili hedefler için uygulama yenilemesi gerekmiyor.",
+                NextAction: "Seçili hedefleri şimdi açabilirsiniz.",
+                RunningProcessCount: 0,
+                KnownExecutablePathCount: 0);
+
+        public static TargetProcessRefreshResult NotRunning(
+            DiscordProcessSnapshot snapshot) =>
+            new(
+                Required: true,
+                Refreshed: false,
+                RequiresManualAction: false,
+                Policy: "not-started-by-astral",
+                Message: "Discord kapalı; Astral uygulamayı kendisi başlatmadı.",
+                NextAction: "Discord'u şimdi açabilirsiniz.",
+                RunningProcessCount: snapshot.RunningProcessCount,
+                KnownExecutablePathCount: snapshot.KnownExecutablePathCount);
+
+        public static TargetProcessRefreshResult Succeeded(
+            DiscordProcessSnapshot snapshot,
+            string message) =>
+            new(
+                Required: true,
+                Refreshed: true,
+                RequiresManualAction: false,
+                Policy: "refreshed-running-discord",
+                Message: string.IsNullOrWhiteSpace(message)
+                    ? "Çalışan Discord tünel kapsamı için yenilendi."
+                    : message,
+                NextAction: "Çalışan Discord yenilendi. Seçili hedefleri kullanabilirsiniz.",
+                RunningProcessCount: snapshot.RunningProcessCount,
+                KnownExecutablePathCount: snapshot.KnownExecutablePathCount);
+
+        public static TargetProcessRefreshResult ManualActionRequired(
+            DiscordProcessSnapshot snapshot,
+            DiscordRestartResult result) =>
+            new(
+                Required: true,
+                Refreshed: false,
+                RequiresManualAction: true,
+                Policy: "manual-restart-required",
+                Message: result.Message,
+                NextAction: "Discord'u kapatıp yeniden açın; ardından bağlantıyı tekrar kontrol edin.",
+                RunningProcessCount: snapshot.RunningProcessCount,
+                KnownExecutablePathCount: snapshot.KnownExecutablePathCount,
+                FailureKind: result.FailureKind.ToString(),
+                Diagnostic: result.Diagnostic);
+
+        public Dictionary<string, string?> ToDiagnosticDetails() =>
+            new Dictionary<string, string?>
+            {
+                ["targetProcessRefresh.required"] = Required.ToString(),
+                ["targetProcessRefresh.refreshed"] = Refreshed.ToString(),
+                ["targetProcessRefresh.manualActionRequired"] =
+                    RequiresManualAction.ToString(),
+                ["targetProcessRefresh.policy"] = Policy,
+                ["targetProcessRefresh.message"] = Message,
+                ["targetProcessRefresh.runningProcessCount"] =
+                    RunningProcessCount.ToString(CultureInfo.InvariantCulture),
+                ["targetProcessRefresh.knownExecutablePathCount"] =
+                    KnownExecutablePathCount.ToString(CultureInfo.InvariantCulture),
+                ["targetProcessRefresh.failureKind"] = FailureKind,
+                ["targetProcessRefresh.diagnostic"] = Diagnostic
+            };
+    }
+
     private sealed record WireSockProcessMarker(
         int ProcessId,
         DateTimeOffset? StartTime,
@@ -1459,8 +1662,11 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 _diagnostics.Info("controller.disconnect", "Aktif WireSock süreci yok; bağlantı koruması etkinleştiriliyor.");
                 await TryClearWebProxyScopeAsync("DisconnectWithoutProcess");
                 await TryClearTunnelScopeAsync("DisconnectWithoutProcess");
-                await _accessLock.EnableAsync(CurrentRoutingPlan, cancellationToken);
-                _accessLockConfirmed = true;
+                if (!await TryEnableAccessLockAsync("DisconnectWithoutProcess"))
+                {
+                    SetDisconnectedProtectionFailure("DisconnectWithoutProcess");
+                    return;
+                }
                 SetStatus(TunnelState.Disconnected, "Astral Bağlı Değil");
                 return;
             }
@@ -1479,8 +1685,11 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             await DisposeProcessAsync();
             await TryClearWebProxyScopeAsync("Disconnect");
             await TryClearTunnelScopeAsync("Disconnect");
-            await _accessLock.EnableAsync(CurrentRoutingPlan, cancellationToken);
-            _accessLockConfirmed = true;
+            if (!await TryEnableAccessLockAsync("Disconnect"))
+            {
+                SetDisconnectedProtectionFailure("Disconnect");
+                return;
+            }
 
             SetStatus(TunnelState.Disconnected, "Astral Bağlı Değil");
             _lastNextAction = null;
@@ -1654,17 +1863,23 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         }
     }
 
-    private async Task TryEnableAccessLockAsync(string operation)
+    private async Task<bool> TryEnableAccessLockAsync(string operation)
     {
         try
         {
             using var timeout = new CancellationTokenSource(CleanupPhaseTimeout);
             await _accessLock.EnableAsync(CurrentRoutingPlan, timeout.Token);
             _accessLockConfirmed = true;
+            return true;
         }
-        catch (OperationCanceledException)
+        catch (Exception exception)
+            when (exception is OperationCanceledException or TimeoutException)
         {
-            WriteDiagnostic(operation + "AccessLockTimeout", "Access lock cleanup timed out.");
+            WriteDiagnostic(
+                operation + "AccessLockTimeout",
+                string.IsNullOrWhiteSpace(exception.Message)
+                    ? "Access lock cleanup timed out."
+                    : exception.Message);
             _diagnostics.Warning(
                 "controller.cleanup.timeout",
                 "Erisim kilidi temizleme fazi zaman asimina ugradi.",
@@ -1675,46 +1890,30 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     ["timeoutMs"] = CleanupPhaseTimeout.TotalMilliseconds
                         .ToString(CultureInfo.InvariantCulture)
                 });
-            if (string.Equals(operation, "Dispose", StringComparison.OrdinalIgnoreCase))
-            {
-                throw new TimeoutException("Access lock cleanup timed out.");
-            }
+            return false;
         }
         catch (Exception exception)
         {
             WriteDiagnostic(operation + "AccessLock", exception.ToString());
+            return false;
         }
     }
 
-    private async Task TryClearTunnelScopeAsync(string operation)
+    private void SetDisconnectedProtectionFailure(string operation)
     {
-        try
-        {
-            using var timeout = new CancellationTokenSource(CleanupPhaseTimeout);
-            await _accessLock.ClearTunnelScopeAsync(timeout.Token);
-        }
-        catch (OperationCanceledException)
-        {
-            WriteDiagnostic(operation + "TunnelScopeTimeout", "Tunnel scope cleanup timed out.");
-            _diagnostics.Warning(
-                "controller.cleanup.timeout",
-                "Tunel kapsami temizleme fazi zaman asimina ugradi.",
-                new Dictionary<string, string?>
-                {
-                    ["operation"] = operation,
-                    ["phase"] = "tunnel-scope",
-                    ["timeoutMs"] = CleanupPhaseTimeout.TotalMilliseconds
-                        .ToString(CultureInfo.InvariantCulture)
-                });
-            if (string.Equals(operation, "Dispose", StringComparison.OrdinalIgnoreCase))
+        _diagnostics.WriteHealth(
+            "koruma guncellenemedi",
+            new Dictionary<string, string?>
             {
-                throw new TimeoutException("Tunnel scope cleanup timed out.");
-            }
-        }
-        catch (Exception exception)
-        {
-            WriteDiagnostic(operation + "TunnelScope", exception.ToString());
-        }
+                ["operation"] = operation,
+                ["accessLock"] = "not-confirmed",
+                ["webProxy"] = "cleared",
+                ["tunnelScope"] = "clear-attempted"
+            });
+        SetStatus(
+            TunnelState.Error,
+            "Baglanti kapandi, hedef korumasi dogrulanamadi.",
+            "Hedef korumasi yeniden etkinlestirilemedi. Onar veya Profili Temizle akisini calistirin.");
     }
 
     private async Task TryClearWebProxyScopeAsync(string operation)
@@ -1724,9 +1923,14 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             using var timeout = new CancellationTokenSource(CleanupPhaseTimeout);
             await _webProxyService.ClearAsync(timeout.Token);
         }
-        catch (OperationCanceledException)
+        catch (Exception exception)
+            when (exception is OperationCanceledException or TimeoutException)
         {
-            WriteDiagnostic(operation + "WebProxyScopeTimeout", "Web proxy cleanup timed out.");
+            WriteDiagnostic(
+                operation + "WebProxyScopeTimeout",
+                string.IsNullOrWhiteSpace(exception.Message)
+                    ? "Web proxy cleanup timed out."
+                    : exception.Message);
             _diagnostics.Warning(
                 "controller.cleanup.timeout",
                 "Web proxy temizleme fazi zaman asimina ugradi.",
@@ -1737,14 +1941,42 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     ["timeoutMs"] = CleanupPhaseTimeout.TotalMilliseconds
                         .ToString(CultureInfo.InvariantCulture)
                 });
-            if (string.Equals(operation, "Dispose", StringComparison.OrdinalIgnoreCase))
-            {
-                throw new TimeoutException("Web proxy cleanup timed out.");
-            }
         }
         catch (Exception exception)
         {
             WriteDiagnostic(operation + "WebProxyScope", exception.ToString());
+        }
+    }
+
+    private async Task TryClearTunnelScopeAsync(string operation)
+    {
+        try
+        {
+            using var timeout = new CancellationTokenSource(CleanupPhaseTimeout);
+            await _accessLock.ClearTunnelScopeAsync(timeout.Token);
+        }
+        catch (Exception exception)
+            when (exception is OperationCanceledException or TimeoutException)
+        {
+            WriteDiagnostic(
+                operation + "TunnelScopeTimeout",
+                string.IsNullOrWhiteSpace(exception.Message)
+                    ? "Tunnel scope cleanup timed out."
+                    : exception.Message);
+            _diagnostics.Warning(
+                "controller.cleanup.timeout",
+                "Tunnel scope temizleme fazi zaman asimina ugradi.",
+                new Dictionary<string, string?>
+                {
+                    ["operation"] = operation,
+                    ["phase"] = "tunnel-scope",
+                    ["timeoutMs"] = CleanupPhaseTimeout.TotalMilliseconds
+                        .ToString(CultureInfo.InvariantCulture)
+                });
+        }
+        catch (Exception exception)
+        {
+            WriteDiagnostic(operation + "TunnelScope", exception.ToString());
         }
     }
 

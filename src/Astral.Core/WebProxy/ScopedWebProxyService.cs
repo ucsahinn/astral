@@ -233,10 +233,13 @@ public sealed class WindowsScopedWebProxyService : IScopedWebProxyService, IAsyn
 {
     private const int DefaultProxyPort = 18088;
     private const int MaxProbeHostsPerTarget = 2;
-    private const int MaxConcurrentProbeTargets = 6;
+    internal const int MaxConcurrentProbeTargetsForTesting = 8;
+    internal static TimeSpan TargetProofTimeoutForTesting => TargetProofTimeout;
+
+    private const int MaxConcurrentProbeTargets = MaxConcurrentProbeTargetsForTesting;
     private const int MaxTargetProofAttempts = 2;
     private static readonly TimeSpan ScriptTimeout = TimeSpan.FromSeconds(20);
-    private static readonly TimeSpan TargetProofTimeout = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan TargetProofTimeout = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan TargetProofRetryDelay = TimeSpan.FromMilliseconds(750);
     private static readonly TimeSpan ProcessStartupValidationDelay =
         TimeSpan.FromMilliseconds(450);

@@ -30,7 +30,8 @@
                Opacity="0.10"
                Stretch="Uniform"
                IsHitTestVisible="False"
-               RenderOptions.BitmapScalingMode="HighQuality" />
+               RenderOptions.BitmapScalingMode="HighQuality"
+               CacheMode="BitmapCache" />
 
         <MediaElement x:Name="BackgroundVideo"
                       HorizontalAlignment="Stretch"
@@ -39,7 +40,7 @@
                       UnloadedBehavior="Close"
                       Stretch="UniformToFill"
                       Volume="0"
-                      Opacity="1"
+                      Opacity="0.94"
                       IsHitTestVisible="False"
                       Loaded="BackgroundVideo_Loaded"
                       MediaOpened="BackgroundVideo_MediaOpened"
@@ -50,7 +51,8 @@
                    Visibility="Collapsed"
                    Text="Hazır" />
 
-        <Rectangle IsHitTestVisible="False">
+        <Rectangle IsHitTestVisible="False"
+                   CacheMode="BitmapCache">
             <Rectangle.Fill>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
                     <GradientStop Color="#18040710" Offset="0" />
@@ -61,7 +63,9 @@
             </Rectangle.Fill>
         </Rectangle>
 
-        <Rectangle IsHitTestVisible="False" Opacity="0.035">
+        <Rectangle IsHitTestVisible="False"
+                   Opacity="0.035"
+                   CacheMode="BitmapCache">
             <Rectangle.Fill>
                 <RadialGradientBrush Center="0.72,0.42"
                                      GradientOrigin="0.72,0.38"
@@ -75,7 +79,9 @@
             </Rectangle.Fill>
         </Rectangle>
 
-        <Rectangle IsHitTestVisible="False" Opacity="0.052">
+        <Rectangle IsHitTestVisible="False"
+                   Opacity="0.052"
+                   CacheMode="BitmapCache">
             <Rectangle.Fill>
                 <LinearGradientBrush StartPoint="0,1" EndPoint="0,0">
                     <GradientStop Color="#58040710" Offset="0" />
@@ -85,7 +91,23 @@
             </Rectangle.Fill>
         </Rectangle>
 
-        <Rectangle IsHitTestVisible="False" Opacity="0.02">
+        <Rectangle Height="172"
+                   VerticalAlignment="Bottom"
+                   IsHitTestVisible="False"
+                   CacheMode="BitmapCache">
+            <Rectangle.Fill>
+                <LinearGradientBrush StartPoint="0,1" EndPoint="0,0">
+                    <GradientStop Color="#EE06101B" Offset="0" />
+                    <GradientStop Color="#C7081423" Offset="0.30" />
+                    <GradientStop Color="#68101A2C" Offset="0.68" />
+                    <GradientStop Color="#00040710" Offset="1" />
+                </LinearGradientBrush>
+            </Rectangle.Fill>
+        </Rectangle>
+
+        <Rectangle IsHitTestVisible="False"
+                   Opacity="0.02"
+                   CacheMode="BitmapCache">
             <Rectangle.Fill>
                 <RadialGradientBrush Center="0.26,0.44"
                                      GradientOrigin="0.22,0.36"
@@ -98,7 +120,9 @@
             </Rectangle.Fill>
         </Rectangle>
 
-        <Rectangle IsHitTestVisible="False" Opacity="0.014">
+        <Rectangle IsHitTestVisible="False"
+                   Opacity="0.014"
+                   CacheMode="BitmapCache">
             <Rectangle.Fill>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
                     <GradientStop Color="#307DEBFF" Offset="0" />
@@ -643,7 +667,7 @@
                                     <Grid>
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="30" />
+                                            <RowDefinition Height="28" />
                                             <RowDefinition Height="Auto" />
                                         </Grid.RowDefinitions>
                                         <StackPanel Orientation="Horizontal">
@@ -669,6 +693,8 @@
                                                    x:Name="RunInBackgroundStatus"
                                                    Margin="0,4,0,4"
                                                    TextWrapping="Wrap"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   MaxHeight="27"
                                                    FontSize="10.5"
                                                    LineHeight="13"
                                                    Foreground="{StaticResource SecondaryTextBrush}"
@@ -1130,7 +1156,7 @@
                                VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource SecondaryTextBrush}"
-                               Text="v2.2.28" />
+                               Text="v2.2.29" />
 
                     <Button Grid.Column="4"
                             x:Name="AutoUpdateButton"

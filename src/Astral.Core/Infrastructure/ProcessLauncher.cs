@@ -10,6 +10,10 @@ public sealed class ProcessLauncher : IProcessLauncher
 {
     private static readonly ConcurrentDictionary<string, object> LogLocks =
         new(StringComparer.OrdinalIgnoreCase);
+    internal static readonly TimeSpan DisposeKilledProcessExitTimeout =
+        TimeSpan.FromMilliseconds(1200);
+    internal static readonly TimeSpan DisposeLogPumpTimeout =
+        TimeSpan.FromMilliseconds(600);
 
     public IManagedProcess Start(
         string executable,
@@ -240,7 +244,8 @@ public sealed class ProcessLauncher : IProcessLauncher
                 try
                 {
                     _process.Kill(entireProcessTree: true);
-                    using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                    using var timeout = new CancellationTokenSource(
+                        DisposeKilledProcessExitTimeout);
                     await _process.WaitForExitAsync(timeout.Token);
                     _exitConfirmed = true;
                 }
@@ -261,7 +266,7 @@ public sealed class ProcessLauncher : IProcessLauncher
             try
             {
                 await Task.WhenAll(_stdoutPump, _stderrPump)
-                    .WaitAsync(TimeSpan.FromSeconds(2));
+                    .WaitAsync(DisposeLogPumpTimeout);
             }
             catch (TimeoutException)
             {

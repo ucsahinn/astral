@@ -54,7 +54,7 @@ C:\Tools\Astral\Astral.exe
 
 Bu durumda güncelleme `C:\Tools\Astral` klasörünü hedef alır.
 
-Yeni elle kurulumlarda klasör adını sabit `Astral` tutmak önerilir. `Astral-2.2.28-win-x64` veya `2.2.28` gibi sürüm adlı klasörlerden çalıştırma desteklenir, ancak Astral bu durumu tanılama paketine yazar ve kullanıcı onayı olmadan klasör taşımaz.
+Yeni elle kurulumlarda klasör adını sabit `Astral` tutmak önerilir. `Astral-2.2.29-win-x64` veya `2.2.29` gibi sürüm adlı klasörlerden çalıştırma desteklenir, ancak Astral bu durumu tanılama paketine yazar ve kullanıcı onayı olmadan klasör taşımaz.
 
 ## Güvenli Değiştirme ve Geri Dönüş
 

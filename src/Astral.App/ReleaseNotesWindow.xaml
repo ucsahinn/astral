@@ -82,11 +82,11 @@
                                 VerticalAlignment="Center">
                         <TextBlock FontSize="22"
                                    FontWeight="SemiBold"
-                                   Text="Astral VPN v2.2.28" />
+                                   Text="Astral VPN v2.2.29" />
                         <TextBlock Margin="0,5,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
-                                   Text="Bağlantı kanıtı, hedef testi ve video görünürlüğü hotfix'i" />
+                                   Text="App hedefi, kapanış ve release doğrulama hotfix'i" />
                     </StackPanel>
                 </Grid>
 
@@ -109,7 +109,7 @@
                                            FontSize="14"
                                            LineHeight="21"
                                            TextWrapping="Wrap"
-                                           Text="Bu sürüm v2.2.27 üzerinde kalan app/web kanıt ayrımı, hedef testi özeti, tanılama netliği ve bakım akışı sırasında video görünürlüğü sorunlarını düzeltir. Astral VPN hâlâ yalnız seçili hedefleri kapsar; genel sistem VPN'i gibi davranmaz." />
+                                           Text="Bu sürüm v2.2.28 üzerinde kalan Discord uygulama hedefi yenileme, kapanış temizliği zaman aşımı ve release doğrulama sorunlarını düzeltir. Astral VPN hâlâ yalnız seçili hedefleri kapsar; genel sistem VPN'i gibi davranmaz." />
                             </StackPanel>
                         </Border>
 
@@ -192,7 +192,15 @@
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Sürüm metadata'sı, updater, web proxy ve uygulama içi release bağlantısı v2.2.28 ile hizalandı." />
+                                           Text="&#x2022; Üretim uygulaması artık gerçek Windows Discord process denetleyicisini kullanır; açık Discord tünel hazır olduktan sonra yenilenir." />
+                                <TextBlock FontSize="13"
+                                           LineHeight="22"
+                                           TextWrapping="Wrap"
+                                           Text="&#x2022; Kapanış, yeniden başlatma ve dispose akışlarında access-lock veya web-proxy timeout'u UI'ı kilitlemez; tanılamaya best-effort timeout olarak yazılır." />
+                                <TextBlock FontSize="13"
+                                           LineHeight="22"
+                                           TextWrapping="Wrap"
+                                           Text="&#x2022; Sürüm metadata'sı, updater, web proxy ve uygulama içi release bağlantısı v2.2.29 ile hizalandı." />
                             </StackPanel>
                         </Border>
 
@@ -238,7 +246,7 @@
                     <TextBlock VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource MutedTextBrush}"
-                                   Text="Bu not, v2.2.28 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
+                                   Text="Bu not, v2.2.29 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
                     <Button Grid.Column="1"
                             Margin="0,0,10,0"
                             Height="40"

@@ -38,6 +38,8 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Web proxy PAC sapmasında kapsamı yeniden uygular", ScopedWebProxyEnsureReappliesMissingPacScopeAsync),
     ("Web proxy erken kapanırsa PAC uygulanmaz", ScopedWebProxyRejectsExitedProcessBeforeApplyingPacAsync),
     ("Web proxy kanıtı seçili her web hedefinden başarı ister", ScopedWebProxyProofRequiresEverySelectedWebTargetAsync),
+    ("Web proxy kanıtı toplu hedeflerde seri beklemeye dönmez", ScopedWebProxyProofKeepsBoundedParallelismAsync),
+    ("Web proxy kanıtı gecikmeli hedefleri paralel ölçer", ScopedWebProxyProofRunsDelayedTargetsInParallelAsync),
     ("Discord kapsamı parametresiz çağrıda sadece uygulamayı içerir", DiscordScopeDefaultsToAppOnlyAsync),
     ("Eski web kapsamı çağrısı tarayıcıları profile eklemez", DiscordScopeDoesNotIncludeBrowsersWhenLegacyFlagIsEnabledAsync),
     ("Web kapsamı PATH üzerindeki sahte tarayıcıları kapsama almaz", DiscordScopeIgnoresPathSpoofedBrowsersAsync),
@@ -82,28 +84,31 @@ var tests = new (string Name, Func<Task> Run)[]
     ("WireSock hazırlığı doğrulanmış yerel kurucuyu indirmeden kullanır", BootstrapUsesVerifiedLocalInstallerAsync),
     ("WireSock hazırlığı yeniden başlatma gerektiren başarı kodunu kabul eder", BootstrapAcceptsRestartRequiredExitCodeAsync),
     ("Denetleyici idempotent bağlanır ve keser", ControllerLifecycleAsync),
+    ("Denetleyici kapatma koruması yenilenemezse başarı raporlamaz", ControllerDisconnectDoesNotReportProtectedWhenAccessLockRestoreFailsAsync),
     ("Denetleyici scoped PAC doğrulanmazsa bağlı raporlamaz", ControllerDoesNotReportConnectedWhenScopedPacMissingAsync),
     ("Denetleyici web-only hedefte Discord sürecine dokunmaz", ControllerConnectsWebOnlyTargetWithoutDiscordProcessAsync),
     ("Denetleyici temiz kapanışta firewall scriptini tekrar çalıştırmaz", ControllerDisposeSkipsDisconnectedCleanupAsync),
     ("Denetleyici kilit doğrulanmadan kapanışta kilidi yeniler", ControllerDisposeRefreshesUnconfirmedDisconnectedLockAsync),
     ("Denetleyici aktif bağlantıyı kapanışta güvenle temizler", ControllerDisposeCleansActiveConnectionAsync),
+    ("Denetleyici kapanışta erişim kilidi zaman aşımını fatal yapmaz", ControllerDisposeTreatsAccessLockTimeoutAsBestEffortAsync),
     ("Denetleyici WireSock kapanışı doğrulanmazsa süreç işaretini korur", ControllerKeepsWireSockMarkerWhenExitIsUnconfirmedAsync),
     ("Denetleyici yanlış WireSock süreç işaretini temizler", ControllerDeletesMismatchedWireSockMarkerAsync),
     ("Denetleyici bağlantı kapanınca hedef uygulamaları kapatmaz", ControllerDoesNotCloseTargetProcessesOnDisconnectAsync),
     ("Denetleyici hedef kapsamını bağlıyken kilitler", ControllerLocksTargetScopeWhileConnectedAsync),
-    ("Denetleyici varsayılan kapsamda hedef uygulama başlatmadan doğrular", ControllerConnectsDefaultScopeWithoutLaunchingTargetProcessAsync),
+    ("Denetleyici kapalı Discord'u otomatik başlatmadan doğrular", ControllerConnectsDefaultScopeWithoutLaunchingClosedTargetProcessAsync),
     ("Denetleyici transparent modda pasif adaptörü tunnel-started loguyla kabul eder", ControllerAcceptsInactiveWireSockAdapterInTransparentModeAsync),
     ("Denetleyici transparent modda eksik adaptörü tunnel-started loguyla kabul eder", ControllerAcceptsMissingWireSockAdapterInTransparentModeAsync),
     ("Denetleyici transparent modda eksik probe'u tunnel-started loguyla kabul eder", ControllerAcceptsUnavailableWireSockProbeInTransparentModeAsync),
     ("Denetleyici transparent modda trafik kanıtıyla eksik handshake logunu kabul eder", ControllerAcceptsTrafficProofWithoutWireSockHandshakeLogAsync),
     ("Denetleyici transparent modda scoped web proxy kanıtıyla pasif adaptörü kabul eder", ControllerAcceptsScopedWebProxyProofInTransparentModeAsync),
-    ("Denetleyici uygulama hedeflerinde sadece web proxy kanıtıyla bağlı saymaz", ControllerRejectsAppTargetWhenOnlyScopedWebProxyProofExistsAsync),
+    ("Denetleyici app+web hedeflerde proxy kanıtıyla app trafiğini bekler", ControllerAcceptsAppWebTargetWhenScopedWebProxyProofExistsAsync),
     ("Denetleyici uygulama ve web hedeflerinde adapter trafik kanıtını tanılamaya yazar", ControllerAcceptsAppWebTargetWithTrafficProofAsync),
     ("Denetleyici transparent modda handshake ve trafik kanıtı yokken bağlı raporlamaz", ControllerRejectsMissingWireSockHandshakeInTransparentModeAsync),
     ("Denetleyici son WireSock çıkışını tanılama detayına yazar", ControllerReportsWireSockExitAfterFinalReadinessProbeAsync),
     ("Denetleyici WireSock tunnel-started loguyla bağlı raporlar", ControllerAcceptsWireSockTunnelStartedLogAsync),
     ("Denetleyici WireSock adaptörü gecikirse yeniden dener", ControllerRetriesDelayedWireSockAdapterAsync),
-    ("Denetleyici WireSock doğrulamasını hedef uygulama yenilemeden yapar", ControllerChecksWireSockWithoutTargetProcessRestartAsync),
+    ("Denetleyici WireSock doğrulamasından sonra çalışan Discord'u yeniler", ControllerRefreshesRunningDiscordAfterWireSockReadinessAsync),
+    ("Denetleyici çalışan Discord yenilenemezse bağlı raporlamaz", ControllerRequiresManualActionWhenRunningDiscordRefreshFailsAsync),
     ("Denetleyici tüm yerleşik presetleri hedef uygulama başlatmadan bağlar", ControllerConnectsEveryBuiltInPresetWithoutLaunchingTargetsAsync),
     ("Denetleyici WireSock hazırlık hatasını bildirir", ControllerBootstrapFailureAsync),
     ("Denetleyici GitHub DNS hatasını Türkçe açıklar", ControllerNetworkFailureIsUserFriendlyAsync),
@@ -113,6 +118,8 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Windows Firewall koruması sessiz PowerShell hatasını operasyonla açıklar", WindowsFirewallAccessLockLabelsSilentPowerShellFailureAsync),
     ("Windows Firewall koruması seçili hedef domainleriyle kilit üretir", WindowsFirewallAccessLockUsesSelectedTargetDomainsAsync),
     ("Windows Firewall tünel kapsamı seçili hedef domainleriyle tarayıcı kaçağını kilitler", WindowsFirewallTunnelScopeUsesSelectedTargetDomainsAsync),
+    ("Windows Firewall tünel hazırlığı tek PowerShell komutuyla uygulanır", WindowsFirewallPrepareTunnelScopeUsesSingleCommandAsync),
+    ("Windows Firewall tünel hazırlığı sessiz PowerShell hatasını operasyonla açıklar", WindowsFirewallPrepareTunnelScopeLabelsSilentPowerShellFailureAsync),
     ("Windows Firewall koruması hedef alan adı kuralını yönetir", WindowsFirewallAccessLockBuildsExpectedCommandsAsync),
     ("Windows Firewall koruması DNS temizleme hatasını kritik çıkış kodu yapmaz", WindowsFirewallAccessLockIgnoresDnsFlushExitCodeAsync),
     ("WireSock hazırlık denetimi wt WireGuard adaptörünü tanır", TunnelReadinessRecognizesWireSockWireGuardAdapterAsync),
@@ -126,6 +133,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Debug tanılama yalnızca açıkken ayrıntılı paket üretir", DiagnosticsWritesDebugBundleOnlyWhenEnabledAsync),
     ("Tanılama kalıcı hata loglarını redakte eder", DiagnosticsRedactsPersistentErrorLogAsync),
     ("Tanılama eski portable marka yolunu redakte eder", DiagnosticsRedactsLegacyPortableBrandInPathsAsync),
+    ("Process launcher keeps dispose waits short for responsive shutdown", ProcessLauncherDisposeTimeoutsStayShortAsync),
     ("WireSock süreç logları yazılırken redakte edilir", ProcessLauncherRedactsTunnelLogAndConfirmsExitAsync),
     ("Süreç başlatıcı WireSock ve web proxy için ortak tunnel logunu paylaşır", ProcessLauncherSharesTunnelLogAcrossScopedProcessesAsync),
     ("Tanılama özeti son bilgi durumunu gecikmeli yazar", DiagnosticsFlushesDebouncedSummaryAsync)
@@ -888,6 +896,82 @@ static async Task ScopedWebProxyProofRequiresEverySelectedWebTargetAsync()
         var failedTargets = proof.FailedTargets ?? string.Empty;
         Assert(failedTargets.Contains("Blogspot", StringComparison.Ordinal));
         Assert(!failedTargets.Contains("Wattpad", StringComparison.Ordinal));
+    }
+    finally
+    {
+        await service.ClearAsync(CancellationToken.None);
+        await launcher.DisposeAsync();
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static Task ScopedWebProxyProofKeepsBoundedParallelismAsync()
+{
+    Assert(WindowsScopedWebProxyService.MaxConcurrentProbeTargetsForTesting >= 8);
+    Assert(WindowsScopedWebProxyService.TargetProofTimeoutForTesting <= TimeSpan.FromSeconds(10));
+    return Task.CompletedTask;
+}
+
+static async Task ScopedWebProxyProofRunsDelayedTargetsInParallelAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var paths = new AppPaths(root);
+    var expectedPacUri = new Uri(paths.WebProxyPacFile).AbsoluteUri;
+    var healthyPacStatus = JsonSerializer.Serialize(new
+    {
+        CurrentAutoConfigURL = expectedPacUri,
+        ExpectedAutoConfigURL = expectedPacUri,
+        PacFileExists = true,
+        StateFileExists = true,
+        StateOwner = "Astral",
+        StateAppliedAutoConfigURL = expectedPacUri
+    });
+    var runner = new SequencedCommandRunner(
+        new CommandResult(0, string.Empty, string.Empty),
+        new CommandResult(0, healthyPacStatus, string.Empty));
+    var launcher = new ConnectProofProcessLauncher(
+        _ => true,
+        TimeSpan.FromMilliseconds(250));
+    var webProxyExecutable = Path.Combine(root, "Astral.WebProxy.exe");
+    var service = new WindowsScopedWebProxyService(
+        paths,
+        runner,
+        launcher,
+        webProxyExecutable,
+        powerShellPath: "powershell.exe",
+        preferredProxyPort: ReserveTcpPort());
+    File.WriteAllText(webProxyExecutable, "proxy");
+
+    var registry = TargetRegistry.CreateDefault();
+    var resolver = new TargetScopeResolver(
+        registry,
+        new DiscordAppScope(root, root, root),
+        webProxyExecutable);
+    var plan = resolver.Resolve(new TargetSelection(
+    [
+        TargetIds.Wattpad,
+        TargetIds.Blogspot,
+        TargetIds.RadioGarden,
+        TargetIds.DeutscheWelle,
+        TargetIds.VoiceOfAmerica,
+        TargetIds.EksiSozluk,
+        TargetIds.Grok,
+        TargetIds.Imgur,
+        TargetIds.Pastebin
+    ]));
+
+    try
+    {
+        await service.ApplyAsync(plan, progress: null, CancellationToken.None);
+
+        var proof = await service.VerifyTargetAccessAsync(
+            plan,
+            CancellationToken.None);
+
+        Assert(proof.IsVerified);
+        Assert(proof.RequiredTargetCount == 9);
+        Assert(proof.VerifiedTargetCount == 9);
+        Assert(launcher.MaxActiveConnections >= 2);
     }
     finally
     {
@@ -2688,6 +2772,7 @@ static async Task ControllerLifecycleAsync()
 
         await controller.ConnectAsync();
         Assert(controller.Snapshot.State == TunnelState.Connected);
+        Assert(accessLock.PrepareTunnelScopeCount == 1);
         Assert(accessLock.DisableCount == 1);
         Assert(accessLock.ApplyTunnelScopeCount == 1);
         Assert(accessLock.LastIncludeBrowserAccess == false);
@@ -2740,6 +2825,54 @@ static async Task ControllerLifecycleAsync()
     {
         Environment.SetEnvironmentVariable("PATH", originalPath);
         await controller.DisposeAsync();
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task ControllerDisconnectDoesNotReportProtectedWhenAccessLockRestoreFailsAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var process = new FakeManagedProcess();
+    var paths = new AppPaths(root);
+    var diagnostics = new AstralDiagnostics(
+        paths,
+        TimeSpan.Zero);
+    var accessLock = new FakeDiscordAccessLock(
+        enableException: new TimeoutException("Access lock restore timed out."));
+    var controller = new DiscordTunnelController(
+        paths,
+        new DiscordAppScope(root, root, root),
+        new FakeWireSockBootstrapper(Path.Combine(
+            root,
+            "WireSock VPN Client",
+            "bin",
+            WireSockPackage.CliExecutableFileName)),
+        new FakeProfileProvisioner(Path.Combine(root, "discord.conf")),
+        new FakeProcessLauncher(process),
+        TimeSpan.Zero,
+        accessLock,
+        diagnostics);
+
+    try
+    {
+        await controller.ConnectAsync();
+        await controller.DisconnectAsync();
+
+        Assert(process.StopCount == 1);
+        Assert(accessLock.ClearTunnelScopeCount == 1);
+        Assert(accessLock.EnableCount == 1);
+        Assert(controller.Snapshot.State == TunnelState.Error);
+        Assert(controller.Snapshot.Message.Contains(
+            "korumasi dogrulanamadi",
+            StringComparison.OrdinalIgnoreCase));
+
+        var health = await File.ReadAllTextAsync(paths.HealthReport);
+        Assert(health.Contains("\"status\":\"koruma guncellenemedi\"", StringComparison.Ordinal));
+        Assert(health.Contains("\"accessLock\":\"not-confirmed\"", StringComparison.Ordinal));
+        Assert(!health.Contains("\"accessLock\":\"enabled\"", StringComparison.Ordinal));
+    }
+    finally
+    {
         Directory.Delete(root, recursive: true);
     }
 }
@@ -2950,6 +3083,48 @@ static async Task ControllerDisposeCleansActiveConnectionAsync()
     }
 }
 
+static async Task ControllerDisposeTreatsAccessLockTimeoutAsBestEffortAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var process = new FakeManagedProcess();
+    var paths = new AppPaths(root);
+    var accessLock = new FakeDiscordAccessLock(
+        enableException: new TimeoutException("Access lock cleanup timed out."));
+    var diagnostics = new AstralDiagnostics(
+        paths,
+        TimeSpan.Zero);
+    var controller = new DiscordTunnelController(
+        paths,
+        new DiscordAppScope(root, root, root),
+        new FakeWireSockBootstrapper(Path.Combine(
+            root,
+            "WireSock VPN Client",
+            "bin",
+            WireSockPackage.CliExecutableFileName)),
+        new FakeProfileProvisioner(Path.Combine(root, "discord.conf")),
+        new FakeProcessLauncher(process),
+        TimeSpan.Zero,
+        accessLock,
+        diagnostics);
+
+    try
+    {
+        await controller.ConnectAsync();
+        await controller.DisposeAsync();
+
+        Assert(process.StopCount == 1);
+        Assert(accessLock.ClearTunnelScopeCount == 1);
+        Assert(accessLock.EnableCount == 1);
+        var events = await File.ReadAllTextAsync(paths.EventLog);
+        Assert(events.Contains("\"source\":\"controller.cleanup.timeout\"", StringComparison.Ordinal));
+        Assert(events.Contains("\"phase\":\"access-lock\"", StringComparison.Ordinal));
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
 static async Task ControllerKeepsWireSockMarkerWhenExitIsUnconfirmedAsync()
 {
     var root = CreateTemporaryDirectory();
@@ -3074,14 +3249,14 @@ static async Task ControllerDoesNotCloseTargetProcessesOnDisconnectAsync()
 
         Assert(controller.Snapshot.State == TunnelState.Disconnected);
         Assert(process.StopCount == 1);
-        Assert(targetProcessManager.RestartCount == 0);
-        Assert(targetProcessManager.VerifyReadyCount == 0);
+        Assert(targetProcessManager.RestartCount == 1);
+        Assert(targetProcessManager.VerifyReadyCount == 1);
         Assert(targetProcessManager.CloseCount == 0);
 
         var details = controller.CreateDiagnosticDetails();
         Assert(!details.ContainsKey("discordRestartStatus"));
         Assert(!details.ContainsKey("discordProcessCount"));
-        Assert(details["targetLaunchPolicy"] == "not-started-by-astral");
+        Assert(details["targetLaunchPolicy"] == "refreshed-running-discord");
     }
     finally
     {
@@ -3090,7 +3265,7 @@ static async Task ControllerDoesNotCloseTargetProcessesOnDisconnectAsync()
     }
 }
 
-static async Task ControllerConnectsDefaultScopeWithoutLaunchingTargetProcessAsync()
+static async Task ControllerConnectsDefaultScopeWithoutLaunchingClosedTargetProcessAsync()
 {
     var root = CreateTemporaryDirectory();
     var process = new FakeManagedProcess();
@@ -3101,9 +3276,9 @@ static async Task ControllerConnectsDefaultScopeWithoutLaunchingTargetProcessAsy
         TimeSpan.Zero);
     var targetProcessManager = new FakeDiscordProcessManager(
         new DiscordProcessSnapshot(
-            2,
-            [Path.Combine(root, "Discord", "app-1.0.9999", "Discord.exe")],
-            [100, 101]));
+            0,
+            [],
+            []));
     var controller = new DiscordTunnelController(
         paths,
         new DiscordAppScope(root, root, root),
@@ -3141,12 +3316,15 @@ static async Task ControllerConnectsDefaultScopeWithoutLaunchingTargetProcessAsy
         var health = await File.ReadAllTextAsync(paths.HealthReport);
         Assert(health.Contains("\"status\":\"bağlantı hazır\"", StringComparison.Ordinal));
         Assert(health.Contains("\"targetLaunchPolicy\":\"not-started-by-astral\"", StringComparison.Ordinal));
+        Assert(health.Contains("\"targetProcessRefresh.runningProcessCount\":\"0\"", StringComparison.Ordinal));
         Assert(!health.Contains("discordProcessCount", StringComparison.OrdinalIgnoreCase));
         Assert(!health.Contains("discordRestartStatus", StringComparison.OrdinalIgnoreCase));
         var details = controller.CreateDiagnosticDetails();
         Assert(details["wireSockRunning"] == "True");
         Assert(details["targetLaunchPolicy"] == "not-started-by-astral");
-        Assert(details["nextAction"] == "Seçili hedefleri şimdi açabilirsiniz.");
+        Assert(details["nextAction"] == "Discord'u şimdi açabilirsiniz.");
+        Assert(details["targetProcessRefresh.required"] == "True");
+        Assert(details["targetProcessRefresh.refreshed"] == "False");
         Assert(!details.ContainsKey("discordProcessCount"));
         Assert(!details.ContainsKey("discordRestartStatus"));
     }
@@ -3157,7 +3335,7 @@ static async Task ControllerConnectsDefaultScopeWithoutLaunchingTargetProcessAsy
     }
 }
 
-static async Task ControllerChecksWireSockWithoutTargetProcessRestartAsync()
+static async Task ControllerRefreshesRunningDiscordAfterWireSockReadinessAsync()
 {
     var root = CreateTemporaryDirectory();
     var process = new FakeManagedProcess();
@@ -3203,8 +3381,73 @@ static async Task ControllerChecksWireSockWithoutTargetProcessRestartAsync()
 
         Assert(controller.Snapshot.State == TunnelState.Connected);
         Assert(readinessProbe.CaptureCount == 2);
-        Assert(targetProcessManager.RestartCount == 0);
+        Assert(targetProcessManager.RestartCount == 1);
+        Assert(targetProcessManager.VerifyReadyCount == 1);
+        var details = controller.CreateDiagnosticDetails();
+        Assert(details["targetLaunchPolicy"] == "refreshed-running-discord");
+        Assert(details["targetProcessRefresh.refreshed"] == "True");
+        Assert(details["nextAction"] == "Çalışan Discord yenilendi. Seçili hedefleri kullanabilirsiniz.");
+    }
+    finally
+    {
+        await controller.DisposeAsync();
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task ControllerRequiresManualActionWhenRunningDiscordRefreshFailsAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var process = new FakeManagedProcess();
+    var accessLock = new FakeDiscordAccessLock();
+    var paths = new AppPaths(root);
+    var diagnostics = new AstralDiagnostics(
+        paths,
+        TimeSpan.Zero);
+    var targetProcessManager = new FakeDiscordProcessManager(
+        new DiscordProcessSnapshot(
+            1,
+            [Path.Combine(root, "Discord", "app-1.0.9999", "Discord.exe")],
+            [100]),
+        new DiscordRestartResult(
+            false,
+            "Discord yenilenemedi.",
+            "Restart failed in test.",
+            DiscordRestartFailureKind.Unknown));
+    var controller = new DiscordTunnelController(
+        paths,
+        new DiscordAppScope(root, root, root),
+        new FakeWireSockBootstrapper(Path.Combine(
+            root,
+            "WireSock VPN Client",
+            "bin",
+            WireSockPackage.CliExecutableFileName)),
+        new FakeProfileProvisioner(Path.Combine(root, "discord.conf")),
+        new FakeProcessLauncher(process, "Connection established"),
+        TimeSpan.Zero,
+        accessLock,
+        diagnostics,
+        targetProcessManager,
+        new FakeTunnelReadinessProbe(TunnelReadinessSnapshot.Ready("Up", 128, 256)),
+        tunnelReadinessRetryDelay: TimeSpan.Zero);
+
+    try
+    {
+        await controller.ConnectAsync();
+
+        Assert(controller.Snapshot.State == TunnelState.DiscordRestartRequired);
+        Assert(targetProcessManager.RestartCount == 1);
         Assert(targetProcessManager.VerifyReadyCount == 0);
+        var details = controller.CreateDiagnosticDetails();
+        Assert(details["targetLaunchPolicy"] == "manual-restart-required");
+        Assert(details["targetProcessRefresh.manualActionRequired"] == "True");
+        Assert(details["targetProcessRefresh.failureKind"] == "Unknown");
+        Assert(details["nextAction"] ==
+            "Discord'u kapatıp yeniden açın; ardından bağlantıyı tekrar kontrol edin.");
+
+        var health = await File.ReadAllTextAsync(paths.HealthReport);
+        Assert(health.Contains("\"status\":\"hedef için ek aksiyon gerekli\"", StringComparison.Ordinal));
+        Assert(health.Contains("\"targetLaunchPolicy\":\"manual-restart-required\"", StringComparison.Ordinal));
     }
     finally
     {
@@ -3227,9 +3470,9 @@ static async Task ControllerConnectsEveryBuiltInPresetWithoutLaunchingTargetsAsy
             Path.Combine(root, $"{target.Id}.conf"));
         var targetProcessManager = new FakeDiscordProcessManager(
             new DiscordProcessSnapshot(
-                1,
-                [Path.Combine(root, "Discord", "app-1.0.9999", "Discord.exe")],
-                [100]));
+                0,
+                [],
+                []));
         var controller = new DiscordTunnelController(
             paths,
             new DiscordAppScope(root, root, root),
@@ -3619,7 +3862,7 @@ static async Task ControllerAcceptsScopedWebProxyProofInTransparentModeAsync()
     }
 }
 
-static async Task ControllerRejectsAppTargetWhenOnlyScopedWebProxyProofExistsAsync()
+static async Task ControllerAcceptsAppWebTargetWhenScopedWebProxyProofExistsAsync()
 {
     var root = CreateTemporaryDirectory();
     var process = new FakeManagedProcess();
@@ -3634,12 +3877,11 @@ static async Task ControllerRejectsAppTargetWhenOnlyScopedWebProxyProofExistsAsy
             [Path.Combine(root, "Discord", "app-1.0.9999", "Discord.exe")],
             [100]));
     var readinessProbe = new FakeTunnelReadinessProbe(
-        TunnelReadinessSnapshot.Ready(
-            "Up",
-            128,
-            256,
-            "wt0",
-            "WireGuard Tunnel"));
+        TunnelReadinessSnapshot.WireSockAdapterInactive(
+            "Down",
+            0,
+            0,
+            "WireSock Virtual Adapter is Down with no app traffic yet."));
     var webProxy = new FakeScopedWebProxyService
     {
         Proof = ScopedWebProxyProof.Verified(
@@ -3670,22 +3912,23 @@ static async Task ControllerRejectsAppTargetWhenOnlyScopedWebProxyProofExistsAsy
     {
         await controller.ConnectAsync();
 
-        Assert(controller.Snapshot.State == TunnelState.Error);
-        Assert(process.HasExited);
+        Assert(controller.Snapshot.State == TunnelState.Connected);
+        Assert(!process.HasExited);
         Assert(webProxy.VerifyTargetAccessCount > 0);
 
         var details = controller.CreateDiagnosticDetails();
         Assert(details["wireSockMode"] == "transparent");
         Assert(details["wireSockConnectionEstablished"] == "False");
         Assert(details["webProxyProof.verified"] == "True");
+        Assert(details["tunnelReadiness"] == "transparent-process-running");
         Assert(details["wireSockHandshakeDiagnostic"]!.Contains(
-            "application targets still require WireSock handshake or adapter traffic proof",
+            "will be exercised",
             StringComparison.OrdinalIgnoreCase));
 
         var health = await File.ReadAllTextAsync(paths.HealthReport);
-        Assert(health.Contains("\"status\":\"hata\"", StringComparison.Ordinal));
+        Assert(health.Contains("\"status\"", StringComparison.Ordinal));
         Assert(health.Contains(
-            "application targets still require WireSock handshake or adapter traffic proof",
+            "will be exercised when their app traffic starts",
             StringComparison.OrdinalIgnoreCase));
     }
     finally
@@ -5134,6 +5377,121 @@ static async Task WindowsFirewallTunnelScopeUsesSelectedTargetDomainsAsync()
     }
 }
 
+static async Task WindowsFirewallPrepareTunnelScopeUsesSingleCommandAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var runner = new RecordingCommandRunner();
+    var accessLock = new WindowsFirewallDiscordAccessLock(
+        new AppPaths(root),
+        runner,
+        "powershell.exe");
+    var registry = TargetRegistry.CreateDefault();
+    var resolver = new TargetScopeResolver(
+        registry,
+        new DiscordAppScope(root, root, root),
+        Path.Combine(root, "Astral.WebProxy.exe"));
+    var plan = resolver.Resolve(new TargetSelection(
+        [TargetIds.Wattpad, TargetIds.Blogspot]));
+
+    try
+    {
+        await accessLock.PrepareTunnelScopeAsync(plan, CancellationToken.None);
+
+        Assert(runner.Commands.Count == 1);
+        var command = runner.Commands[0];
+        var disableIndex = command.IndexOf(
+            "PrepareTunnelScope:disable-domain-lock",
+            StringComparison.Ordinal);
+        var scopeIndex = command.IndexOf(
+            "PrepareTunnelScope:clear-browser-scope",
+            StringComparison.Ordinal);
+        Assert(disableIndex >= 0);
+        Assert(scopeIndex > disableIndex);
+        Assert(command.Contains(
+            "'wattpad.com'",
+            StringComparison.Ordinal));
+        Assert(command.Contains(
+            "'blogspot.com'",
+            StringComparison.Ordinal));
+        Assert(!command.Contains(
+            "'*.blogspot.com'",
+            StringComparison.Ordinal));
+        Assert(!command.Contains(
+            "'discord.com'",
+            StringComparison.Ordinal));
+        Assert(command.Contains(
+            WindowsFirewallDiscordAccessLock.RuleName,
+            StringComparison.Ordinal));
+        Assert(command.Contains(
+            WindowsFirewallDiscordAccessLock.BrowserScopeGroup,
+            StringComparison.Ordinal));
+        Assert(command.Contains(
+            "-Enabled False",
+            StringComparison.Ordinal));
+        Assert(command.Contains(
+            "-Program $program",
+            StringComparison.Ordinal));
+        Assert(command.Contains(
+            "-RemoteAddress $addressList",
+            StringComparison.Ordinal));
+        Assert(command.Contains(
+            "direct browser bypass protection was not installed",
+            StringComparison.Ordinal));
+        Assert(!command.Contains(
+            "Get-Command chrome",
+            StringComparison.OrdinalIgnoreCase));
+        Assert(!command.Contains(
+            "HKCU:\\",
+            StringComparison.Ordinal));
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task WindowsFirewallPrepareTunnelScopeLabelsSilentPowerShellFailureAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var runner = new RecordingCommandRunner(
+        new CommandResult(
+            1,
+            "astral-phase=PrepareTunnelScope:disable-domain-lock",
+            string.Empty));
+    var accessLock = new WindowsFirewallDiscordAccessLock(
+        new AppPaths(root),
+        runner,
+        "powershell.exe");
+    var registry = TargetRegistry.CreateDefault();
+    var resolver = new TargetScopeResolver(
+        registry,
+        new DiscordAppScope(root, root, root),
+        Path.Combine(root, "Astral.WebProxy.exe"));
+    var plan = resolver.Resolve(new TargetSelection([TargetIds.Wattpad]));
+
+    try
+    {
+        var exception = await AssertThrowsAsync<InvalidOperationException>(
+            () => accessLock.PrepareTunnelScopeAsync(
+                plan,
+                CancellationToken.None));
+
+        Assert(exception.Message.Contains(
+            "PrepareTunnelScope",
+            StringComparison.Ordinal));
+        Assert(exception.Message.Contains(
+            "PowerShell exit code 1",
+            StringComparison.Ordinal));
+        Assert(exception.Message.Contains(
+            "PrepareTunnelScope:disable-domain-lock",
+            StringComparison.Ordinal));
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
 static async Task WindowsFirewallAccessLockBuildsExpectedCommandsAsync()
 {
     var root = CreateTemporaryDirectory();
@@ -5195,6 +5553,9 @@ static async Task WindowsFirewallAccessLockBuildsExpectedCommandsAsync()
             StringComparison.Ordinal));
         Assert(runner.Commands[0].Contains(
             "Resolve-DnsName",
+            StringComparison.Ordinal));
+        Assert(runner.Commands[0].Contains(
+            "-QuickTimeout",
             StringComparison.Ordinal));
         Assert(runner.Commands[0].Contains(
             "'gateway.discord.gg'",
@@ -5273,6 +5634,9 @@ static async Task WindowsFirewallAccessLockBuildsExpectedCommandsAsync()
             StringComparison.Ordinal));
         Assert(runner.Commands[2].Contains(
             "-RemoteAddress $addressList",
+            StringComparison.Ordinal));
+        Assert(runner.Commands[2].Contains(
+            "-QuickTimeout",
             StringComparison.Ordinal));
         Assert(runner.Commands[3].Contains(
             "$includeBrowserAccess = $true",
@@ -5881,6 +6245,13 @@ static Task DiagnosticsRedactsLegacyPortableBrandInPathsAsync()
     return Task.CompletedTask;
 }
 
+static Task ProcessLauncherDisposeTimeoutsStayShortAsync()
+{
+    Assert(ProcessLauncher.DisposeKilledProcessExitTimeout <= TimeSpan.FromMilliseconds(1200));
+    Assert(ProcessLauncher.DisposeLogPumpTimeout <= TimeSpan.FromMilliseconds(600));
+    return Task.CompletedTask;
+}
+
 static async Task ProcessLauncherRedactsTunnelLogAndConfirmsExitAsync()
 {
     var root = CreateTemporaryDirectory();
@@ -5997,7 +6368,7 @@ static async Task DiagnosticsFlushesDebouncedSummaryAsync()
                 return false;
             }
 
-            var summary = await File.ReadAllTextAsync(paths.DiagnosticSummary);
+            var summary = await ReadAllTextSharedAsync(paths.DiagnosticSummary);
             return summary.Contains("son durum", StringComparison.Ordinal);
         });
     }
@@ -6115,6 +6486,22 @@ static async Task WaitForConditionAsync(Func<Task<bool>> condition)
     }
 
     throw new InvalidOperationException("Koşul beklenen sürede gerçekleşmedi.");
+}
+
+static async Task<string> ReadAllTextSharedAsync(string path)
+{
+    await using var stream = new FileStream(
+        path,
+        FileMode.Open,
+        FileAccess.Read,
+        FileShare.ReadWrite | FileShare.Delete,
+        bufferSize: 4096,
+        useAsync: true);
+    using var reader = new StreamReader(
+        stream,
+        Encoding.UTF8,
+        detectEncodingFromByteOrderMarks: true);
+    return await reader.ReadToEndAsync();
 }
 
 static byte[] CreateUpdatePackage(
@@ -6260,13 +6647,16 @@ file static class TestJsonOptions
 file sealed class FakeDiscordAccessLock(
     Exception? disableException = null,
     Exception? applyTunnelScopeException = null,
-    int applyTunnelScopeFailureAttempt = 1) : IDiscordAccessLock
+    int applyTunnelScopeFailureAttempt = 1,
+    Exception? enableException = null) : IDiscordAccessLock
 {
     public int EnableCount { get; private set; }
 
     public int DisableCount { get; private set; }
 
     public int ApplyTunnelScopeCount { get; private set; }
+
+    public int PrepareTunnelScopeCount { get; private set; }
 
     public bool? LastIncludeBrowserAccess { get; private set; }
 
@@ -6278,6 +6668,11 @@ file sealed class FakeDiscordAccessLock(
     {
         cancellationToken.ThrowIfCancellationRequested();
         EnableCount++;
+        if (enableException is not null)
+        {
+            return Task.FromException(enableException);
+        }
+
         return Task.CompletedTask;
     }
 
@@ -6307,6 +6702,18 @@ file sealed class FakeDiscordAccessLock(
         }
 
         return Task.CompletedTask;
+    }
+
+    public async Task PrepareTunnelScopeAsync(
+        RoutingPlan routingPlan,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(routingPlan);
+        PrepareTunnelScopeCount++;
+        await DisableAsync(cancellationToken);
+        await ApplyTunnelScopeAsync(
+            !routingPlan.RequiresWebProxy,
+            cancellationToken);
     }
 
     public Task ClearTunnelScopeAsync(CancellationToken cancellationToken)
@@ -7070,10 +7477,14 @@ file sealed class SequencedCommandRunner(params CommandResult[] results) : IComm
     }
 }
 
-file sealed class ConnectProofProcessLauncher(Func<string, bool> shouldSucceed)
+file sealed class ConnectProofProcessLauncher(
+    Func<string, bool> shouldSucceed,
+    TimeSpan? responseDelay = null)
     : IProcessLauncher, IAsyncDisposable
 {
     private ConnectProofManagedProcess? _process;
+
+    public int MaxActiveConnections => _process?.MaxActiveConnections ?? 0;
 
     public IManagedProcess Start(
         string executable,
@@ -7086,7 +7497,10 @@ file sealed class ConnectProofProcessLauncher(Func<string, bool> shouldSucceed)
             .Single(item => item.value == "--port")
             .index + 1;
         var port = int.Parse(arguments[portIndex], CultureInfo.InvariantCulture);
-        _process = new ConnectProofManagedProcess(port, shouldSucceed);
+        _process = new ConnectProofManagedProcess(
+            port,
+            shouldSucceed,
+            responseDelay ?? TimeSpan.Zero);
         return _process;
     }
 
@@ -7103,16 +7517,21 @@ file sealed class ConnectProofManagedProcess : IManagedProcess
 {
     private static int _nextProcessId = 7000;
     private readonly Func<string, bool> _shouldSucceed;
+    private readonly TimeSpan _responseDelay;
     private readonly CancellationTokenSource _stop = new();
     private readonly TcpListener _listener;
     private readonly Task _acceptLoop;
+    private int _activeConnections;
+    private int _maxActiveConnections;
     private bool _hasExited;
 
     public ConnectProofManagedProcess(
         int port,
-        Func<string, bool> shouldSucceed)
+        Func<string, bool> shouldSucceed,
+        TimeSpan responseDelay)
     {
         _shouldSucceed = shouldSucceed;
+        _responseDelay = responseDelay;
         ProcessId = Interlocked.Increment(ref _nextProcessId);
         StartTime = DateTimeOffset.Now;
         _listener = new TcpListener(IPAddress.Loopback, port);
@@ -7131,6 +7550,8 @@ file sealed class ConnectProofManagedProcess : IManagedProcess
     public int ProcessId { get; }
 
     public DateTimeOffset? StartTime { get; }
+
+    public int MaxActiveConnections => Volatile.Read(ref _maxActiveConnections);
 
     public async Task StopAsync(
         TimeSpan timeout,
@@ -7189,17 +7610,51 @@ file sealed class ConnectProofManagedProcess : IManagedProcess
     private async Task HandleClientAsync(TcpClient client)
     {
         using var _ = client;
-        var stream = client.GetStream();
-        var buffer = new byte[1024];
-        var read = await stream.ReadAsync(buffer, _stop.Token);
-        var request = Encoding.ASCII.GetString(buffer, 0, read);
-        var host = ParseConnectHost(request);
-        var response = _shouldSucceed(host)
-            ? "HTTP/1.1 200 Connection Established\r\n\r\n"
-            : "HTTP/1.1 502 Bad Gateway\r\n\r\n";
-        await stream.WriteAsync(
-            Encoding.ASCII.GetBytes(response),
-            _stop.Token);
+        var active = Interlocked.Increment(ref _activeConnections);
+        UpdateMaxActiveConnections(active);
+        try
+        {
+            var stream = client.GetStream();
+            var buffer = new byte[1024];
+            var read = await stream.ReadAsync(buffer, _stop.Token);
+            var request = Encoding.ASCII.GetString(buffer, 0, read);
+            var host = ParseConnectHost(request);
+            if (_responseDelay > TimeSpan.Zero)
+            {
+                await Task.Delay(_responseDelay, _stop.Token);
+            }
+
+            var response = _shouldSucceed(host)
+                ? "HTTP/1.1 200 Connection Established\r\n\r\n"
+                : "HTTP/1.1 502 Bad Gateway\r\n\r\n";
+            await stream.WriteAsync(
+                Encoding.ASCII.GetBytes(response),
+                _stop.Token);
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _activeConnections);
+        }
+    }
+
+    private void UpdateMaxActiveConnections(int active)
+    {
+        while (true)
+        {
+            var current = Volatile.Read(ref _maxActiveConnections);
+            if (active <= current)
+            {
+                return;
+            }
+
+            if (Interlocked.CompareExchange(
+                    ref _maxActiveConnections,
+                    active,
+                    current) == current)
+            {
+                return;
+            }
+        }
     }
 
     private static string ParseConnectHost(string request)

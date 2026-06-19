@@ -30,6 +30,15 @@ public interface IDiscordAccessLock
             cancellationToken);
     }
 
+    async Task PrepareTunnelScopeAsync(
+        RoutingPlan routingPlan,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(routingPlan);
+        await DisableAsync(cancellationToken);
+        await ApplyTunnelScopeAsync(routingPlan, cancellationToken);
+    }
+
     Task ClearTunnelScopeAsync(CancellationToken cancellationToken);
 
     Task RemoveAsync(CancellationToken cancellationToken);
