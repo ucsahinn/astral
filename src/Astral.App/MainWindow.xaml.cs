@@ -201,7 +201,7 @@ public partial class MainWindow : Window, IDisposable
 
         try
         {
-            if (!_controller.Snapshot.IsConnected
+            if (!_controller.Snapshot.IsTunnelActive
                 && !_wireSockBootstrapper.IsSetupConsentAccepted)
             {
                 var consentWindow = new WireSockConsentWindow(_wireSockBootstrapper)
@@ -220,7 +220,7 @@ public partial class MainWindow : Window, IDisposable
             _operationCancellation?.Dispose();
             _operationCancellation = new CancellationTokenSource();
 
-            if (_controller.Snapshot.IsConnected)
+            if (_controller.Snapshot.IsTunnelActive)
             {
                 await _controller.DisconnectAsync(CancellationToken.None);
             }
@@ -352,7 +352,7 @@ public partial class MainWindow : Window, IDisposable
             _isUpdateProgressPinned = false;
         }
 
-        if (!snapshot.IsConnected && !snapshot.IsBusy)
+        if (!snapshot.IsTunnelActive && !snapshot.IsBusy)
         {
             _automaticTargetTestQueued = false;
             _targetProbeResults.Clear();
@@ -371,7 +371,7 @@ public partial class MainWindow : Window, IDisposable
         ApplyTargetTestCardState(snapshot);
         StatusMessage.Text = GetStatusMessage(snapshot);
         StatusDetail.Text = GetDetail(snapshot);
-        RefreshTargetScopeView(snapshot.IsBusy || snapshot.IsConnected);
+        RefreshTargetScopeView(snapshot.IsBusy || snapshot.IsTunnelActive);
         RefreshLiveStatusCards(snapshot);
         UpdateBackgroundVideoForSnapshot(snapshot);
         QueueAutomaticTargetTestIfNeeded(snapshot, previousState);
@@ -968,7 +968,7 @@ public partial class MainWindow : Window, IDisposable
 
         SyncTargetTogglesFromSelection(_controller.TargetSelection);
         RefreshTargetScopeView(_controller.Snapshot.IsBusy
-            || _controller.Snapshot.IsConnected);
+            || _controller.Snapshot.IsTunnelActive);
     }
 
     private void RenderTargetCards()
@@ -1028,7 +1028,7 @@ public partial class MainWindow : Window, IDisposable
             return;
         }
 
-        if (_controller.Snapshot.IsBusy || _controller.Snapshot.IsConnected)
+        if (_controller.Snapshot.IsBusy || _controller.Snapshot.IsTunnelActive)
         {
             SyncTargetTogglesFromSelection(_controller.TargetSelection);
             RefreshTargetScopeView(locked: true);
@@ -1163,7 +1163,7 @@ public partial class MainWindow : Window, IDisposable
     private bool HandleLockedTargetActivation(object sender)
     {
         var snapshot = _controller.Snapshot;
-        if (!snapshot.IsBusy && !snapshot.IsConnected)
+        if (!snapshot.IsBusy && !snapshot.IsTunnelActive)
         {
             return false;
         }
@@ -1570,9 +1570,11 @@ public partial class MainWindow : Window, IDisposable
     {
         if (!_targetProbeResults.TryGetValue(targetId, out var result))
         {
-            return snapshot.IsConnected
-                ? "Test bekliyor"
-                : "Kapsam hazır";
+            return snapshot.NeedsTargetAction
+                ? "Aksiyon gerekli"
+                : snapshot.IsConnected
+                    ? "Test bekliyor"
+                    : "Kapsam hazır";
         }
 
         return result.Status switch
@@ -1583,7 +1585,9 @@ public partial class MainWindow : Window, IDisposable
             TargetProbeStatus.ProfileScope => "Profil hazır",
             TargetProbeStatus.Failed => "Sorunlu",
             TargetProbeStatus.Skipped => "Kapsam hazır",
-            _ => snapshot.IsConnected ? "Test bekliyor" : "Kapsam hazır"
+            _ => snapshot.NeedsTargetAction
+                ? "Aksiyon gerekli"
+                : snapshot.IsConnected ? "Test bekliyor" : "Kapsam hazır"
         };
     }
 
@@ -1690,7 +1694,9 @@ public partial class MainWindow : Window, IDisposable
         if (!snapshot.IsConnected)
         {
             TargetTestSummary.Text =
-                "Bağlanınca seçili hedefleri ölçer.";
+                snapshot.NeedsTargetAction
+                    ? "Hedef aksiyonu gerekiyor; tam bağlantı kanıtı alınmadı."
+                    : "Bağlanınca seçili hedefleri ölçer.";
             return;
         }
 
@@ -1770,7 +1776,9 @@ public partial class MainWindow : Window, IDisposable
             : snapshot.IsBusy
                 ? "Devam eden bağlantı işlemi bitince test çalıştırılabilir."
                 : !snapshot.IsConnected
-                    ? "Önce Astral bağlantısını açın."
+                    ? snapshot.NeedsTargetAction
+                        ? "Hedef aksiyonu gerekiyor; tam bağlantı kanıtı alınmadan test çalıştırılmaz."
+                        : "Önce Astral bağlantısını açın."
                     : "Seçili hedeflerde bağlantı testini başlat";
         ToolTipService.SetShowOnDisabled(TargetTestButton, true);
         ToolTipService.SetShowsToolTipOnKeyboardFocus(TargetTestButton, true);
@@ -1782,6 +1790,8 @@ public partial class MainWindow : Window, IDisposable
                     ? $"{failedCount} sorun"
                     : hasSuccess
                         ? $"{verifiedCount}/{selectedCount} OK"
+                    : snapshot.NeedsTargetAction
+                        ? "Aksiyon"
                         : snapshot.IsConnected
                             ? "Hazır"
                             : "Bekliyor";
@@ -1878,7 +1888,9 @@ public partial class MainWindow : Window, IDisposable
         {
             TargetTestSummary.Text = snapshot.IsBusy
                 ? "Bağlantı işlemi bitince hedef testi çalıştırılabilir."
-                : "Hedef testi için önce Astral bağlantısını açın.";
+                : snapshot.NeedsTargetAction
+                    ? "Hedef aksiyonu gerekiyor; tam bağlantı kanıtı alınmadı."
+                    : "Hedef testi için önce Astral bağlantısını açın.";
             ApplyTargetTestCardState(snapshot);
             return;
         }
@@ -2020,7 +2032,7 @@ public partial class MainWindow : Window, IDisposable
                     results.Add(scoped);
                     LogTargetProbeResult(target, scoped);
                     RefreshTargetScopeView(_controller.Snapshot.IsBusy
-                        || _controller.Snapshot.IsConnected);
+                        || _controller.Snapshot.IsTunnelActive);
                     continue;
                 }
 
@@ -2100,7 +2112,7 @@ public partial class MainWindow : Window, IDisposable
             ApplyTargetTestSummaryState(_controller.Snapshot);
             ApplyTargetTestCardState(_controller.Snapshot);
             RefreshTargetScopeView(_controller.Snapshot.IsBusy
-                || _controller.Snapshot.IsConnected);
+                || _controller.Snapshot.IsTunnelActive);
             RefreshLiveStatusCards(_controller.Snapshot);
             ApplyRepairButtonState(_controller.Snapshot);
         }
@@ -3306,7 +3318,7 @@ public partial class MainWindow : Window, IDisposable
             ApplyRepairButtonState(_controller.Snapshot);
             ApplyUpdateControls(_controller.Snapshot.IsBusy);
             RefreshTargetScopeView(_controller.Snapshot.IsBusy
-                || _controller.Snapshot.IsConnected);
+                || _controller.Snapshot.IsTunnelActive);
         }
     }
 
@@ -3731,7 +3743,7 @@ public partial class MainWindow : Window, IDisposable
 
     private async Task RunDiagnosticConnectSmokeAsync()
     {
-        if (_controller.Snapshot.IsBusy || _controller.Snapshot.IsConnected)
+        if (_controller.Snapshot.IsBusy || _controller.Snapshot.IsTunnelActive)
         {
             _diagnostics.Info(
                 "ui.diagnosticConnectSmoke",
@@ -3966,7 +3978,9 @@ public partial class MainWindow : Window, IDisposable
         if (!snapshot.IsConnected)
         {
             TargetTestSummary.Text =
-                "Hedefi açmadan önce Astral bağlantısını açın.";
+                snapshot.NeedsTargetAction
+                    ? "Hedef aksiyonu gerekiyor; tam bağlantı kanıtı alınmadan hedef açılmadı."
+                    : "Hedefi açmadan önce Astral bağlantısını açın.";
             ApplyTargetTestCardState(snapshot);
             return;
         }
@@ -4345,7 +4359,7 @@ public partial class MainWindow : Window, IDisposable
             _diagnostics.Info("ui.update.install", "Güncelleme yükleme istendi.");
             ResetUpdateProgressLogThrottle();
 
-            if (_controller.Snapshot.IsConnected)
+            if (_controller.Snapshot.IsTunnelActive)
             {
                 DiagnosticsStatus.Text = "Bağlantı kapatılıyor. Ardından güncelleme yüklenecek.";
                 SetUpdateStageProgress(

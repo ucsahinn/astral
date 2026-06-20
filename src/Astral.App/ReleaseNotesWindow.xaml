@@ -212,6 +212,10 @@
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
+                                           Text="&#x2022; Hedef aksiyonu gereken durum artık tam bağlı sayılmaz; yalnızca güvenli kapatma/cleanup için aktif tünel lifecycle olarak izlenir." />
+                                <TextBlock FontSize="13"
+                                           LineHeight="22"
+                                           TextWrapping="Wrap"
                                            Text="&#x2022; Disconnect akışı web proxy veya tünel kapsam temizliği doğrulanamazsa temiz kapanmış gibi raporlamaz; kullanıcıya Onar veya Profili Temizle aksiyonu gösterilir." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"

@@ -676,7 +676,10 @@ static void VerifyConnectedTargetCardsRequireProbeEvidence()
         Assert(cardTexts.Contains("Discord", StringComparer.Ordinal));
         var targetTestButton = FindVisualChildren<Button>(window)
             .Single(button => button.Name == "TargetTestButton");
-        Assert(targetTestButton.IsEnabled);
+        Assert(GetController(window).Snapshot.State == TunnelState.DiscordRestartRequired);
+        Assert(!GetController(window).Snapshot.IsConnected);
+        Assert(GetController(window).Snapshot.IsTunnelActive);
+        Assert(!targetTestButton.IsEnabled);
 
         var openedUris = new List<Uri>();
         MainWindow.OpenUriOverrideForTesting = openedUris.Add;
@@ -695,9 +698,13 @@ static void VerifyConnectedTargetCardsRequireProbeEvidence()
                 RoutedEvent = System.Windows.Input.Keyboard.PreviewKeyDownEvent
             });
 
-            Assert(openedUris.Count == 1);
-            Assert(openedUris.Single().Host == "discord.com");
+            Assert(openedUris.Count == 0);
             Assert(discordCard.IsChecked == wasChecked);
+            var targetTestSummary = FindVisualChildren<TextBlock>(window)
+                .Single(block => block.Name == "TargetTestSummary");
+            Assert(targetTestSummary.Text.Contains(
+                "tam bağlantı kanıtı",
+                StringComparison.OrdinalIgnoreCase));
         }
         finally
         {

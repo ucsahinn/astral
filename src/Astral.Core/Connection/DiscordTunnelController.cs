@@ -164,7 +164,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(selection);
 
-        if (_snapshot.IsConnected || _snapshot.IsBusy)
+        if (_snapshot.IsTunnelActive || _snapshot.IsBusy)
         {
             _diagnostics.Warning(
                 "controller.targetSelection",
@@ -206,7 +206,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
         try
         {
-            if (_snapshot.IsConnected || _snapshot.IsBusy)
+            if (_snapshot.IsTunnelActive || _snapshot.IsBusy)
             {
                 return;
             }
@@ -234,7 +234,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
     public async Task ToggleAsync(CancellationToken cancellationToken = default)
     {
-        if (_snapshot.IsConnected)
+        if (_snapshot.IsTunnelActive)
         {
             await DisconnectAsync(cancellationToken);
         }
@@ -304,7 +304,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         try
         {
             var routingPlan = CurrentRoutingPlan;
-            var status = _snapshot.IsConnected
+            var status = _snapshot.IsTunnelActive
                 ? await _webProxyService.EnsureAppliedAsync(
                     routingPlan,
                     progress: null,
@@ -357,7 +357,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 exception,
                 details);
 
-            if (_snapshot.IsConnected && routingPlan.RequiresWebProxy)
+            if (_snapshot.IsTunnelActive && routingPlan.RequiresWebProxy)
             {
                 SetStatus(
                     TunnelState.Error,
@@ -380,7 +380,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
         try
         {
-            if (_snapshot.IsConnected || _snapshot.IsBusy)
+            if (_snapshot.IsTunnelActive || _snapshot.IsBusy)
             {
                 return;
             }

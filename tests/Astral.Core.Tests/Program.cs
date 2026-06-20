@@ -4771,7 +4771,9 @@ static async Task ControllerKeepsTunnelActiveWhenDiscordRestartFailsAsync()
         await controller.ConnectAsync();
 
         Assert(controller.Snapshot.State == TunnelState.DiscordRestartRequired);
-        Assert(controller.Snapshot.IsConnected);
+        Assert(!controller.Snapshot.IsConnected);
+        Assert(controller.Snapshot.IsTunnelActive);
+        Assert(controller.Snapshot.NeedsTargetAction);
         Assert(controller.Snapshot.Message.Contains(
             "Discord otomatik yenilenemedi.",
             StringComparison.Ordinal));
