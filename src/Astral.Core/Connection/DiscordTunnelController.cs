@@ -506,16 +506,30 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     _lastWebProxyProof.Message);
             }
 
-            SetStatus(TunnelState.Verifying, "Hedef kapsamı doğrulanıyor");
-            await VerifyTunnelReadinessAsync(
-                _lastTunnelLogStartPosition,
-                cancellationToken);
-            LogConnectPhase("tunnel-ready");
+            if (RoutingPlanRequiresApplicationTunnelProof(routingPlan)
+                && _lastWebProxyProof.Required
+                && _lastWebProxyProof.IsVerified)
+            {
+                CaptureWireSockTrafficBaseline();
+                _lastWireSockTrafficDiagnostic =
+                    "WireSock adapter traffic baseline reset after scoped web proxy proof; subsequent traffic is used for application tunnel proof.";
+                LogConnectPhase("application-proof-baseline");
+            }
 
             _lastTargetProcessRefresh = await RefreshRunningTargetProcessesAsync(
                 routingPlan,
                 cancellationToken);
             LogConnectPhase("target-process-refresh");
+
+            var enforceApplicationTunnelProof =
+                RoutingPlanRequiresApplicationTunnelProof(routingPlan)
+                && !_lastTargetProcessRefresh.RequiresManualAction;
+            SetStatus(TunnelState.Verifying, "Hedef kapsamı doğrulanıyor");
+            await VerifyTunnelReadinessAsync(
+                _lastTunnelLogStartPosition,
+                enforceApplicationTunnelProof,
+                cancellationToken);
+            LogConnectPhase("tunnel-ready");
 
             var finalState = _lastTargetProcessRefresh.RequiresManualAction
                 ? TunnelState.DiscordRestartRequired
@@ -544,6 +558,8 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     ["routingSummary"] = FormatRoutingSummary(_lastRoutingSummary),
                     ["applicationTunnelProofRequired"] =
                         RoutingPlanRequiresApplicationTunnelProof(routingPlan).ToString(),
+                    ["applicationTunnelProofEnforced"] =
+                        enforceApplicationTunnelProof.ToString(),
                     ["targetLaunchPolicy"] = targetLaunchPolicy,
                     ["nextAction"] = nextAction,
                     ["connectElapsedMs"] = connectStopwatch.ElapsedMilliseconds
@@ -565,6 +581,8 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     ["routingSummary"] = FormatRoutingSummary(_lastRoutingSummary),
                     ["applicationTunnelProofRequired"] =
                         RoutingPlanRequiresApplicationTunnelProof(routingPlan).ToString(),
+                    ["applicationTunnelProofEnforced"] =
+                        enforceApplicationTunnelProof.ToString(),
                     ["targetLaunchPolicy"] = targetLaunchPolicy,
                     ["nextAction"] = nextAction,
                     ["profilePath"] = profilePath,
@@ -746,6 +764,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
     private async Task VerifyTunnelReadinessAsync(
         long tunnelLogStartPosition,
+        bool enforceApplicationTunnelProof,
         CancellationToken cancellationToken)
     {
         for (var attempt = 1; attempt <= MaxTunnelReadinessChecks; attempt++)
@@ -755,7 +774,9 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             CaptureWireSockProcessState();
             _lastWireSockConnectionEstablished =
                 HasWireSockConnectionEstablished(tunnelLogStartPosition);
-            var ready = TryMarkTunnelReadyForCurrentMode(attempt);
+            var ready = TryMarkTunnelReadyForCurrentMode(
+                attempt,
+                enforceApplicationTunnelProof);
             var details = CreateTunnelReadinessDetails();
             details["attempt"] = attempt.ToString(CultureInfo.InvariantCulture);
             details["maxAttempts"] =
@@ -787,7 +808,9 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         CaptureWireSockProcessState();
         _lastWireSockConnectionEstablished =
             HasWireSockConnectionEstablished(tunnelLogStartPosition);
-        if (TryMarkTunnelReadyForCurrentMode(MaxTunnelReadinessChecks))
+        if (TryMarkTunnelReadyForCurrentMode(
+                MaxTunnelReadinessChecks,
+                enforceApplicationTunnelProof))
         {
             _diagnostics.Info(
                 "controller.tunnelReadiness",
@@ -810,7 +833,8 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
         if (!IsWireSockHandshakeReady())
         {
-            if (RoutingPlanRequiresApplicationTunnelProof(CurrentRoutingPlan)
+            if (enforceApplicationTunnelProof
+                && RoutingPlanRequiresApplicationTunnelProof(CurrentRoutingPlan)
                 && _lastWebProxyProof.Required
                 && _lastWebProxyProof.IsVerified)
             {
@@ -909,7 +933,9 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         return details;
     }
 
-    private bool TryMarkTunnelReadyForCurrentMode(int attempt)
+    private bool TryMarkTunnelReadyForCurrentMode(
+        int attempt,
+        bool enforceApplicationTunnelProof)
     {
         if (_lastWireSockProcessExited == true)
         {
@@ -935,8 +961,11 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         if (_lastWebProxyProof.Required && _lastWebProxyProof.IsVerified)
         {
             var routingPlan = CurrentRoutingPlan;
-            var requiresApplicationTunnelProof =
+            var planRequiresApplicationTunnelProof =
                 RoutingPlanRequiresApplicationTunnelProof(routingPlan);
+            var requiresApplicationTunnelProof =
+                enforceApplicationTunnelProof
+                && planRequiresApplicationTunnelProof;
             if (requiresApplicationTunnelProof && !IsWireSockHandshakeReady())
             {
                 if (!_lastTunnelReadiness.BlocksConnection
@@ -961,11 +990,15 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 _lastTunnelReadiness,
                 requiresApplicationTunnelProof
                     ? "WireSock transparent mode is running; adapter readiness and scoped web proxy target proof were observed."
+                    : planRequiresApplicationTunnelProof
+                        ? "WireSock transparent mode is running; scoped web proxy target proof was observed while application proof waits for user action."
                     : "WireSock transparent mode is running; scoped web proxy target proof was observed.");
 
             _lastWireSockHandshakeDiagnostic =
                 requiresApplicationTunnelProof
                     ? "WireSock log marker was not observed; adapter readiness plus scoped web proxy proof confirmed app/web readiness."
+                    : planRequiresApplicationTunnelProof
+                        ? "WireSock log marker was not observed; scoped web proxy proof confirmed web readiness while application proof remains pending."
                     : "WireSock log marker was not observed; scoped web proxy target proof confirmed readiness.";
 
             return true;
@@ -1595,7 +1628,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             new(
                 Required: true,
                 Refreshed: false,
-                RequiresManualAction: false,
+                RequiresManualAction: true,
                 Policy: "not-started-by-astral",
                 Message: "Discord kapalı; Astral uygulamayı kendisi başlatmadı.",
                 NextAction: "Discord'u şimdi açabilirsiniz.",

@@ -192,7 +192,7 @@
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Üretim uygulaması artık gerçek Windows Discord process denetleyicisini kullanır; açık Discord tünel hazır olduktan sonra yenilenir." />
+                                           Text="&#x2022; Üretim uygulaması artık gerçek Windows Discord process denetleyicisini kullanır; açık Discord tünel profili hazırlandıktan sonra, app kanıtından önce yenilenir." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
@@ -204,6 +204,14 @@
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
+                                           Text="&#x2022; Scoped web proxy kanıtından sonra adapter trafik baseline'ı sıfırlanır; WebProxy'nin kendi CONNECT trafiği app kanıtı gibi sayılmaz." />
+                                <TextBlock FontSize="13"
+                                           LineHeight="22"
+                                           TextWrapping="Wrap"
+                                           Text="&#x2022; Discord açıksa tünel profili hazırlandıktan sonra yenilenir; Discord kapalıysa Astral otomatik başlatmadan ek aksiyon gerektiğini söyler." />
+                                <TextBlock FontSize="13"
+                                           LineHeight="22"
+                                           TextWrapping="Wrap"
                                            Text="&#x2022; Disconnect akışı web proxy veya tünel kapsam temizliği doğrulanamazsa temiz kapanmış gibi raporlamaz; kullanıcıya Onar veya Profili Temizle aksiyonu gösterilir." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
@@ -212,7 +220,7 @@
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Hedef testi UI'ı HTTP CONNECT başarısını app kapsamı hazır gibi göstermeyi bıraktı; app kanıtı profil/WireSock kapsamından ayrı değerlendirilir." />
+                                           Text="&#x2022; Hedef testi UI'ı HTTP CONNECT başarısını app kapsamı hazır gibi göstermez; profil kapsamını ayrı ve sınırlı bir kanıt türü olarak yazar." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"

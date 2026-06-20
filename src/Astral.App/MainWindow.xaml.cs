@@ -1846,6 +1846,7 @@ public partial class MainWindow : Window, IDisposable
     private static bool IsTargetTestSummaryReusable(string summary)
     {
         return summary.Contains("web rota OK", StringComparison.OrdinalIgnoreCase)
+            || summary.Contains("profil kapsamı", StringComparison.OrdinalIgnoreCase)
             || summary.Contains("app kapsam hazır", StringComparison.OrdinalIgnoreCase)
             || summary.Contains("kontrol gerekli", StringComparison.OrdinalIgnoreCase)
             || summary.Contains("atlandı", StringComparison.OrdinalIgnoreCase);
@@ -1853,11 +1854,11 @@ public partial class MainWindow : Window, IDisposable
 
     private static string CreateTargetTestSummary(
         int webRouteSuccessCount,
-        int appScopeReadyCount,
+        int profileScopeCount,
         int failedCount,
         int skippedCount)
     {
-        return $"{webRouteSuccessCount} web rota OK, {appScopeReadyCount} app kapsam hazır, {failedCount} kontrol gerekli, {skippedCount} atlandı.";
+        return $"{webRouteSuccessCount} web rota OK, {profileScopeCount} profil kapsamı, {failedCount} kontrol gerekli, {skippedCount} atlandı.";
     }
 
     private async Task RunSelectedTargetsProbeAsync()
@@ -2061,7 +2062,7 @@ public partial class MainWindow : Window, IDisposable
             var webRouteSuccessCount = selectedTargets.Count(target =>
                 _targetProbeResults.TryGetValue(target.Id, out var result)
                 && IsTargetWebRouteVerified(target, result));
-            var appScopeReadyCount = selectedTargets.Count(target =>
+            var profileScopeCount = selectedTargets.Count(target =>
                 _targetProbeResults.TryGetValue(target.Id, out var result)
                 && IsTargetApplicationScopeReady(target, result));
             var failedCount = results.Count(result =>
@@ -2070,7 +2071,7 @@ public partial class MainWindow : Window, IDisposable
                 result.Status is TargetProbeStatus.Skipped);
             _lastTargetTestSummary = CreateTargetTestSummary(
                 webRouteSuccessCount,
-                appScopeReadyCount,
+                profileScopeCount,
                 failedCount,
                 skippedCount);
             _lastTargetTestElapsedMilliseconds = testStopwatch.ElapsedMilliseconds;
@@ -2426,7 +2427,7 @@ public partial class MainWindow : Window, IDisposable
                 && IsTargetWebRouteVerified(target, result))
             .Select(target => target.Id)
             .ToArray();
-        var appScopeReadyTargetIds = selectedTargets
+        var profileScopeTargetIds = selectedTargets
             .Where(target => _targetProbeResults.TryGetValue(target.Id, out var result)
                 && IsTargetApplicationScopeReady(target, result))
             .Select(target => target.Id)
@@ -2459,14 +2460,14 @@ public partial class MainWindow : Window, IDisposable
             ["maxConcurrentProbes"] = MaxConcurrentTargetTestProbes.ToString(CultureInfo.InvariantCulture),
             ["verifiedTargetCount"] = verifiedTargetIds.Length.ToString(CultureInfo.InvariantCulture),
             ["webRouteVerifiedTargetCount"] = webRouteVerifiedTargetIds.Length.ToString(CultureInfo.InvariantCulture),
-            ["appScopeReadyTargetCount"] = appScopeReadyTargetIds.Length.ToString(CultureInfo.InvariantCulture),
+            ["profileScopeTargetCount"] = profileScopeTargetIds.Length.ToString(CultureInfo.InvariantCulture),
             ["failedTargetCount"] = failedTargetIds.Length.ToString(CultureInfo.InvariantCulture),
             ["skippedTargetCount"] = skippedTargetIds.Length.ToString(CultureInfo.InvariantCulture),
             ["runningTargetCount"] = runningTargetIds.Length.ToString(CultureInfo.InvariantCulture),
             ["untestedTargetCount"] = untestedTargetIds.Length.ToString(CultureInfo.InvariantCulture),
             ["verifiedTargets"] = string.Join(", ", verifiedTargetIds),
             ["webRouteVerifiedTargets"] = string.Join(", ", webRouteVerifiedTargetIds),
-            ["appScopeReadyTargets"] = string.Join(", ", appScopeReadyTargetIds),
+            ["profileScopeTargets"] = string.Join(", ", profileScopeTargetIds),
             ["failedTargets"] = string.Join(", ", failedTargetIds),
             ["skippedTargets"] = string.Join(", ", skippedTargetIds),
             ["runningTargets"] = string.Join(", ", runningTargetIds),

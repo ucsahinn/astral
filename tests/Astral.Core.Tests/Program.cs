@@ -102,12 +102,13 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Denetleyici transparent modda trafik kanıtıyla eksik handshake logunu kabul eder", ControllerAcceptsTrafficProofWithoutWireSockHandshakeLogAsync),
     ("Denetleyici transparent modda scoped web proxy kanıtıyla pasif adaptörü kabul eder", ControllerAcceptsScopedWebProxyProofInTransparentModeAsync),
     ("Denetleyici app+web hedeflerde app kanıtı yokken bağlı raporlamaz", ControllerRejectsAppWebTargetWhenOnlyScopedWebProxyProofExistsAsync),
+    ("Denetleyici çalışan Discord'u app kanıtından önce yeniler", ControllerRefreshesRunningDiscordBeforeAppTunnelProofAsync),
     ("Denetleyici uygulama ve web hedeflerinde adapter trafik kanıtını tanılamaya yazar", ControllerAcceptsAppWebTargetWithTrafficProofAsync),
     ("Denetleyici transparent modda handshake ve trafik kanıtı yokken bağlı raporlamaz", ControllerRejectsMissingWireSockHandshakeInTransparentModeAsync),
     ("Denetleyici son WireSock çıkışını tanılama detayına yazar", ControllerReportsWireSockExitAfterFinalReadinessProbeAsync),
     ("Denetleyici WireSock tunnel-started loguyla bağlı raporlar", ControllerAcceptsWireSockTunnelStartedLogAsync),
     ("Denetleyici WireSock adaptörü gecikirse yeniden dener", ControllerRetriesDelayedWireSockAdapterAsync),
-    ("Denetleyici WireSock doğrulamasından sonra çalışan Discord'u yeniler", ControllerRefreshesRunningDiscordAfterWireSockReadinessAsync),
+    ("Denetleyici WireSock doğrulamasından önce çalışan Discord'u yeniler", ControllerRefreshesRunningDiscordBeforeWireSockReadinessAsync),
     ("Denetleyici çalışan Discord yenilenemezse bağlı raporlamaz", ControllerRequiresManualActionWhenRunningDiscordRefreshFailsAsync),
     ("Denetleyici tüm yerleşik presetleri hedef uygulama başlatmadan bağlar", ControllerConnectsEveryBuiltInPresetWithoutLaunchingTargetsAsync),
     ("Denetleyici WireSock hazırlık hatasını bildirir", ControllerBootstrapFailureAsync),
@@ -2732,6 +2733,26 @@ static async Task ControllerLifecycleAsync()
     var webProxyService = new FakeScopedWebProxyService();
     var profileProvisioner = new FakeProfileProvisioner(
         Path.Combine(root, "discord.conf"));
+    var discordExecutable = Path.Combine(root, "Discord", "app-1.0.9999", "Discord.exe");
+    var discordManager = new FakeDiscordProcessManager(
+        new DiscordProcessSnapshot(
+            1,
+            [discordExecutable],
+            [100]));
+    var readinessProbe = new ObservingTunnelReadinessProbe(() =>
+        discordManager.RestartCount > 0
+            ? TunnelReadinessSnapshot.Ready(
+                "Up",
+                128,
+                512,
+                "wt0",
+                "WireGuard Tunnel")
+            : TunnelReadinessSnapshot.Ready(
+                "Up",
+                128,
+                256,
+                "wt0",
+                "WireGuard Tunnel"));
     var chromePath = Path.Combine(root, "Google", "Chrome", "Application", "chrome.exe");
     var edgePath = Path.Combine(root, "Microsoft", "Edge", "Application", "msedge.exe");
     var pathChromePath = Path.Combine(root, "PathBrowsers", "chrome.exe");
@@ -2758,6 +2779,8 @@ static async Task ControllerLifecycleAsync()
         processLauncher,
         TimeSpan.Zero,
         accessLock,
+        discordProcessManager: discordManager,
+        tunnelReadinessProbe: readinessProbe,
         webProxyService: webProxyService)
     {
         IncludeBrowserAccess = true
@@ -2772,6 +2795,8 @@ static async Task ControllerLifecycleAsync()
 
         await controller.ConnectAsync();
         Assert(controller.Snapshot.State == TunnelState.Connected);
+        Assert(discordManager.RestartCount == 1);
+        Assert(discordManager.VerifyReadyCount == 1);
         Assert(accessLock.PrepareTunnelScopeCount == 1);
         Assert(accessLock.DisableCount == 1);
         Assert(accessLock.ApplyTunnelScopeCount == 1);
@@ -3402,9 +3427,9 @@ static async Task ControllerConnectsDefaultScopeWithoutLaunchingClosedTargetProc
     {
         await controller.ConnectAsync();
 
-        Assert(controller.Snapshot.State == TunnelState.Connected);
+        Assert(controller.Snapshot.State == TunnelState.DiscordRestartRequired);
         Assert(controller.Snapshot.Message.Contains(
-            "seçili hedefler",
+            "yenilenemedi",
             StringComparison.OrdinalIgnoreCase));
         Assert(!controller.Snapshot.Message.Contains(
             "Discord yenilendi",
@@ -3416,7 +3441,7 @@ static async Task ControllerConnectsDefaultScopeWithoutLaunchingClosedTargetProc
         Assert(targetProcessManager.VerifyReadyCount == 0);
 
         var health = await File.ReadAllTextAsync(paths.HealthReport);
-        Assert(health.Contains("\"status\":\"bağlantı hazır\"", StringComparison.Ordinal));
+        Assert(health.Contains("\"status\":\"hedef için ek aksiyon gerekli\"", StringComparison.Ordinal));
         Assert(health.Contains("\"targetLaunchPolicy\":\"not-started-by-astral\"", StringComparison.Ordinal));
         Assert(health.Contains("\"targetProcessRefresh.runningProcessCount\":\"0\"", StringComparison.Ordinal));
         Assert(!health.Contains("discordProcessCount", StringComparison.OrdinalIgnoreCase));
@@ -3437,7 +3462,7 @@ static async Task ControllerConnectsDefaultScopeWithoutLaunchingClosedTargetProc
     }
 }
 
-static async Task ControllerRefreshesRunningDiscordAfterWireSockReadinessAsync()
+static async Task ControllerRefreshesRunningDiscordBeforeWireSockReadinessAsync()
 {
     var root = CreateTemporaryDirectory();
     var process = new FakeManagedProcess();
@@ -3451,10 +3476,16 @@ static async Task ControllerRefreshesRunningDiscordAfterWireSockReadinessAsync()
             1,
             [Path.Combine(root, "Discord", "app-1.0.9999", "Discord.exe")],
             [100]));
+    var readinessCaptureCount = 0;
     var readinessProbe = new ObservingTunnelReadinessProbe(() =>
     {
-        Assert(targetProcessManager.RestartCount == 0);
-        Assert(targetProcessManager.VerifyReadyCount == 0);
+        readinessCaptureCount++;
+        if (readinessCaptureCount > 1)
+        {
+            Assert(targetProcessManager.RestartCount == 1);
+            Assert(targetProcessManager.VerifyReadyCount == 1);
+        }
+
         return TunnelReadinessSnapshot.Ready(
             "Up",
             512,
@@ -3482,7 +3513,7 @@ static async Task ControllerRefreshesRunningDiscordAfterWireSockReadinessAsync()
         await controller.ConnectAsync();
 
         Assert(controller.Snapshot.State == TunnelState.Connected);
-        Assert(readinessProbe.CaptureCount == 2);
+        Assert(readinessProbe.CaptureCount >= 2);
         Assert(targetProcessManager.RestartCount == 1);
         Assert(targetProcessManager.VerifyReadyCount == 1);
         var details = controller.CreateDiagnosticDetails();
@@ -3600,7 +3631,14 @@ static async Task ControllerConnectsEveryBuiltInPresetWithoutLaunchingTargetsAsy
 
             await controller.ConnectAsync();
 
-            Assert(controller.Snapshot.State == TunnelState.Connected);
+            if (target.Id.Equals(TargetIds.Discord, StringComparison.OrdinalIgnoreCase))
+            {
+                Assert(controller.Snapshot.State == TunnelState.DiscordRestartRequired);
+            }
+            else
+            {
+                Assert(controller.Snapshot.State == TunnelState.Connected);
+            }
             Assert(targetProcessManager.RestartCount == 0);
             Assert(targetProcessManager.VerifyReadyCount == 0);
             Assert(targetProcessManager.CloseCount == 0);
@@ -3672,6 +3710,11 @@ static async Task ControllerLocksTargetScopeWhileConnectedAsync()
 {
     var root = CreateTemporaryDirectory();
     var accessLock = new FakeDiscordAccessLock();
+    var targetProcessManager = new FakeDiscordProcessManager(
+        new DiscordProcessSnapshot(
+            1,
+            [Path.Combine(root, "Discord", "app-1.0.9999", "Discord.exe")],
+            [100]));
     var profileProvisioner = new FakeProfileProvisioner(
         Path.Combine(root, "discord.conf"));
     var controller = new DiscordTunnelController(
@@ -3683,14 +3726,16 @@ static async Task ControllerLocksTargetScopeWhileConnectedAsync()
             "bin",
             WireSockPackage.CliExecutableFileName)),
         profileProvisioner,
-        new FakeProcessLauncher(new FakeManagedProcess()),
+        new FakeProcessLauncher(new FakeManagedProcess(), "Connection established"),
         TimeSpan.Zero,
-        accessLock);
+        accessLock,
+        discordProcessManager: targetProcessManager);
 
     try
     {
         await controller.ConnectAsync();
         Assert(controller.Snapshot.State == TunnelState.Connected);
+        Assert(targetProcessManager.RestartCount == 1);
         Assert(accessLock.LastIncludeBrowserAccess == false);
         Assert(profileProvisioner.LastAllowedApplications.Any(app =>
             app.Equals("Discord.exe", StringComparison.OrdinalIgnoreCase)));
@@ -4045,6 +4090,84 @@ static async Task ControllerRejectsAppWebTargetWhenOnlyScopedWebProxyProofExists
     }
 }
 
+static async Task ControllerRefreshesRunningDiscordBeforeAppTunnelProofAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var process = new FakeManagedProcess();
+    var accessLock = new FakeDiscordAccessLock();
+    var paths = new AppPaths(root);
+    var diagnostics = new AstralDiagnostics(
+        paths,
+        TimeSpan.Zero);
+    var discordManager = new FakeDiscordProcessManager(
+        new DiscordProcessSnapshot(
+            1,
+            [Path.Combine(root, "Discord", "app-1.0.9999", "Discord.exe")],
+            [100]));
+    var readinessProbe = new ObservingTunnelReadinessProbe(() =>
+        discordManager.RestartCount > 0
+            ? TunnelReadinessSnapshot.Ready(
+                "Up",
+                128,
+                512,
+                "wt0",
+                "WireGuard Tunnel")
+            : TunnelReadinessSnapshot.Ready(
+                "Up",
+                128,
+                256,
+                "wt0",
+                "WireGuard Tunnel"));
+    var webProxy = new FakeScopedWebProxyService
+    {
+        Proof = ScopedWebProxyProof.Verified(
+            "discord.com",
+            18088,
+            "Fake scoped web proxy target proof succeeded.")
+    };
+    var controller = new DiscordTunnelController(
+        paths,
+        new DiscordAppScope(root, root, root),
+        new FakeWireSockBootstrapper(Path.Combine(
+            root,
+            "WireSock VPN Client",
+            "bin",
+            WireSockPackage.CliExecutableFileName)),
+        new FakeProfileProvisioner(Path.Combine(root, "discord.conf")),
+        new FakeProcessLauncher(process, "WireSock started"),
+        TimeSpan.Zero,
+        accessLock,
+        diagnostics,
+        discordManager,
+        readinessProbe,
+        tunnelReadinessRetryDelay: TimeSpan.Zero,
+        webProxyService: webProxy);
+    controller.TrySetTargetSelection(new TargetSelection([TargetIds.Discord]));
+
+    try
+    {
+        await controller.ConnectAsync();
+
+        Assert(controller.Snapshot.State == TunnelState.Connected);
+        Assert(discordManager.RestartCount == 1);
+        Assert(discordManager.VerifyReadyCount == 1);
+        Assert(!process.HasExited);
+
+        var details = controller.CreateDiagnosticDetails();
+        Assert(details["targetLaunchPolicy"] == "refreshed-running-discord");
+        Assert(details["targetProcessRefresh.refreshed"] == "True");
+        Assert(details["webProxyProof.verified"] == "True");
+        Assert(details["applicationTunnelProofRequired"] == "True");
+        Assert(details["wireSockTrafficDeltaObserved"] == "True");
+        Assert(details["wireSockTrafficDeltaBytesSent"] == "256");
+    }
+    finally
+    {
+        await controller.DisposeAsync();
+        Directory.Delete(root, recursive: true);
+    }
+}
+
 static async Task ControllerAcceptsAppWebTargetWithTrafficProofAsync()
 {
     var root = CreateTemporaryDirectory();
@@ -4070,6 +4193,12 @@ static async Task ControllerAcceptsAppWebTargetWithTrafficProofAsync()
             "Up",
             128,
             512,
+            "wt0",
+            "WireGuard Tunnel"),
+        TunnelReadinessSnapshot.Ready(
+            "Up",
+            128,
+            768,
             "wt0",
             "WireGuard Tunnel"));
     var webProxy = new FakeScopedWebProxyService
@@ -4323,7 +4452,7 @@ static async Task ControllerRetriesDelayedWireSockAdapterAsync()
         await controller.ConnectAsync();
 
         Assert(controller.Snapshot.State == TunnelState.Connected);
-        Assert(readinessProbe.CaptureCount == 2);
+        Assert(readinessProbe.CaptureCount >= 2);
 
         var details = controller.CreateDiagnosticDetails();
         Assert(details["tunnelReadiness"] == "ready");
