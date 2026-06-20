@@ -1,6 +1,6 @@
 # Astral Release ve Tag Denetimi
 
-Son denetim: 2026-06-19
+Son denetim: 2026-06-20
 Son cleanup: 2026-06-14
 
 Bu doküman, GitHub Releases yüzeyindeki sürüm kararlarını ve yayın kapısını kısa biçimde tutar. Release/tag/asset silme veya `--cleanup-tag` kullanımı yıkıcı işlem sayılır; yalnız açık cleanup onayıyla yapılır.
@@ -16,7 +16,7 @@ Bu doküman, GitHub Releases yüzeyindeki sürüm kararlarını ve yayın kapıs
 
 ## Güncel Sürüm Kararı
 
-Güncel patch hedef `v2.2.30` olarak belirlendi.
+Güncel yayın `v2.2.30` olarak doğrulandı.
 
 Neden `v2.2.30`?
 
@@ -39,11 +39,11 @@ Neden `v2.2.30`?
 
 | Release | Canlı durum | Asset durumu | Karar | Gerekçe |
 | --- | --- | --- | --- | --- |
-| `v2.2.30` | Aday | Bekleniyor | Yayına hazırsa oluştur | App+web yanlış bağlı pozitifinin kapatılması, Discord dışı app hedeflerinin target-specific proof kapısı, cleanup doğrulama kapısı ve 2.2.30 sürüm hizalaması. |
-| `v2.2.29` | Aday | Bekleniyor | v2.2.30 ile üstlen | Üretim Discord process yenileme, cleanup timeout dayanıklılığı ve 2.2.29 sürüm hizalaması. |
+| `v2.2.30` | Yayında | 4 asset | Güncel | App+web yanlış bağlı pozitifinin kapatılması, Discord dışı app hedeflerinin target-specific proof kapısı, cleanup doğrulama kapısı ve 2.2.30 sürüm hizalaması. |
+| `v2.2.29` | Aday | Yerine geçti | v2.2.30 ile üstlen | Üretim Discord process yenileme, cleanup timeout dayanıklılığı ve 2.2.29 sürüm hizalaması. |
 | `v2.2.28` | Yayında | 4 asset | v2.2.30 ile üstlen | App/web kanıt ayrımı, hedef testi özeti, tanılama netliği, video görünürlüğü ve 2.2.28 sürüm hizalaması. |
 | `v2.2.27` | Yayında | 4 asset | v2.2.28 ile üstlen | Video görünürlüğü, hedef testi rozetleri, hedef açma gecikmesi, app hedef kanıtı ve 2.2.27 sürüm hizalaması. |
-| `v2.2.26` | Aday | Bekleniyor | v2.2.27 ile üstlen | Yeni arka plan video paketi, Roblox preset temizliği, hedef linkleri, Astral VPN ürün yüzeyi ve hedef listeli proof kapısı. |
+| `v2.2.26` | Aday | Yerine geçti | v2.2.27 ile üstlen | Yeni arka plan video paketi, Roblox preset temizliği, hedef linkleri, Astral VPN ürün yüzeyi ve hedef listeli proof kapısı. |
 | `v2.2.25` | Yayında | 4 asset | v2.2.26 ile üstlen | Doğru video paketini yayınladı; aktif hedef listesinde kalan Roblox izleri v2.2.26 ile temizlenir. |
 | `v2.2.24` | Yayında | 4 asset | v2.2.25 ile üstlen | Yayın asset'i yerel doğrulanan yeni video build'iyle eşleşmediği için aynı sürüm yerine v2.2.25 hotfix'iyle ilerlenir. |
 | `v2.2.23` | Yayında | 4 asset | Koru | Transparent mode için seçili her web hedefinde scoped WebProxy aktif hedef kanıtı, tanı alanları ve kısmi başarıyı bağlı saymama hotfix'i. |
@@ -74,7 +74,7 @@ Neden `v2.2.30`?
 
 ## Yayın Kapısı
 
-`v2.2.30` yayınından önce tamamlanması gereken koşullar:
+`v2.2.30` yayını için doğrulanan koşullar:
 
 - Proje, updater ve web proxy sürümü `2.2.30` ile aynı.
 - `src/Astral.App/app.manifest` kimlik sürümü proje sürümüyle aynı.
