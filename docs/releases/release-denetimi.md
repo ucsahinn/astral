@@ -28,8 +28,8 @@ Neden `v2.2.30`?
 - v2.2.29, v2.2.28 üzerinde kalan üretim Discord process yenileme ve kapanış temizliği timeout sorunlarını düzeltir.
 - v2.2.30, v2.2.29 üzerinde kalan app+web yanlış bağlı pozitifini kapatır; scoped web proxy kanıtı artık uygulama tünel kanıtı yerine geçmez, Discord dışı app hedefleri target-specific proof olmadan tam bağlı sayılmaz ve Discord sonradan açıldığında aktif tünelde `Kontrol Et` ile yeniden kanıt toplanır.
 - v2.2.21 tanı paketleri WireSock sürecinin ve Astral.WebProxy/PAC kapsamının başladığını, ancak transparent modda sanal adapter `Down` kaldığı için pasif readiness kapısının bağlantıyı yanlış başarısız saydığını gösterdi.
-- WireSock transparent mode sanal adapter `Up` kanıtına bağlı değildir; web hedefleri için doğru aktif kanıt, yalnız `Astral.WebProxy.exe` üzerinden seçili hedef hostlarına yapılan scoped `CONNECT` denemesidir.
-- v2.2.23, PAC uygulandıktan sonra seçili her web hedefi için scoped WebProxy kanıtı alır ve bu kanıtı transparent readiness kararına dahil eder.
+- Eski transparent-mode hotfixlerinde sanal adapter `Up` kanıtına bağlı kalmama kararı kullanıldı; v2.2.30'dan itibaren WireSock `run -lac` ile scoped sanal ağ arayüzü modunda başlatılır ve web hedefleri için doğru aktif kanıt, yalnız `Astral.WebProxy.exe` üzerinden seçili hedef hostlarına yapılan scoped `CONNECT` denemesidir.
+- v2.2.30, PAC uygulandıktan sonra seçili her web hedefi için scoped WebProxy kanıtı alır; app hedefleri için ise ayrıca WireSock handshake veya adapter trafik kanıtı ister.
 - Tarayıcı executable'ları yine WireSock `AllowedApps` içine girmez; proof trafiği yalnız `Astral.WebProxy.exe` sürecinden çıkar.
 - v2.2.21 yayınlandığı için bu bağlantı doğrulama düzeltmesi ayrı `v2.2.22` hotfix sürümü olarak çıkarılır; böylece 2.2.21 kullanıcıları otomatik güncelleme görür.
 - v2.2.22 yayınlandıktan sonra tek başarılı hostun yeterli olması daraltıldı; `v2.2.23` tüm seçili web hedefleri için hedef bazlı kanıt ister.
@@ -84,6 +84,7 @@ Neden `v2.2.30`?
 - Astral release içinde eski isimli uyumluluk ZIP'i yayınlanmaz.
 - Kod imzalama sertifikası yapılandırılmadıysa paket imzasız olduğu açıkça not edilir.
 - `dotnet build`, Core tests, Windows tests, `scripts/verify.ps1`, `scripts/build-release.ps1`, `git diff --check` ve Gitleaks geçer.
+- Discord app kapsamı için yönetici PowerShell'de `scripts\smoke-live-connect.ps1 -TargetIds discord -RequireTargetActionRecheck` çalışır; `TargetActionRequired`, hedef process açılma, `Kontrol Et` recheck'i ve tam web+app kanıtı rapora geçer.
 - GitHub Release assetleri ve SHA-256 dosyaları yayınlandıktan sonra erişilebilir olarak doğrulanır.
 
 ## Eski İstemci Geçişi

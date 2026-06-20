@@ -3,7 +3,10 @@ param(
     [string]$ExePath,
     [int]$TimeoutSeconds = 90,
     [string]$OutputPath,
-    [string[]]$TargetIds = @('discord')
+    [string[]]$TargetIds = @('discord'),
+    [switch]$ManualTargetActionRecheck,
+    [switch]$RequireTargetActionRecheck,
+    [int]$ManualTargetActionTimeoutSeconds = 120
 )
 
 $ErrorActionPreference = 'Stop'
@@ -31,6 +34,9 @@ if ($normalizedTargetIds.Count -eq 0) {
     throw 'Canli smoke testi icin en az bir hedef secilmelidir.'
 }
 
+$manualTargetActionRecheckEnabled =
+    [bool]$ManualTargetActionRecheck -or [bool]$RequireTargetActionRecheck
+
 $settingsPath = Join-Path $env:LOCALAPPDATA 'Astral\settings.json'
 $profilePath = Join-Path $env:ProgramData 'Astral\profiles\discord.conf'
 $logPath = Join-Path $env:LOCALAPPDATA 'Astral\logs\tunnel.log'
@@ -55,6 +61,18 @@ $targetAppPatterns = @{
         'IMVUClient\.exe',
         'IMVU\.exe'
     )
+}
+$targetProcessNames = @{
+    'discord' = @(
+        'Discord',
+        'DiscordPTB',
+        'DiscordCanary',
+        'DiscordDevelopment'
+    )
+    'azar' = @('Azar')
+    'tango' = @('Tango')
+    'livu' = @('LiVU', 'Livu')
+    'imvu' = @('IMVUClient', 'IMVU')
 }
 $targetLockProbeDomains = @{
     'discord' = @('discord.com', 'discord.gg')
@@ -206,6 +224,28 @@ function Test-Tcp443 {
     }
 }
 
+$script:LastTcp443SuccessHost = ''
+$script:LastTcp443FailedHosts = ''
+
+function Test-AnyTcp443 {
+    param([string[]]$HostNames)
+
+    $failedHosts = New-Object System.Collections.Generic.List[string]
+    foreach ($hostName in $HostNames) {
+        if (Test-Tcp443 $hostName) {
+            $script:LastTcp443SuccessHost = $hostName
+            $script:LastTcp443FailedHosts = ($failedHosts -join ',')
+            return $true
+        }
+
+        [void]$failedHosts.Add($hostName)
+    }
+
+    $script:LastTcp443SuccessHost = ''
+    $script:LastTcp443FailedHosts = ($failedHosts -join ',')
+    return $false
+}
+
 function Test-AllowedAppsPattern {
     param(
         [string]$AllowedAppsText,
@@ -243,6 +283,85 @@ function Get-UnexpectedAppPatternSummary {
     }
 
     return @($unexpected)
+}
+
+function Get-SelectedApplicationProcessStatus {
+    $required = New-Object System.Collections.Generic.List[string]
+    $running = New-Object System.Collections.Generic.List[string]
+    $missing = New-Object System.Collections.Generic.List[string]
+    $processKeys = New-Object System.Collections.Generic.List[string]
+
+    foreach ($targetId in $normalizedTargetIds) {
+        if (-not $targetProcessNames.ContainsKey($targetId)) {
+            continue
+        }
+
+        $names = @($targetProcessNames[$targetId])
+        [void]$required.Add($targetId + '=' + ($names -join '|'))
+        $foundNames = New-Object System.Collections.Generic.List[string]
+        foreach ($name in $names) {
+            $processes = @(
+                Get-Process -Name $name -ErrorAction SilentlyContinue
+            )
+            if ($processes.Count -eq 0) {
+                continue
+            }
+
+            [void]$foundNames.Add($name)
+            foreach ($process in $processes) {
+                $startTicks = 'unknown'
+                try {
+                    $startTicks = [string]$process.StartTime.ToUniversalTime().Ticks
+                }
+                catch {
+                }
+
+                [void]$processKeys.Add(
+                    ('{0}={1}:{2}:{3}' -f `
+                        $targetId,
+                        $process.ProcessName,
+                        $process.Id,
+                        $startTicks))
+            }
+        }
+
+        if ($foundNames.Count -gt 0) {
+            [void]$running.Add($targetId + '=' + ($foundNames -join '|'))
+        }
+        else {
+            [void]$missing.Add($targetId + '=' + ($names -join '|'))
+        }
+    }
+
+    return [pscustomobject]@{
+        RequiredCount = $required.Count
+        RequiredSummary = ($required -join ',')
+        RunningSummary = ($running -join ',')
+        MissingSummary = ($missing -join ',')
+        ProcessKeys = @($processKeys)
+        ProcessKeysSummary = ($processKeys -join ',')
+        AllRequiredRunning = $missing.Count -eq 0
+    }
+}
+
+function Copy-SelectedApplicationProcessStatus {
+    param([object]$Status)
+
+    if ($null -eq $Status) {
+        $Status = Get-SelectedApplicationProcessStatus
+    }
+
+    $result.SelectedTargetProcessRequired =
+        [int]$Status.RequiredCount -gt 0
+    $result.SelectedTargetProcessRequiredNames =
+        [string]$Status.RequiredSummary
+    $result.SelectedTargetProcessRunningNames =
+        [string]$Status.RunningSummary
+    $result.SelectedTargetProcessMissingNames =
+        [string]$Status.MissingSummary
+    $result.SelectedTargetProcessKeys =
+        [string]$Status.ProcessKeysSummary
+    return [bool]$Status.AllRequiredRunning
 }
 
 function Set-AstralTargetSelection {
@@ -448,6 +567,7 @@ function Copy-HealthResult {
             [bool]$result.HealthWebProxyProofHasNoFailedTargets
         )
     $adapterReady =
+        $result.HealthWireSockMode -eq 'virtual-adapter' -and
         $result.HealthTunnelReadiness -eq 'ready' -and
         $result.HealthWireSockAdapterDetected -eq 'True' -and
         $result.HealthWireSockAdapterUp -eq 'True' -and
@@ -461,21 +581,87 @@ function Copy-HealthResult {
     $result.HealthHasRequiredApplicationProof =
         (-not $requiresApplicationTunnelProof) -or
         $applicationProofReady
-    $transparentReady =
-        $result.HealthTunnelReadiness -eq 'transparent-process-running' -and
-        $result.HealthWireSockMode -eq 'transparent' -and
+    $result.HealthTunnelReady = $adapterReady
+}
+
+function Test-HealthTargetActionRequired {
+    param([object]$Health)
+
+    if ($null -eq $Health) {
+        return $false
+    }
+
+    $status = ([string]$Health.status).ToLowerInvariant()
+    $manualActionRequired = ''
+    $operation = ''
+    $proofRequired = ''
+    $proofEnforced = ''
+    if ($null -ne $Health.details) {
+        $manualActionRequired =
+            [string]$Health.details.'targetProcessRefresh.manualActionRequired'
+        $operation = [string]$Health.details.operation
+        $proofRequired =
+            [string]$Health.details.applicationTunnelProofRequired
+        $proofEnforced =
+            [string]$Health.details.applicationTunnelProofEnforced
+    }
+
+    return $manualActionRequired -eq 'True' -or
+        ($status.Contains('hedef') -and $status.Contains('aksiyon')) -or
         (
-            (
-                $requiresApplicationTunnelProof -and
-                $applicationProofReady
-            ) -or
-            (
-                (-not $requiresApplicationTunnelProof) -and
-                $result.HealthWebProxyProofVerified -eq 'True'
-            )
-        ) -and
-        $result.HealthWireSockProcessExited -ne 'True'
-    $result.HealthTunnelReady = $adapterReady -or $transparentReady
+            $operation -eq 'target-action-recheck' -and
+            $proofRequired -eq 'True' -and
+            $proofEnforced -eq 'False'
+        )
+}
+
+function Wait-AstralHealthState {
+    param(
+        [int]$ProcessId,
+        [datetime]$NotBefore,
+        [int]$Seconds,
+        [bool]$AllowTargetActionRequired,
+        [bool]$StrictNotBefore = $false
+    )
+
+    return Wait-Until {
+        $script:currentHealth = Get-CurrentHealth `
+            -ProcessId $ProcessId `
+            -NotBefore $NotBefore
+        if ($null -eq $script:currentHealth) {
+            return $false
+        }
+
+        if ($StrictNotBefore) {
+            [DateTimeOffset]$strictGeneratedAt = [DateTimeOffset]::MinValue
+            if (-not [DateTimeOffset]::TryParse(
+                    [string]$script:currentHealth.generatedAt,
+                    [ref]$strictGeneratedAt)) {
+                return $false
+            }
+
+            if ($strictGeneratedAt.LocalDateTime -lt $NotBefore) {
+                return $false
+            }
+        }
+
+        Copy-HealthResult -Health $script:currentHealth
+        if (
+            [bool]$result.HealthTunnelReady -and
+            [bool]$result.HealthHasRequiredWebProxyProof
+        ) {
+            return $true
+        }
+
+        if (
+            $AllowTargetActionRequired -and
+            (Test-HealthTargetActionRequired -Health $script:currentHealth)
+        ) {
+            return $true
+        }
+
+        return [string]$script:currentHealth.status -eq 'hata'
+    } $Seconds
 }
 
 function Stop-AstralProcess {
@@ -592,6 +778,41 @@ function Find-AstralToggleForProcess {
         $condition)
 }
 
+function Find-AstralTargetTestButton {
+    param([System.Windows.Automation.AutomationElement]$Window)
+
+    $automationIdCondition = [System.Windows.Automation.PropertyCondition]::new(
+        [System.Windows.Automation.AutomationElement]::AutomationIdProperty,
+        'TargetTestButton')
+    $button = $Window.FindFirst(
+        [System.Windows.Automation.TreeScope]::Descendants,
+        $automationIdCondition)
+
+    if ($null -ne $button) {
+        return $button
+    }
+
+    return $null
+}
+
+function Find-AstralTargetTestButtonForProcess {
+    param([int]$ProcessId)
+
+    $processCondition = [System.Windows.Automation.PropertyCondition]::new(
+        [System.Windows.Automation.AutomationElement]::ProcessIdProperty,
+        $ProcessId)
+    $automationIdCondition = [System.Windows.Automation.PropertyCondition]::new(
+        [System.Windows.Automation.AutomationElement]::AutomationIdProperty,
+        'TargetTestButton')
+    $condition = [System.Windows.Automation.AndCondition]::new(
+        $processCondition,
+        $automationIdCondition)
+
+    return [System.Windows.Automation.AutomationElement]::RootElement.FindFirst(
+        [System.Windows.Automation.TreeScope]::Descendants,
+        $condition)
+}
+
 function Invoke-PrimaryWindowClick {
     param([System.Windows.Automation.AutomationElement]$Window)
 
@@ -681,6 +902,38 @@ function Invoke-AstralToggle {
     Invoke-AutomationElementClick -Element $button
 }
 
+function Invoke-AstralTargetTest {
+    param([System.Windows.Automation.AutomationElement]$Window)
+
+    $button = $null
+    $script:targetTestButton = $null
+    [void](Wait-Until {
+        $script:targetTestButton = Find-AstralTargetTestButton -Window $Window
+        $null -ne $script:targetTestButton -and
+            $script:targetTestButton.Current.IsEnabled
+    } 20)
+    $button = $script:targetTestButton
+
+    if ($null -eq $button) {
+        $processId = [int]$Window.Current.ProcessId
+        $script:targetTestButton = $null
+        [void](Wait-Until {
+            $script:targetTestButton =
+                Find-AstralTargetTestButtonForProcess -ProcessId $processId
+            $null -ne $script:targetTestButton -and
+                $script:targetTestButton.Current.IsEnabled
+        } 20)
+        $button = $script:targetTestButton
+    }
+
+    if ($null -eq $button) {
+        return $false
+    }
+
+    Invoke-AutomationElementClick -Element $button
+    return $true
+}
+
 if (-not (Test-IsAdministrator)) {
     throw 'Bu script Windows yoneticisi olarak calistirilmalidir.'
 }
@@ -760,15 +1013,40 @@ $result = [ordered]@{
     HealthHasRequiredWebProxyProof = -not $requiresWebProxy
     HealthHasRequiredApplicationProof = -not $requiresApplicationTunnelProof
     HealthTunnelReady = $false
+    ManualTargetActionRecheckEnabled = [bool]$manualTargetActionRecheckEnabled
+    RequireTargetActionRecheck = [bool]$RequireTargetActionRecheck
+    ManualTargetActionTimeoutSeconds = $ManualTargetActionTimeoutSeconds
+    SelectedTargetProcessRequired = $requiresApplicationTunnelProof
+    SelectedTargetProcessRequiredNames = ''
+    SelectedTargetProcessRunningNames = ''
+    SelectedTargetProcessMissingNames = ''
+    SelectedTargetProcessKeys = ''
+    InitialSelectedTargetProcessRunning = -not $requiresApplicationTunnelProof
+    InitialSelectedTargetProcessWasClosed = -not $requiresApplicationTunnelProof
+    InitialSelectedTargetProcessKeys = ''
+    TargetActionRequiredDetected = $false
+    TargetActionProcessSeenBeforeRecheck = -not $requiresApplicationTunnelProof
+    TargetActionNewProcessDetected = -not $requiresApplicationTunnelProof
+    TargetActionNewProcessKeys = ''
+    TargetActionRecheckButtonFound = $false
+    TargetActionRecheckClicked = $false
+    TargetActionRecheckHealthFresh = $false
+    TargetActionRecheckPassed = $false
+    TargetActionRecheckStatus = ''
     HostsLockRemovedWhileConnected = $false
     FirewallRuleDisabledWhileConnected = $false
     DirectDiscordTcp443WhileConnected = $false
     DirectNonTargetTcp443WhileConnected = $false
+    DirectNonTargetTcp443Host = ''
+    DirectNonTargetTcp443FailedHosts = ''
     ProfileRequiresDiscord = $requiresDiscord
     ProfileRequiresWebProxy = $requiresWebProxy
     ProfileHasPlainAllowedApps = $false
     ProfileHasPrefixedAllowedApps = $false
     ProfileUsesDirectAllowedApps = $false
+    ProfileAllowedAppsDirectiveCount = 0
+    ProfileActiveAllowedAppsDirectiveCount = 0
+    ProfilePrefixedAllowedAppsDirectiveCount = 0
     ProfileHasDiscord = $false
     ProfileHasDiscordFullPath = $false
     ProfileHasRequiredDiscord = -not $requiresDiscord
@@ -804,6 +1082,14 @@ try {
     try {
         Set-AstralTargetSelection
         $result.TargetSelectionPrepared = $true
+        $initialProcessStatus = Get-SelectedApplicationProcessStatus
+        $result.InitialSelectedTargetProcessRunning =
+            Copy-SelectedApplicationProcessStatus -Status $initialProcessStatus
+        $result.InitialSelectedTargetProcessWasClosed =
+            -not [bool]$result.InitialSelectedTargetProcessRunning
+        $result.InitialSelectedTargetProcessKeys =
+            [string]$initialProcessStatus.ProcessKeysSummary
+        $initialTargetProcessKeys = @($initialProcessStatus.ProcessKeys)
 
         $appProcess = Start-Process `
             -FilePath $ExePath `
@@ -853,32 +1139,50 @@ try {
         $result.HostsLockRemovedWhileConnected = -not (Test-AstralHostsLock)
         $result.FirewallRuleDisabledWhileConnected =
             (Get-AstralRuleEnabled) -eq 'False'
-        $result.DirectDiscordTcp443WhileConnected = Test-Tcp443 'discord.com'
-        $result.DirectNonTargetTcp443WhileConnected = Test-Tcp443 'www.microsoft.com'
 
         if (Test-Path -LiteralPath $profilePath) {
-            $allowedAppsLine = Select-String `
+            $allowedAppsMatches = @(
+                Select-String `
                 -Path $profilePath `
-                -Pattern '^(?:#@ws:)?AllowedApps\s*=' |
-                Select-Object -First 1
-            $allowedAppsText = [string]$allowedAppsLine.Line
+                    -Pattern '^\s*(?:#@ws:)?AllowedApps\s*='
+            )
+            $allowedAppsLines = @(
+                $allowedAppsMatches |
+                    ForEach-Object { [string]$_.Line }
+            )
+            $activeAllowedAppsLines = @(
+                $allowedAppsLines |
+                    Where-Object { $_ -match '^\s*AllowedApps\s*=' }
+            )
+            $prefixedAllowedAppsLines = @(
+                $allowedAppsLines |
+                    Where-Object { $_ -match '^\s*#@ws:AllowedApps\s*=' }
+            )
+            $allowedAppsText = ($activeAllowedAppsLines -join ',')
+            $allAllowedAppsText = ($allowedAppsLines -join ',')
+            $result.ProfileAllowedAppsDirectiveCount =
+                $allowedAppsLines.Count
+            $result.ProfileActiveAllowedAppsDirectiveCount =
+                $activeAllowedAppsLines.Count
+            $result.ProfilePrefixedAllowedAppsDirectiveCount =
+                $prefixedAllowedAppsLines.Count
             $result.ProfileHasPlainAllowedApps =
-                $allowedAppsText -match '^AllowedApps\s*='
+                $activeAllowedAppsLines.Count -gt 0
             $result.ProfileHasPrefixedAllowedApps =
-                $allowedAppsText -match '^#@ws:AllowedApps\s*='
+                $prefixedAllowedAppsLines.Count -gt 0
             $result.ProfileUsesDirectAllowedApps =
-                [bool]$result.ProfileHasPlainAllowedApps -and
-                -not [bool]$result.ProfileHasPrefixedAllowedApps
+                $activeAllowedAppsLines.Count -eq 1 -and
+                $prefixedAllowedAppsLines.Count -eq 0
             $result.ProfileHasDiscord =
-                $allowedAppsText -match 'Discord\.exe'
+                $allAllowedAppsText -match 'Discord\.exe'
             $result.ProfileHasDiscordFullPath =
-                $allowedAppsText -match '\\Discord(?:PTB|Canary|Development)?\\app-[^,\\]+\\Discord(?:PTB|Canary|Development)?\.exe'
+                $allAllowedAppsText -match '\\Discord(?:PTB|Canary|Development)?\\app-[^,\\]+\\Discord(?:PTB|Canary|Development)?\.exe'
             $result.ProfileHasRequiredDiscord =
                 (-not $requiresDiscord) -or [bool]$result.ProfileHasDiscord
             $result.ProfileHasRequiredDiscordFullPath =
                 (-not $requiresDiscord) -or [bool]$result.ProfileHasDiscordFullPath
             $result.ProfileHasWebProxy =
-                $allowedAppsText -match 'Astral\.WebProxy\.exe'
+                $allAllowedAppsText -match 'Astral\.WebProxy\.exe'
             $result.ProfileHasRequiredWebProxy =
                 (-not $requiresWebProxy) -or [bool]$result.ProfileHasWebProxy
             $expectedAppPatterns = @(Get-ExpectedAppPatternSummary)
@@ -907,7 +1211,7 @@ try {
                         else {
                             $pattern = $targetAndPattern.Substring($separatorIndex + 1)
                             Test-AllowedAppsPattern `
-                                -AllowedAppsText $allowedAppsText `
+                                -AllowedAppsText $allAllowedAppsText `
                                 -Pattern $pattern
                         }
                     }
@@ -917,9 +1221,9 @@ try {
             $result.ProfileHasOnlySelectedTargetApps =
                 $unexpectedAppPatterns.Count -eq 0
             $result.ProfileHasBrowserProcess =
-                $allowedAppsText -match '(?:^|[,=\s"])(?:chrome|msedge|firefox|brave|opera|vivaldi)\.exe(?:[,="\s]|$)'
+                $allAllowedAppsText -match '(?:^|[,=\s"])(?:chrome|msedge|firefox|brave|opera|vivaldi)\.exe(?:[,="\s]|$)'
             $result.ProfileHasBrowserFullPath =
-                $allowedAppsText -match '\\(?:BraveSoftware\\Brave-Browser\\Application\\brave|Google\\Chrome\\Application\\chrome|Microsoft\\Edge\\Application\\msedge|Mozilla Firefox\\firefox|Opera\\opera|Programs\\Opera\\opera|Programs\\Opera GX\\opera|Vivaldi\\Application\\vivaldi)\.exe'
+                $allAllowedAppsText -match '\\(?:BraveSoftware\\Brave-Browser\\Application\\brave|Google\\Chrome\\Application\\chrome|Microsoft\\Edge\\Application\\msedge|Mozilla Firefox\\firefox|Opera\\opera|Programs\\Opera\\opera|Programs\\Opera GX\\opera|Vivaldi\\Application\\vivaldi)\.exe'
             $result.ProfileExcludesBrowserProcess =
                 -not [bool]$result.ProfileHasBrowserProcess
             $result.ProfileExcludesBrowserFullPath =
@@ -933,24 +1237,97 @@ try {
             $newLogText -match 'Wire[Gg]uard tunnel has been started\.'
 
         $currentHealth = $null
-        $result.HealthFresh = Wait-Until {
-            $script:currentHealth = Get-CurrentHealth `
-                -ProcessId $appProcess.Id `
-                -NotBefore $startedAt
-            if ($null -eq $script:currentHealth) {
-                return $false
-            }
-
-            Copy-HealthResult -Health $script:currentHealth
-            return (
-                    [bool]$result.HealthTunnelReady -and
-                    [bool]$result.HealthHasRequiredWebProxyProof
-                ) -or
-                [string]$script:currentHealth.status -eq 'hata'
-        } $TimeoutSeconds
+        $result.HealthFresh = Wait-AstralHealthState `
+            -ProcessId $appProcess.Id `
+            -NotBefore $startedAt `
+            -Seconds $TimeoutSeconds `
+            -AllowTargetActionRequired $manualTargetActionRecheckEnabled
         $health = $script:currentHealth
         if ($result.HealthFresh -and $null -ne $health) {
             Copy-HealthResult -Health $health
+        }
+        $result.TargetActionRequiredDetected =
+            Test-HealthTargetActionRequired -Health $health
+
+        if (
+            [bool]$result.TargetActionRequiredDetected -and
+            [bool]$manualTargetActionRecheckEnabled
+        ) {
+            Write-Host (
+                'Hedef aksiyonu gerekli. Secili hedef uygulamasini acin; ' +
+                'script Kontrol Et butonunu tetikleyecek.')
+
+            $result.TargetActionProcessSeenBeforeRecheck = Wait-Until {
+                $script:targetProcessStatus =
+                    Get-SelectedApplicationProcessStatus
+                $processReady = Copy-SelectedApplicationProcessStatus `
+                    -Status $script:targetProcessStatus
+                $currentTargetProcessKeys = @(
+                    $script:targetProcessStatus.ProcessKeys
+                )
+                $newTargetProcessKeys = @(
+                    $currentTargetProcessKeys |
+                        Where-Object {
+                            $initialTargetProcessKeys -notcontains $_
+                        }
+                )
+                $result.TargetActionNewProcessDetected =
+                    $newTargetProcessKeys.Count -gt 0
+                $result.TargetActionNewProcessKeys =
+                    ($newTargetProcessKeys -join ',')
+                if ([bool]$RequireTargetActionRecheck) {
+                    return [bool]$processReady -and
+                        [bool]$result.TargetActionNewProcessDetected
+                }
+
+                return [bool]$processReady
+            } $ManualTargetActionTimeoutSeconds
+
+            if ([bool]$result.TargetActionProcessSeenBeforeRecheck) {
+                $recheckStartedAt = Get-Date
+                $result.TargetActionRecheckButtonFound =
+                    Invoke-AstralTargetTest -Window $window
+                $result.TargetActionRecheckClicked =
+                    [bool]$result.TargetActionRecheckButtonFound
+
+                if ([bool]$result.TargetActionRecheckClicked) {
+                    $result.TargetActionRecheckHealthFresh =
+                        Wait-AstralHealthState `
+                            -ProcessId $appProcess.Id `
+                            -NotBefore $recheckStartedAt `
+                            -Seconds $TimeoutSeconds `
+                            -AllowTargetActionRequired $true `
+                            -StrictNotBefore $true
+                    $health = $script:currentHealth
+                    if ($result.TargetActionRecheckHealthFresh -and
+                        $null -ne $health) {
+                        Copy-HealthResult -Health $health
+                        $result.TargetActionRecheckStatus =
+                            [string]$health.status
+                    }
+
+                    $result.TargetActionRecheckPassed =
+                        [bool]$result.HealthTunnelReady -and
+                        [bool]$result.HealthHasRequiredWebProxyProof -and
+                        [bool]$result.HealthHasRequiredApplicationProof
+                }
+            }
+        }
+
+        if ($result.HealthFresh) {
+            $result.DirectDiscordTcp443WhileConnected =
+                Test-Tcp443 'discord.com'
+            $result.DirectNonTargetTcp443WhileConnected =
+                Wait-Until {
+                    Test-AnyTcp443 @(
+                        'www.microsoft.com',
+                        'example.com',
+                        'cloudflare.com')
+                } 15
+            $result.DirectNonTargetTcp443Host =
+                $script:LastTcp443SuccessHost
+            $result.DirectNonTargetTcp443FailedHosts =
+                $script:LastTcp443FailedHosts
         }
 
         if ($result.HealthTunnelReady) {
@@ -1026,6 +1403,19 @@ $criticalChecks = @(
     'FinalTargetLockRestored',
     'SettingsRestored'
 )
+
+if ([bool]$RequireTargetActionRecheck) {
+    $criticalChecks += @(
+        'InitialSelectedTargetProcessWasClosed',
+        'TargetActionRequiredDetected',
+        'TargetActionProcessSeenBeforeRecheck',
+        'TargetActionNewProcessDetected',
+        'TargetActionRecheckButtonFound',
+        'TargetActionRecheckClicked',
+        'TargetActionRecheckHealthFresh',
+        'TargetActionRecheckPassed'
+    )
+}
 
 $result.SmokePassed =
     (($criticalChecks | Where-Object { -not [bool]$result[$_] }).Count -eq 0) -and

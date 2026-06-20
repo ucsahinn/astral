@@ -9,7 +9,7 @@ Astral'ın güvenlik hedefi, seçili hedefler dışında kalan trafiği kapsam d
 - Web hedeflerinde yalnız `Astral.WebProxy.exe` WireSock kapsamına girer.
 - PAC kuralı seçili domainlerde PROXY, diğer tüm domainlerde DIRECT döndürür.
 - Eski ayarlarda kalan özel hedef alanları yeni sürümde route planına taşınmaz.
-- WireSock varsayılan transparent mode ile çalışır; sanal adaptör oluşturan sistem geneli routing davranışı varsayılan akış değildir.
+- WireSock `-lac` scoped sanal ağ arayüzü moduyla çalışır; `AllowedApps` kapsamı seçili uygulamalar ve gerektiğinde `Astral.WebProxy.exe` ile sınırlıdır.
 
 ## TLS ve İçerik
 

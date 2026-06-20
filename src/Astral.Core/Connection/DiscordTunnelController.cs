@@ -21,6 +21,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 {
     private const int MaxTunnelReadinessChecks = 60;
     private const int MinTransparentReadinessChecks = 4;
+    private const int MaxScopedWebProxyProofAttempts = 2;
     private const int MaxWireSockLogReadBytes = 64 * 1024;
     private const string WireSockTransparentMode = "transparent";
     private const string WireSockVirtualAdapterMode = "virtual-adapter";
@@ -84,7 +85,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
     private string? _lastWireSockProcessId;
     private bool? _lastWireSockProcessExited;
     private string? _lastWireSockProcessExitCode;
-    private string _lastWireSockMode = WireSockTransparentMode;
+    private string _lastWireSockMode = WireSockVirtualAdapterMode;
     private long _lastTunnelLogStartPosition;
     private IReadOnlyDictionary<string, string?> _lastRoutingSummary =
         new Dictionary<string, string?>();
@@ -432,7 +433,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     _lastWebProxyStatus.Message);
             }
 
-            _lastWebProxyProof = await _webProxyService.VerifyTargetAccessAsync(
+            _lastWebProxyProof = await VerifyScopedWebProxyTargetAccessWithRetryAsync(
                 routingPlan,
                 cancellationToken);
             if (_lastWebProxyProof.Required && !_lastWebProxyProof.IsVerified)
@@ -687,7 +688,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             _lastWireSockConnectionEstablished = false;
             _lastWireSockHandshakeDiagnostic =
                 "WireSock handshake has not been checked.";
-            _lastWireSockMode = WireSockTransparentMode;
+            _lastWireSockMode = WireSockVirtualAdapterMode;
             _lastWebProxyProof =
                 ScopedWebProxyProof.NotRequired("Web proxy target proof has not run.");
             _lastTargetProcessRefresh = TargetProcessRefreshResult.NotRun();
@@ -776,7 +777,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     _lastWebProxyStatus.Message);
             }
 
-            _lastWebProxyProof = await _webProxyService.VerifyTargetAccessAsync(
+            _lastWebProxyProof = await VerifyScopedWebProxyTargetAccessWithRetryAsync(
                 routingPlan,
                 cancellationToken);
             LogConnectPhase("web-proxy-proof");
@@ -1075,6 +1076,57 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         return refreshed;
     }
 
+    private async Task<ScopedWebProxyProof> VerifyScopedWebProxyTargetAccessWithRetryAsync(
+        RoutingPlan routingPlan,
+        CancellationToken cancellationToken)
+    {
+        ScopedWebProxyProof proof = ScopedWebProxyProof.NotRequired();
+        for (var attempt = 1; attempt <= MaxScopedWebProxyProofAttempts; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            proof = await _webProxyService.VerifyTargetAccessAsync(
+                routingPlan,
+                cancellationToken);
+
+            if (!proof.Required
+                || proof.IsVerified
+                || attempt == MaxScopedWebProxyProofAttempts)
+            {
+                return proof;
+            }
+
+            _lastWebProxyProof = proof;
+            _lastTunnelReadiness = _tunnelReadinessProbe.Capture();
+            CaptureWireSockProcessState();
+            _lastWireSockConnectionEstablished =
+                HasWireSockConnectionEstablished(_lastTunnelLogStartPosition);
+
+            var details = proof.ToDiagnosticDetails()
+                .ToDictionary(pair => pair.Key, pair => pair.Value);
+            details["attempt"] = attempt.ToString(CultureInfo.InvariantCulture);
+            details["maxAttempts"] =
+                MaxScopedWebProxyProofAttempts.ToString(CultureInfo.InvariantCulture);
+            foreach (var pair in CreateTunnelReadinessDetails())
+            {
+                details[$"warmup.{pair.Key}"] = pair.Value;
+            }
+
+            _diagnostics.Warning(
+                "webProxy.proof.retry",
+                "Scoped web proxy target proof failed; WireSock warm-up sonrasi tekrar denenecek.",
+                details);
+
+            if (_lastWireSockProcessExited == true)
+            {
+                return proof;
+            }
+
+            await Task.Delay(_tunnelReadinessRetryDelay, cancellationToken);
+        }
+
+        return proof;
+    }
+
     private async Task VerifyTunnelReadinessAsync(
         long tunnelLogStartPosition,
         bool enforceApplicationTunnelProof,
@@ -1263,6 +1315,46 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
         if (UsesVirtualAdapterMode())
         {
+            var routingPlan = CurrentRoutingPlan;
+            var planRequiresApplicationTunnelProof =
+                RoutingPlanRequiresApplicationTunnelProof(routingPlan);
+            var requiresApplicationTunnelProof =
+                enforceApplicationTunnelProof
+                && planRequiresApplicationTunnelProof;
+            if (!_lastTunnelReadiness.BlocksConnection
+                && HasWireSockTrafficDelta())
+            {
+                _lastWireSockHandshakeDiagnostic =
+                    _lastWebProxyProof.Required && _lastWebProxyProof.IsVerified
+                        ? "WireSock virtual adapter mode is running; adapter traffic plus scoped web proxy target proof confirmed app/web readiness."
+                        : "WireSock virtual adapter mode is running; adapter traffic increased after process start.";
+
+                return true;
+            }
+
+            if (!_lastTunnelReadiness.BlocksConnection
+                && _lastWebProxyProof.Required
+                && _lastWebProxyProof.IsVerified)
+            {
+                if (!requiresApplicationTunnelProof)
+                {
+                    _lastWireSockHandshakeDiagnostic =
+                        planRequiresApplicationTunnelProof
+                            ? "WireSock virtual adapter mode is running; scoped web proxy target proof confirmed web readiness while application proof remains pending."
+                            : "WireSock virtual adapter mode is running; scoped web proxy target proof confirmed web readiness.";
+
+                    return true;
+                }
+
+                _lastWireSockHandshakeDiagnostic =
+                    "Seçili uygulama hedefleri için uygulama tünel kanıtı alınamadı; scoped web proxy kanıtı yalnızca web rotalarını doğrular ve app bağlantısı yerine geçmez.";
+                return false;
+            }
+
+            _lastWireSockHandshakeDiagnostic =
+                _lastTunnelReadiness.BlocksConnection
+                    ? "WireSock virtual adapter is not ready."
+                    : "WireSock virtual adapter is ready but traffic proof has not increased yet.";
             return false;
         }
 
@@ -1534,6 +1626,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             "run",
             "-config",
             profilePath,
+            "-lac",
             "-log-level",
             "info"
         ]);
@@ -2258,7 +2351,15 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
         _wireSockProcess.Exited -= OnWireSockExited;
         var process = _wireSockProcess;
+        var processId = process.ProcessId.ToString(CultureInfo.InvariantCulture);
+        CaptureWireSockProcessState();
         await process.DisposeAsync();
+        _lastWireSockProcessId = processId;
+        _lastWireSockProcessExited = process.HasExited;
+        _lastWireSockProcessExitCode = process.HasExited
+            ? process.ExitCode?.ToString(CultureInfo.InvariantCulture)
+                ?? "unknown"
+            : null;
         _wireSockProcess = null;
         if (process.ExitConfirmed)
         {

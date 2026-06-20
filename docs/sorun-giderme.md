@@ -31,22 +31,24 @@ Kontrol edin:
 
 ## WireSock Hazırlığı Doğrulanamadı
 
-Astral WireSock'u varsayılan transparent mode ile başlatır. Bu modda sanal adaptörün `Up` görünmesi tek başına yeterli kanıt değildir. Bağlantı başarılı sayılmadan önce şu kanıtlardan biri aranır:
+Astral WireSock'u `-lac` scoped sanal ağ arayüzü moduyla başlatır. Bu modda WireSock sürecinin yaşıyor olması tek başına yeterli kanıt değildir. Bağlantı başarılı sayılmadan önce şu kanıtlar aranır:
 
 - WireSock logunda tünelin başladığını gösteren onay.
 - WireSock adapter sayaçlarında süreç başladıktan sonra trafik artışı.
 - Web hedefi seçildiyse `Astral.WebProxy.exe` üzerinden seçili her web hedefi için en az bir başarılı scoped `CONNECT` kanıtı.
+- App hedefi seçildiyse WireSock handshake veya adapter trafik kanıtı; web proxy kanıtı app hedefi yerine geçmez.
 
 Tanılama paketinde şu imzalar birlikte görünüyorsa bağlantı motoru gerçekten hazır olmadan kapanmıştır:
 
 - `wireSockProcessExited=True`
 - `wireSockProcessExitCode` değerinin beklenmeyen şekilde dolu olması
-- `wireSockMode=transparent`
-- `tunnelReadiness` değerinin `transparent-process-running` olmaması
+- `wireSockMode=virtual-adapter`
+- `tunnelReadiness` değerinin `ready` olmaması
+- `wireSockConnectionEstablished=False` ve `wireSockTrafficDeltaObserved=False` değerlerinin birlikte görünmesi
 
 Bu durumda Astral bağlantıyı başarılı saymaz ve proxy/PAC kapsamını geri temizler. Önce **Onar** akışını çalıştırın, ardından tekrar deneyin. Devam ederse WireSock kurulumu, güvenlik yazılımı, profil üretimi veya Windows ağ yığını ayrıca incelenmelidir.
 
-Güncel tanılama paketinde `wireSockMode=transparent`, `tunnelReadiness=transparent-process-running`, `webProxyProof.verified=True`, `webProxyProof.requiredTargetCount` ile `webProxyProof.verifiedTargetCount` eşit, `allowedBareBrowserNameCount=0`, `allowedBrowserApplicationCount=0` ve `webProxy=included` görünüyorsa seçili web hedefleri için kapsam planı dar ve beklenen biçimde kurulmuştur.
+Güncel tanılama paketinde `wireSockMode=virtual-adapter`, `tunnelReadiness=ready`, `webProxyProof.verified=True`, `webProxyProof.requiredTargetCount` ile `webProxyProof.verifiedTargetCount` eşit, `allowedBareBrowserNameCount=0`, `allowedBrowserApplicationCount=0`, `webProxy=included` ve app hedeflerinde `wireSockConnectionEstablished=True` veya `wireSockTrafficDeltaObserved=True` görünüyorsa seçili hedefler için kapsam planı dar ve beklenen biçimde kurulmuştur.
 
 ## Proxy/PAC Temizlenmedi Şüphesi
 

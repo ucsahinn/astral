@@ -63,6 +63,7 @@ public sealed class ProcessLauncher : IProcessLauncher
     private sealed class ManagedProcess : IManagedProcess
     {
         private readonly Process _process;
+        private readonly int _processId;
         private readonly string _processName;
         private readonly object _logLock;
         private readonly StreamWriter _log;
@@ -77,6 +78,7 @@ public sealed class ProcessLauncher : IProcessLauncher
             string? processName)
         {
             _process = process;
+            _processId = process.Id;
             _processName = string.IsNullOrWhiteSpace(processName)
                 ? "Hedef"
                 : processName;
@@ -155,7 +157,7 @@ public sealed class ProcessLauncher : IProcessLauncher
             }
         }
 
-        public int ProcessId => _process.Id;
+        public int ProcessId => _processId;
 
         public DateTimeOffset? StartTime
         {
