@@ -268,7 +268,10 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             ["routingScope"] = CreateRoutingScopeDescription(routingPlan),
             ["routingSummary"] = FormatRoutingSummary(_lastRoutingSummary),
             ["applicationTunnelProofRequired"] =
-                RoutingPlanRequiresApplicationTunnelProof(routingPlan).ToString()
+                RoutingPlanRequiresApplicationTunnelProof(routingPlan).ToString(),
+            ["applicationTunnelProofEnforced"] =
+                (RoutingPlanRequiresApplicationTunnelProof(routingPlan)
+                    && !_lastTargetProcessRefresh.RequiresManualAction).ToString()
         };
 
         foreach (var webProxyDetail in _lastWebProxyStatus.ToDiagnosticDetails())
@@ -366,6 +369,284 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             }
 
             return failedStatus;
+        }
+        finally
+        {
+            _operationGate.Release();
+        }
+    }
+
+    public async Task<TunnelSnapshot> RecheckTargetActionAsync(
+        CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        await _operationGate.WaitAsync(cancellationToken);
+
+        try
+        {
+            if (!_snapshot.NeedsTargetAction)
+            {
+                return _snapshot;
+            }
+
+            var routingPlan = CurrentRoutingPlan;
+            CaptureWireSockProcessState();
+            if (_wireSockProcess is null || _wireSockProcess.HasExited)
+            {
+                SetStatus(
+                    TunnelState.Error,
+                    "Astral motoru aktif değil; tekrar bağlanın.");
+                _diagnostics.WriteHealth(
+                    "hata",
+                    new Dictionary<string, string?>
+                    {
+                        ["operation"] = "target-action-recheck",
+                        ["selectedTargets"] = routingPlan.Summary,
+                        ["wireSockRunning"] = "False",
+                        ["nextAction"] = "Bağlantıyı kapatıp yeniden başlatın."
+                    }.Concat(CreateTunnelReadinessDetails())
+                        .ToDictionary(pair => pair.Key, pair => pair.Value));
+                return _snapshot;
+            }
+
+            var recheckStopwatch = Stopwatch.StartNew();
+            SetStatus(TunnelState.Verifying, "Hedef aksiyonu kontrol ediliyor");
+            _diagnostics.Info(
+                "controller.targetAction.recheck",
+                "Aktif tünel üzerinde hedef aksiyonu yeniden doğrulanıyor.",
+                new Dictionary<string, string?>
+                {
+                    ["selectedTargets"] = routingPlan.Summary,
+                    ["routingScope"] = CreateRoutingScopeDescription(routingPlan)
+                });
+            var recheckTunnelLogStartPosition = GetFileLength(_paths.TunnelLog);
+
+            _lastWebProxyStatus = await _webProxyService.EnsureAppliedAsync(
+                routingPlan,
+                progress: null,
+                cancellationToken);
+            if (_lastWebProxyStatus.Required && !_lastWebProxyStatus.IsApplied)
+            {
+                throw new InvalidOperationException(
+                    "Seçili web hedefleri için scoped proxy kapsamı doğrulanamadı: " +
+                    _lastWebProxyStatus.Message);
+            }
+
+            _lastWebProxyProof = await _webProxyService.VerifyTargetAccessAsync(
+                routingPlan,
+                cancellationToken);
+            if (_lastWebProxyProof.Required && !_lastWebProxyProof.IsVerified)
+            {
+                throw new InvalidOperationException(
+                    "Seçili web hedeflerine scoped proxy üzerinden çıkış doğrulanamadı: " +
+                    _lastWebProxyProof.Message);
+            }
+
+            if (RoutingPlanRequiresApplicationTunnelProof(routingPlan))
+            {
+                CaptureWireSockTrafficBaseline();
+                _lastWireSockTrafficDiagnostic = _lastWebProxyProof.Required
+                    ? "WireSock adapter traffic baseline reset after scoped web proxy proof during target action recheck; subsequent traffic is used for application tunnel proof."
+                    : "WireSock adapter traffic baseline captured during target action recheck before application proof.";
+            }
+
+            _lastTargetProcessRefresh = await RefreshRunningTargetProcessesAsync(
+                routingPlan,
+                cancellationToken);
+            var enforceApplicationTunnelProof =
+                RoutingPlanRequiresApplicationTunnelProof(routingPlan)
+                && !_lastTargetProcessRefresh.RequiresManualAction;
+            try
+            {
+                await VerifyTunnelReadinessAsync(
+                    recheckTunnelLogStartPosition,
+                    enforceApplicationTunnelProof,
+                    cancellationToken);
+            }
+            catch (InvalidOperationException exception)
+                when (enforceApplicationTunnelProof
+                    && _lastWireSockProcessExited != true)
+            {
+                WriteDiagnostic("TargetActionRecheckReadiness", exception.ToString());
+                _lastNextAction =
+                    "Hedef uygulamasını kapatıp yeniden açın, ardından Kontrol Et'i çalıştırın.";
+                SetStatus(
+                    TunnelState.TargetActionRequired,
+                    "Uygulama tünel kanıtı bekleniyor",
+                    exception.ToString());
+                _diagnostics.WriteHealth(
+                    "hedef için ek aksiyon gerekli",
+                    new Dictionary<string, string?>
+                    {
+                        ["operation"] = "target-action-recheck",
+                        ["selectedTargets"] = routingPlan.Summary,
+                        ["routingScope"] = CreateRoutingScopeDescription(routingPlan),
+                        ["routingSummary"] = FormatRoutingSummary(_lastRoutingSummary),
+                        ["applicationTunnelProofRequired"] =
+                            RoutingPlanRequiresApplicationTunnelProof(routingPlan).ToString(),
+                        ["applicationTunnelProofEnforced"] =
+                            enforceApplicationTunnelProof.ToString(),
+                        ["targetLaunchPolicy"] = _lastTargetProcessRefresh.Policy,
+                        ["nextAction"] = _lastNextAction,
+                        ["recheckElapsedMs"] = recheckStopwatch.ElapsedMilliseconds
+                            .ToString(CultureInfo.InvariantCulture),
+                        ["wireSockRunning"] = "True"
+                    }.Concat(_lastWebProxyStatus.ToDiagnosticDetails())
+                        .Concat(_lastWebProxyProof.ToDiagnosticDetails())
+                        .Concat(_lastTargetProcessRefresh.ToDiagnosticDetails())
+                        .Concat(CreateTunnelReadinessDetails())
+                        .ToDictionary(pair => pair.Key, pair => pair.Value));
+                return _snapshot;
+            }
+
+            var finalState = _lastTargetProcessRefresh.RequiresManualAction
+                ? TunnelState.TargetActionRequired
+                : TunnelState.Connected;
+            var nextAction = _lastTargetProcessRefresh.NextAction;
+            var connectionMessage = _lastTargetProcessRefresh.RequiresManualAction
+                ? "Seçili uygulama bağlantısı yenilenemedi"
+                : "Sadece seçili hedefler tünelden çıkıyor";
+            _lastNextAction = nextAction;
+            SetStatus(finalState, connectionMessage, nextAction);
+            _diagnostics.Info(
+                "controller.targetAction.recheck",
+                "Hedef aksiyonu yeniden doğrulandı.",
+                new Dictionary<string, string?>
+                {
+                    ["selectedTargets"] = routingPlan.Summary,
+                    ["routingScope"] = CreateRoutingScopeDescription(routingPlan),
+                    ["applicationTunnelProofRequired"] =
+                        RoutingPlanRequiresApplicationTunnelProof(routingPlan).ToString(),
+                    ["applicationTunnelProofEnforced"] =
+                        enforceApplicationTunnelProof.ToString(),
+                    ["targetLaunchPolicy"] = _lastTargetProcessRefresh.Policy,
+                    ["nextAction"] = nextAction,
+                    ["recheckElapsedMs"] = recheckStopwatch.ElapsedMilliseconds
+                        .ToString(CultureInfo.InvariantCulture),
+                    ["wireSockRunning"] = "True"
+                }.Concat(_lastWebProxyStatus.ToDiagnosticDetails())
+                    .Concat(_lastWebProxyProof.ToDiagnosticDetails())
+                    .Concat(_lastTargetProcessRefresh.ToDiagnosticDetails())
+                    .Concat(CreateTunnelReadinessDetails())
+                    .ToDictionary(pair => pair.Key, pair => pair.Value));
+            _diagnostics.WriteHealth(
+                finalState is TunnelState.Connected
+                    ? "bağlantı hazır"
+                    : "hedef için ek aksiyon gerekli",
+                new Dictionary<string, string?>
+                {
+                    ["operation"] = "target-action-recheck",
+                    ["selectedTargets"] = routingPlan.Summary,
+                    ["routingScope"] = CreateRoutingScopeDescription(routingPlan),
+                    ["routingSummary"] = FormatRoutingSummary(_lastRoutingSummary),
+                    ["applicationTunnelProofRequired"] =
+                        RoutingPlanRequiresApplicationTunnelProof(routingPlan).ToString(),
+                    ["applicationTunnelProofEnforced"] =
+                        enforceApplicationTunnelProof.ToString(),
+                    ["targetLaunchPolicy"] = _lastTargetProcessRefresh.Policy,
+                    ["nextAction"] = nextAction,
+                    ["recheckElapsedMs"] = recheckStopwatch.ElapsedMilliseconds
+                        .ToString(CultureInfo.InvariantCulture),
+                    ["wireSockRunning"] = "True"
+                }.Concat(_lastWebProxyStatus.ToDiagnosticDetails())
+                    .Concat(_lastWebProxyProof.ToDiagnosticDetails())
+                    .Concat(_lastTargetProcessRefresh.ToDiagnosticDetails())
+                    .Concat(CreateTunnelReadinessDetails())
+                    .ToDictionary(pair => pair.Key, pair => pair.Value));
+
+            return _snapshot;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            var routingPlan = CurrentRoutingPlan;
+            CaptureWireSockProcessState();
+            if (_wireSockProcess is not null && !_wireSockProcess.HasExited)
+            {
+                _lastNextAction =
+                    "Hedef uygulamasını açıp Kontrol Et'i tekrar çalıştırın.";
+                SetStatus(
+                    TunnelState.TargetActionRequired,
+                    "Hedef kontrolü iptal edildi",
+                    "Target action recheck was canceled.");
+                _diagnostics.WriteHealth(
+                    "hedef için ek aksiyon gerekli",
+                    new Dictionary<string, string?>
+                    {
+                        ["operation"] = "target-action-recheck",
+                        ["selectedTargets"] = routingPlan.Summary,
+                        ["routingScope"] = CreateRoutingScopeDescription(routingPlan),
+                        ["routingSummary"] = FormatRoutingSummary(_lastRoutingSummary),
+                        ["applicationTunnelProofRequired"] =
+                            RoutingPlanRequiresApplicationTunnelProof(routingPlan).ToString(),
+                        ["applicationTunnelProofEnforced"] = "False",
+                        ["targetLaunchPolicy"] = _lastTargetProcessRefresh.Policy,
+                        ["nextAction"] = _lastNextAction,
+                        ["wireSockRunning"] = "True"
+                    }.Concat(_lastWebProxyStatus.ToDiagnosticDetails())
+                        .Concat(_lastWebProxyProof.ToDiagnosticDetails())
+                        .Concat(_lastTargetProcessRefresh.ToDiagnosticDetails())
+                        .Concat(CreateTunnelReadinessDetails())
+                        .ToDictionary(pair => pair.Key, pair => pair.Value));
+            }
+
+            throw;
+        }
+        catch (Exception exception)
+        {
+            WriteDiagnostic("TargetActionRecheck", exception.ToString());
+            var routingPlan = CurrentRoutingPlan;
+            var userFacingMessage = CreateUserFacingConnectError(exception);
+            CaptureWireSockProcessState();
+            if (_wireSockProcess is not null && !_wireSockProcess.HasExited)
+            {
+                _lastNextAction =
+                    "Sorun giderildikten sonra Kontrol Et'i tekrar çalıştırın veya bağlantıyı kesin.";
+                _diagnostics.WriteHealth(
+                    "hedef için ek aksiyon gerekli",
+                    new Dictionary<string, string?>
+                    {
+                        ["operation"] = "target-action-recheck",
+                        ["message"] = userFacingMessage,
+                        ["diagnostic"] = exception.Message,
+                        ["selectedTargets"] = routingPlan.Summary,
+                        ["routingScope"] = CreateRoutingScopeDescription(routingPlan),
+                        ["routingSummary"] = FormatRoutingSummary(_lastRoutingSummary),
+                        ["applicationTunnelProofRequired"] =
+                            RoutingPlanRequiresApplicationTunnelProof(routingPlan).ToString(),
+                        ["applicationTunnelProofEnforced"] = "False",
+                        ["targetLaunchPolicy"] = _lastTargetProcessRefresh.Policy,
+                        ["nextAction"] = _lastNextAction,
+                        ["wireSockRunning"] = "True"
+                    }.Concat(_lastWebProxyStatus.ToDiagnosticDetails())
+                        .Concat(_lastWebProxyProof.ToDiagnosticDetails())
+                        .Concat(_lastTargetProcessRefresh.ToDiagnosticDetails())
+                        .Concat(CreateTunnelReadinessDetails())
+                        .ToDictionary(pair => pair.Key, pair => pair.Value));
+                SetStatus(
+                    TunnelState.TargetActionRequired,
+                    "Hedef kontrolü tamamlanamadı",
+                    exception.ToString());
+                return _snapshot;
+            }
+
+            _diagnostics.WriteHealth(
+                "hata",
+                new Dictionary<string, string?>
+                {
+                    ["operation"] = "target-action-recheck",
+                    ["message"] = userFacingMessage,
+                    ["diagnostic"] = exception.Message,
+                    ["selectedTargets"] = routingPlan.Summary
+                }.Concat(_lastWebProxyStatus.ToDiagnosticDetails())
+                    .Concat(_lastWebProxyProof.ToDiagnosticDetails())
+                    .Concat(_lastTargetProcessRefresh.ToDiagnosticDetails())
+                    .Concat(CreateTunnelReadinessDetails())
+                    .ToDictionary(pair => pair.Key, pair => pair.Value));
+            SetStatus(
+                TunnelState.Error,
+                userFacingMessage,
+                exception.ToString());
+            return _snapshot;
         }
         finally
         {
@@ -532,7 +813,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             LogConnectPhase("tunnel-ready");
 
             var finalState = _lastTargetProcessRefresh.RequiresManualAction
-                ? TunnelState.DiscordRestartRequired
+                ? TunnelState.TargetActionRequired
                 : TunnelState.Connected;
             var nextAction = _lastTargetProcessRefresh.NextAction;
             var connectionMessage = _lastTargetProcessRefresh.RequiresManualAction
@@ -689,8 +970,26 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         RoutingPlan routingPlan,
         CancellationToken cancellationToken)
     {
+        var nonDiscordApplicationTargets = routingPlan.SelectedTargets
+            .Where(target =>
+                target.HasApplicationScope
+                && !target.Id.Equals(TargetIds.Discord, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
         if (!RoutingPlanRequiresDiscordProcessRefresh(routingPlan))
         {
+            if (nonDiscordApplicationTargets.Length > 0)
+            {
+                var manualAction = TargetProcessRefreshResult.ApplicationManualActionRequired(
+                    nonDiscordApplicationTargets,
+                    routingPlan.AllowedApplications);
+                _diagnostics.Info(
+                    "controller.targetProcess.refresh",
+                    manualAction.Message,
+                    manualAction.ToDiagnosticDetails());
+                return manualAction;
+            }
+
             return TargetProcessRefreshResult.NotRequired();
         }
 
@@ -759,6 +1058,20 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             "controller.targetProcess.refresh",
             refreshed.Message,
             refreshed.ToDiagnosticDetails());
+
+        if (nonDiscordApplicationTargets.Length > 0)
+        {
+            var manualAction = TargetProcessRefreshResult.ApplicationManualActionRequired(
+                nonDiscordApplicationTargets,
+                routingPlan.AllowedApplications,
+                refreshedExistingTargets: true);
+            _diagnostics.Info(
+                "controller.targetProcess.refresh",
+                manualAction.Message,
+                manualAction.ToDiagnosticDetails());
+            return manualAction;
+        }
+
         return refreshed;
     }
 
@@ -1634,6 +1947,36 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 NextAction: "Discord'u şimdi açabilirsiniz.",
                 RunningProcessCount: snapshot.RunningProcessCount,
                 KnownExecutablePathCount: snapshot.KnownExecutablePathCount);
+
+        public static TargetProcessRefreshResult ApplicationManualActionRequired(
+            IReadOnlyList<TargetDefinition> targets,
+            IReadOnlyList<string> allowedApplications,
+            bool refreshedExistingTargets = false)
+        {
+            var targetSummary = string.Join(
+                ", ",
+                targets.Select(target => target.Label)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(label => label, StringComparer.OrdinalIgnoreCase));
+            var knownExecutableCount = allowedApplications.Count(IsApplicationTunnelExecutable);
+            var message = string.IsNullOrWhiteSpace(targetSummary)
+                ? "Seçili uygulama hedefi tünel kapsamına alındı; uygulamayı tünel açıldıktan sonra yeniden başlatın."
+                : $"{targetSummary} uygulama kapsamı hazır; uygulamayı tünel açıldıktan sonra yeniden başlatın.";
+
+            return new(
+                Required: true,
+                Refreshed: refreshedExistingTargets,
+                RequiresManualAction: true,
+                Policy: refreshedExistingTargets
+                    ? "partial-refresh-manual-start-required"
+                    : "manual-start-required",
+                Message: message,
+                NextAction: "Seçili uygulamayı kapatıp yeniden açın; web hedefleri tünel açıkken ayrıca test edilir.",
+                RunningProcessCount: 0,
+                KnownExecutablePathCount: knownExecutableCount,
+                FailureKind: "TargetSpecificAppProofUnavailable",
+                Diagnostic: "Non-Discord application targets are scoped in the WireSock profile, but Astral does not have target-specific app process/access proof for them yet.");
+        }
 
         public static TargetProcessRefreshResult Succeeded(
             DiscordProcessSnapshot snapshot,

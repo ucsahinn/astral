@@ -676,10 +676,11 @@ static void VerifyConnectedTargetCardsRequireProbeEvidence()
         Assert(cardTexts.Contains("Discord", StringComparer.Ordinal));
         var targetTestButton = FindVisualChildren<Button>(window)
             .Single(button => button.Name == "TargetTestButton");
-        Assert(GetController(window).Snapshot.State == TunnelState.DiscordRestartRequired);
+        Assert(GetController(window).Snapshot.State == TunnelState.TargetActionRequired);
         Assert(!GetController(window).Snapshot.IsConnected);
         Assert(GetController(window).Snapshot.IsTunnelActive);
-        Assert(!targetTestButton.IsEnabled);
+        Assert(targetTestButton.IsEnabled);
+        Assert((string)targetTestButton.Content == "Kontrol Et");
 
         var openedUris = new List<Uri>();
         MainWindow.OpenUriOverrideForTesting = openedUris.Add;

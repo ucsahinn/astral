@@ -451,7 +451,7 @@ public partial class MainWindow : Window, IDisposable
         }
 
         if (snapshot.State is TunnelState.Error
-            or TunnelState.DiscordRestartRequired)
+            or TunnelState.TargetActionRequired)
         {
             return true;
         }
@@ -583,7 +583,7 @@ public partial class MainWindow : Window, IDisposable
     {
         return state switch
         {
-            TunnelState.DiscordRestartRequired => "Hedef kontrolü gerekiyor",
+            TunnelState.TargetActionRequired => "Hedef kontrolü gerekiyor",
             TunnelState.Connected => "Bağlı",
             TunnelState.Verifying => "Doğrulanıyor",
             TunnelState.Preparing => "Hazırlanıyor",
@@ -602,7 +602,7 @@ public partial class MainWindow : Window, IDisposable
 
         return snapshot.State switch
         {
-            TunnelState.DiscordRestartRequired => $"Hedef bağlantısı kontrol edilmeli, {time}",
+            TunnelState.TargetActionRequired => $"Hedef bağlantısı kontrol edilmeli, {time}",
             TunnelState.Connected => $"Tünel aktif, son durum {time}",
             TunnelState.Verifying => $"Seçili hedef kapsamı kontrol ediliyor, {time}",
             TunnelState.Preparing or TunnelState.Connecting
@@ -632,7 +632,7 @@ public partial class MainWindow : Window, IDisposable
     {
         return state switch
         {
-            TunnelState.DiscordRestartRequired => new StateVisual(
+            TunnelState.TargetActionRequired => new StateVisual(
                 "ONARIM GEREKİYOR",
                 "BAĞLANTIYI KES",
                 MediaColor.FromRgb(249, 214, 107),
@@ -771,7 +771,7 @@ public partial class MainWindow : Window, IDisposable
                 "Bağlantı hazır",
                 "Tünel kanıtı alındı; seçili hedef testi izleniyor.",
                 4),
-            TunnelState.DiscordRestartRequired => (
+            TunnelState.TargetActionRequired => (
                 96,
                 "Hedef kontrol edilmeli",
                 "Kapsam kilidi hazır; hedef uygulama/web oturumu yenilenmeli.",
@@ -949,7 +949,7 @@ public partial class MainWindow : Window, IDisposable
         return state switch
         {
             TunnelState.Connected => "Sadece seçili hedefler tünelden çıkıyor.",
-            TunnelState.DiscordRestartRequired => "Seçili hedef kapsamını kontrol edip tekrar bağlanın.",
+            TunnelState.TargetActionRequired => "Seçili hedef kapsamını kontrol edip tekrar bağlanın.",
             TunnelState.Verifying => "Astral tünel motoru açık, hedef kapsamı kontrol ediliyor.",
             TunnelState.Preparing => "Kurulum, dijital imza ve bağlantı profili doğrulanıyor.",
             TunnelState.Connecting => "Astral tünel motoru başlatılıyor.",
@@ -1236,7 +1236,7 @@ public partial class MainWindow : Window, IDisposable
         }
 
         if (snapshot.State is TunnelState.Error
-            or TunnelState.DiscordRestartRequired)
+            or TunnelState.TargetActionRequired)
         {
             return _targetProbeResults.TryGetValue(target.Id, out var failedProbe)
                 && failedProbe.Status is TargetProbeStatus.Failed
@@ -1760,7 +1760,7 @@ public partial class MainWindow : Window, IDisposable
             TargetProbeStatus.Success,
             TargetProbeStatus.ProfileScope);
         var failedCount = GetSelectedTargetProbeCount(TargetProbeStatus.Failed);
-        TargetTestButton.IsEnabled = snapshot.IsConnected
+        TargetTestButton.IsEnabled = (snapshot.IsConnected || snapshot.NeedsTargetAction)
             && !snapshot.IsBusy
             && !_isTargetTestRunning
             && hasSelected;
@@ -1770,7 +1770,9 @@ public partial class MainWindow : Window, IDisposable
                 ? "Tekrar Dene"
                 : hasSuccess
                     ? "Tekrar Test Et"
-                    : "Test Et";
+                    : snapshot.NeedsTargetAction
+                        ? "Kontrol Et"
+                        : "Test Et";
         TargetTestButton.ToolTip = !hasSelected
             ? "Test edilecek hedef seçili değil."
             : snapshot.IsBusy
@@ -1802,9 +1804,11 @@ public partial class MainWindow : Window, IDisposable
                 ? MediaColor.FromRgb(255, 122, 122)
                 : hasSuccess
                     ? MediaColor.FromRgb(93, 255, 146)
-                    : snapshot.IsConnected
-                        ? MediaColor.FromRgb(125, 235, 255)
-                        : MediaColor.FromRgb(66, 156, 212);
+                    : snapshot.NeedsTargetAction
+                        ? MediaColor.FromRgb(255, 217, 85)
+                        : snapshot.IsConnected
+                            ? MediaColor.FromRgb(125, 235, 255)
+                            : MediaColor.FromRgb(66, 156, 212);
         TargetTestCardBorder.BorderBrush = new SolidColorBrush(borderColor);
         TargetTestCardBorder.Effect = CreateGlowEffect(
             hasFailure || hasSuccess ? 28 : 16,
@@ -1884,6 +1888,62 @@ public partial class MainWindow : Window, IDisposable
         }
 
         var snapshot = _controller.Snapshot;
+        if (snapshot.NeedsTargetAction && !snapshot.IsBusy)
+        {
+            _isTargetTestRunning = true;
+            TargetTestSummary.Text =
+                "Hedef aksiyonu yeniden kontrol ediliyor; uygulama kanıtı bekleniyor.";
+            _lastTargetTestSummary = "Hedef aksiyonu yeniden kontrol ediliyor.";
+            RefreshTargetScopeView(locked: true);
+            ApplyTargetTestCardState(snapshot);
+
+            CancellationToken recheckLifetimeToken;
+            try
+            {
+                recheckLifetimeToken = _windowLifetimeCancellation.Token;
+            }
+            catch (ObjectDisposedException)
+            {
+                _isTargetTestRunning = false;
+                return;
+            }
+
+            try
+            {
+                using var recheckTimeoutSource = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+                using var recheckLinkedSource = CancellationTokenSource.CreateLinkedTokenSource(
+                    recheckTimeoutSource.Token,
+                    recheckLifetimeToken);
+                snapshot = await _controller.RecheckTargetActionAsync(recheckLinkedSource.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                snapshot = _controller.Snapshot;
+                _isTargetTestRunning = false;
+                TargetTestSummary.Text =
+                    "Hedef aksiyonu kontrolü tamamlanamadı; tekrar deneyin.";
+                _lastTargetTestSummary = TargetTestSummary.Text;
+                RefreshTargetScopeView(snapshot.IsBusy || snapshot.IsTunnelActive);
+                ApplyTargetTestCardState(snapshot);
+                return;
+            }
+            finally
+            {
+                _isTargetTestRunning = false;
+            }
+
+            RefreshTargetScopeView(snapshot.IsBusy || snapshot.IsTunnelActive);
+            ApplyTargetTestCardState(snapshot);
+            if (!snapshot.IsConnected)
+            {
+                TargetTestSummary.Text = snapshot.NeedsTargetAction
+                    ? "Hedef aksiyonu devam ediyor; hedef uygulamayı açıp Kontrol Et'i tekrar çalıştırın."
+                    : snapshot.Message;
+                _lastTargetTestSummary = TargetTestSummary.Text;
+                return;
+            }
+        }
+
         if (!snapshot.IsConnected || snapshot.IsBusy)
         {
             TargetTestSummary.Text = snapshot.IsBusy

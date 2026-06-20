@@ -13,8 +13,8 @@ public sealed record TunnelSnapshot(
 
     public bool IsConnected => State is TunnelState.Connected;
 
-    public bool NeedsTargetAction => State is TunnelState.DiscordRestartRequired;
+    public bool NeedsTargetAction => State is TunnelState.TargetActionRequired;
 
     public bool IsTunnelActive => State is TunnelState.Connected
-        or TunnelState.DiscordRestartRequired;
+        or TunnelState.TargetActionRequired;
 }

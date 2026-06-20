@@ -26,20 +26,20 @@ Neden `v2.2.30`?
 - v2.2.27, v2.2.26 üzerinde kalan video görünürlüğü, hedef testi kartı, hedef açma gecikmesi, app hedef kanıtı ve timeout tanılama sorunlarını düzeltir.
 - v2.2.28, v2.2.27 üzerinde kalan app/web kanıt ayrımı, hedef testi özeti, tanılama netliği ve bakım akışı sırasında video görünürlüğü sorunlarını düzeltir.
 - v2.2.29, v2.2.28 üzerinde kalan üretim Discord process yenileme ve kapanış temizliği timeout sorunlarını düzeltir.
-- v2.2.30, v2.2.29 üzerinde kalan app+web yanlış bağlı pozitifini kapatır; scoped web proxy kanıtı artık uygulama tünel kanıtı yerine geçmez.
+- v2.2.30, v2.2.29 üzerinde kalan app+web yanlış bağlı pozitifini kapatır; scoped web proxy kanıtı artık uygulama tünel kanıtı yerine geçmez, Discord dışı app hedefleri target-specific proof olmadan tam bağlı sayılmaz ve Discord sonradan açıldığında aktif tünelde `Kontrol Et` ile yeniden kanıt toplanır.
 - v2.2.21 tanı paketleri WireSock sürecinin ve Astral.WebProxy/PAC kapsamının başladığını, ancak transparent modda sanal adapter `Down` kaldığı için pasif readiness kapısının bağlantıyı yanlış başarısız saydığını gösterdi.
 - WireSock transparent mode sanal adapter `Up` kanıtına bağlı değildir; web hedefleri için doğru aktif kanıt, yalnız `Astral.WebProxy.exe` üzerinden seçili hedef hostlarına yapılan scoped `CONNECT` denemesidir.
 - v2.2.23, PAC uygulandıktan sonra seçili her web hedefi için scoped WebProxy kanıtı alır ve bu kanıtı transparent readiness kararına dahil eder.
 - Tarayıcı executable'ları yine WireSock `AllowedApps` içine girmez; proof trafiği yalnız `Astral.WebProxy.exe` sürecinden çıkar.
 - v2.2.21 yayınlandığı için bu bağlantı doğrulama düzeltmesi ayrı `v2.2.22` hotfix sürümü olarak çıkarılır; böylece 2.2.21 kullanıcıları otomatik güncelleme görür.
 - v2.2.22 yayınlandıktan sonra tek başarılı hostun yeterli olması daraltıldı; `v2.2.23` tüm seçili web hedefleri için hedef bazlı kanıt ister.
-- v2.2.30, app kapsamlı hedeflerde WireSock handshake veya adapter trafik kanıtını zorunlu hale getirir; cleanup doğrulanamazsa bağlantı temiz kapandı diye raporlanmaz.
+- v2.2.30, app kapsamlı hedeflerde WireSock handshake veya adapter trafik kanıtını zorunlu hale getirir; Discord dışı app hedefleri için manuel hedef aksiyonu durumunu `TargetActionRequired` olarak yazar, Discord aksiyonu sonrası recheck ile aktif tüneli kesmeden yeniden doğrular ve cleanup doğrulanamazsa bağlantı temiz kapandı diye raporlanmaz.
 
 ## Public Release Yüzeyi
 
 | Release | Canlı durum | Asset durumu | Karar | Gerekçe |
 | --- | --- | --- | --- | --- |
-| `v2.2.30` | Aday | Bekleniyor | Yayına hazırsa oluştur | App+web yanlış bağlı pozitifinin kapatılması, cleanup doğrulama kapısı ve 2.2.30 sürüm hizalaması. |
+| `v2.2.30` | Aday | Bekleniyor | Yayına hazırsa oluştur | App+web yanlış bağlı pozitifinin kapatılması, Discord dışı app hedeflerinin target-specific proof kapısı, cleanup doğrulama kapısı ve 2.2.30 sürüm hizalaması. |
 | `v2.2.29` | Aday | Bekleniyor | v2.2.30 ile üstlen | Üretim Discord process yenileme, cleanup timeout dayanıklılığı ve 2.2.29 sürüm hizalaması. |
 | `v2.2.28` | Yayında | 4 asset | v2.2.30 ile üstlen | App/web kanıt ayrımı, hedef testi özeti, tanılama netliği, video görünürlüğü ve 2.2.28 sürüm hizalaması. |
 | `v2.2.27` | Yayında | 4 asset | v2.2.28 ile üstlen | Video görünürlüğü, hedef testi rozetleri, hedef açma gecikmesi, app hedef kanıtı ve 2.2.27 sürüm hizalaması. |
