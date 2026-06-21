@@ -8,6 +8,7 @@ Astral'ın güvenlik hedefi, seçili hedefler dışında kalan trafiği kapsam d
 - Web hedefleri için `chrome.exe`, `msedge.exe`, `firefox.exe`, `brave.exe`, `opera.exe`, `vivaldi.exe` gibi genel tarayıcı süreçleri `AllowedApps` içine eklenmez.
 - Web hedeflerinde yalnız `Astral.WebProxy.exe` WireSock kapsamına girer.
 - PAC kuralı seçili domainlerde PROXY, diğer tüm domainlerde DIRECT döndürür.
+- `Astral.WebProxy` varsayılan olarak sistem DNS davranışını kullanır; Cloudflare/Google gibi public DNS fallback yalnız `ASTRAL_WEBPROXY_ALLOW_PUBLIC_DNS_FALLBACK=1` / `true` / `yes` ile açılır.
 - Eski ayarlarda kalan özel hedef alanları yeni sürümde route planına taşınmaz.
 - WireSock `-lac` scoped sanal ağ arayüzü moduyla çalışır; `AllowedApps` kapsamı seçili uygulamalar ve gerektiğinde `Astral.WebProxy.exe` ile sınırlıdır.
 

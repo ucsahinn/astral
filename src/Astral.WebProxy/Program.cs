@@ -396,6 +396,8 @@ file sealed record ProxyOptions(
 
 file static class UpstreamConnector
 {
+    private const string AllowPublicDnsFallbackEnvironmentVariable =
+        "ASTRAL_WEBPROXY_ALLOW_PUBLIC_DNS_FALLBACK";
     private const ushort DnsRecordTypeA = 1;
     private const ushort DnsRecordTypeAaaa = 28;
     private const ushort DnsClassInternet = 1;
@@ -430,6 +432,11 @@ file static class UpstreamConnector
         }
         catch (SocketException exception) when (ShouldTryResolverFallback(exception))
         {
+            if (!IsPublicDnsFallbackEnabled())
+            {
+                throw;
+            }
+
             var addresses = await ResolveBypassSystemDnsAsync(host, cancellationToken);
             if (addresses.Count == 0)
             {
@@ -442,6 +449,15 @@ file static class UpstreamConnector
                 port,
                 cancellationToken);
         }
+    }
+
+    private static bool IsPublicDnsFallbackEnabled()
+    {
+        var value = Environment.GetEnvironmentVariable(
+            AllowPublicDnsFallbackEnvironmentVariable);
+        return string.Equals(value, "1", StringComparison.Ordinal)
+            || string.Equals(value, "true", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(value, "yes", StringComparison.OrdinalIgnoreCase);
     }
 
     private static async Task<TcpClient> ConnectResolvedAddressAsync(

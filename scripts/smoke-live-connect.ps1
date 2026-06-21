@@ -486,6 +486,35 @@ function Get-CurrentHealth {
     }
 }
 
+function Test-DelimitedValueContainsAll {
+    param(
+        [string]$Actual,
+        [string[]]$Expected
+    )
+
+    if ($Expected.Count -eq 0) {
+        return $true
+    }
+
+    if ([string]::IsNullOrWhiteSpace($Actual)) {
+        return $false
+    }
+
+    $actualValues = @(
+        $Actual.Split(
+            ',',
+            [System.StringSplitOptions]::RemoveEmptyEntries) |
+            ForEach-Object { $_.Trim().ToLowerInvariant() }
+    )
+    foreach ($expectedValue in $Expected) {
+        if ($actualValues -notcontains $expectedValue.ToLowerInvariant()) {
+            return $false
+        }
+    }
+
+    return $true
+}
+
 function Copy-HealthResult {
     param([object]$Health)
 
@@ -548,6 +577,8 @@ function Copy-HealthResult {
         [string]$Health.details.'webProxyProof.requiredTargetCount'
     $result.HealthWebProxyProofVerifiedTargetCount =
         [string]$Health.details.'webProxyProof.verifiedTargetCount'
+    $result.HealthWebProxyProofVerifiedTargetIds =
+        [string]$Health.details.'webProxyProof.verifiedTargetIds'
     $result.HealthWebProxyProofFailedTargets =
         [string]$Health.details.'webProxyProof.failedTargets'
     $result.HealthWebProxyProofElapsedMs =
@@ -572,12 +603,18 @@ function Copy-HealthResult {
     $result.HealthWebProxyProofHasNoFailedTargets =
         (-not $requiresWebProxy) -or
         [string]::IsNullOrWhiteSpace($result.HealthWebProxyProofFailedTargets)
+    $result.HealthWebProxyProofIncludesSelectedTargets =
+        (-not $requiresWebProxy) -or
+        (Test-DelimitedValueContainsAll `
+            -Actual $result.HealthWebProxyProofVerifiedTargetIds `
+            -Expected $webTargetIdsForSelection)
     $result.HealthHasRequiredWebProxyProof =
         (-not $requiresWebProxy) -or
         (
             [bool]$result.HealthWebProxyProofVerifiedBool -and
             [bool]$result.HealthWebProxyProofCountsMatch -and
-            [bool]$result.HealthWebProxyProofHasNoFailedTargets
+            [bool]$result.HealthWebProxyProofHasNoFailedTargets -and
+            [bool]$result.HealthWebProxyProofIncludesSelectedTargets
         )
     $targetTestFailedCount = 0
     $targetTestSelectedCount = 0
@@ -619,14 +656,6 @@ function Copy-HealthResult {
         $targetTestSelectedCount -gt 0 -and
         $targetTestFailedCount -eq 0 -and
         $targetTestAccountedCount -ge $targetTestSelectedCount
-
-    if ([bool]$result.HealthTargetTestPassed -and
-        -not $requiresApplicationTunnelProof) {
-        $result.HealthWebProxyProofVerifiedBool = $true
-        $result.HealthWebProxyProofCountsMatch = $true
-        $result.HealthWebProxyProofHasNoFailedTargets = $true
-        $result.HealthHasRequiredWebProxyProof = $true
-    }
 
     $adapterReady =
         $result.HealthWireSockMode -eq 'virtual-adapter' -and
@@ -732,13 +761,6 @@ function Wait-AstralHealthState {
                 return [bool]$result.HealthTargetTestPassed
             }
 
-            return $true
-        }
-
-        if (
-            [bool]$result.HealthTargetTestPassed -and
-            (-not $requiresApplicationTunnelProof)
-        ) {
             return $true
         }
 
@@ -1100,11 +1122,13 @@ $result = [ordered]@{
     HealthWebProxyProofMessage = ''
     HealthWebProxyProofRequiredTargetCount = ''
     HealthWebProxyProofVerifiedTargetCount = ''
+    HealthWebProxyProofVerifiedTargetIds = ''
     HealthWebProxyProofFailedTargets = ''
     HealthWebProxyProofElapsedMs = ''
     HealthWebProxyProofVerifiedBool = -not $requiresWebProxy
     HealthWebProxyProofCountsMatch = -not $requiresWebProxy
     HealthWebProxyProofHasNoFailedTargets = -not $requiresWebProxy
+    HealthWebProxyProofIncludesSelectedTargets = -not $requiresWebProxy
     HealthHasRequiredWebProxyProof = -not $requiresWebProxy
     HealthTargetTestPassed = $false
     HealthTargetTestSelectedCount = 0

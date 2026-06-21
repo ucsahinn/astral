@@ -87,7 +87,8 @@ public sealed record ScopedWebProxyProof(
     int? RequiredTargetCount = null,
     int? VerifiedTargetCount = null,
     string? FailedTargets = null,
-    int? ElapsedMilliseconds = null)
+    int? ElapsedMilliseconds = null,
+    string? VerifiedTargetIds = null)
 {
     public static ScopedWebProxyProof NotRequired(
         string message = "Web proxy target proof is not required.") =>
@@ -110,7 +111,8 @@ public sealed record ScopedWebProxyProof(
     public static ScopedWebProxyProof VerifiedAll(
         IReadOnlyList<string> hosts,
         int proxyPort,
-        int requiredTargetCount) =>
+        int requiredTargetCount,
+        IReadOnlyList<string>? verifiedTargetIds = null) =>
         new(
             true,
             true,
@@ -119,7 +121,10 @@ public sealed record ScopedWebProxyProof(
             proxyPort,
             200,
             requiredTargetCount,
-            hosts.Count);
+            hosts.Count,
+            VerifiedTargetIds: verifiedTargetIds is null
+                ? null
+                : string.Join(", ", verifiedTargetIds));
 
     public static ScopedWebProxyProof Failed(
         string? host,
@@ -155,6 +160,7 @@ public sealed record ScopedWebProxyProof(
                 RequiredTargetCount?.ToString(CultureInfo.InvariantCulture),
             [$"{prefix}.verifiedTargetCount"] =
                 VerifiedTargetCount?.ToString(CultureInfo.InvariantCulture),
+            [$"{prefix}.verifiedTargetIds"] = VerifiedTargetIds,
             [$"{prefix}.failedTargets"] = FailedTargets,
             [$"{prefix}.elapsedMs"] =
                 ElapsedMilliseconds?.ToString(CultureInfo.InvariantCulture)
@@ -523,6 +529,12 @@ public sealed class WindowsScopedWebProxyService : IScopedWebProxyService, IAsyn
             .Where(result => result.VerifiedHost is not null)
             .Select(result => result.TargetLabel + "=" + result.VerifiedHost)
             .ToArray();
+        var verifiedTargetIds = proofResults
+            .Where(result => result.VerifiedHost is not null)
+            .Select(result => result.TargetId)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
         var targetFailures = proofResults
             .Where(result => result.Failure is not null)
             .Select(result => result.TargetLabel + "=" + result.Failure)
@@ -533,7 +545,8 @@ public sealed class WindowsScopedWebProxyService : IScopedWebProxyService, IAsyn
             var verified = ScopedWebProxyProof.VerifiedAll(
                 verifiedHosts,
                 proxyPort,
-                probeTargets.Length)
+                probeTargets.Length,
+                verifiedTargetIds)
                 with
                 {
                     ElapsedMilliseconds = (int)elapsed.ElapsedMilliseconds

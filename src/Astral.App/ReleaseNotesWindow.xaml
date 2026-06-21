@@ -82,7 +82,7 @@
                                 VerticalAlignment="Center">
                         <TextBlock FontSize="22"
                                    FontWeight="SemiBold"
-                                   Text="Astral VPN v2.2.31" />
+                                   Text="Astral VPN v2.2.32" />
                         <TextBlock Margin="0,5,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
@@ -109,7 +109,7 @@
                                            FontSize="14"
                                            LineHeight="21"
                                            TextWrapping="Wrap"
-                                           Text="Bu sürüm v2.2.30 üzerinde kalan Discord dahil uygulama hedefi yanlış bağlı pozitiflerini kapatır. Astral VPN artık uygulama kapsamlı hedeflerde seçili hedef process'inin hedef host'a ait bağlantısını kanıtlamadan tam bağlı demez; genel sistem VPN'i gibi davranmaz." />
+                                           Text="Bu sürüm v2.2.31 üzerine kanıt kimliği ve DNS güvenliği sıkılaştırması ekler. Astral VPN artık web hedeflerinde yalnız sayım değil, seçili hedef ID'lerinin de kanıtlandığını doğrular; WebProxy public DNS fallback varsayılan olarak kapalıdır." />
                             </StackPanel>
                         </Border>
 
@@ -244,7 +244,7 @@
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Sürüm metadata'sı, updater, web proxy ve uygulama içi release bağlantısı v2.2.31 ile hizalandı." />
+                                           Text="&#x2022; Sürüm metadata'sı, updater, web proxy ve uygulama içi release bağlantısı v2.2.32 ile hizalandı." />
                             </StackPanel>
                         </Border>
 
@@ -290,7 +290,7 @@
                     <TextBlock VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource MutedTextBrush}"
-                                   Text="Bu not, v2.2.31 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
+                                   Text="Bu not, v2.2.32 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
                     <Button Grid.Column="1"
                             Margin="0,0,10,0"
                             Height="40"

@@ -71,7 +71,7 @@ public partial class MainWindow : Window, IDisposable
     private static readonly Uri RepositoryUri = new(
         "https://github.com/ucsahinn/astral");
     private static readonly Uri ReleaseNotesUri = new(
-        "https://github.com/ucsahinn/astral/releases/tag/v2.2.31");
+        "https://github.com/ucsahinn/astral/releases/tag/v2.2.32");
     private static readonly Uri BackgroundVideoCdnUri = new(
         "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260328_105406_16f4600d-7a92-4292-b96e-b19156c7830a.mp4");
     private static readonly string LocalBackgroundVideoPath = Path.Combine(
@@ -2166,11 +2166,12 @@ public partial class MainWindow : Window, IDisposable
             _lastTargetTestElapsedMilliseconds = testStopwatch.ElapsedMilliseconds;
             TargetTestSummary.Text = "Kapsam doğrulaması: " + _lastTargetTestSummary;
             var diagnosticDetails = CreateTargetTestDiagnosticDetails(results);
+            var healthDetails = CreateTargetTestHealthDetails(diagnosticDetails);
             if (failedCount > 0)
             {
                 snapshot = _controller.ReportTargetAccessProofFailure(
                     "Hedef testi gecmedi: " + _lastTargetTestSummary,
-                    diagnosticDetails);
+                    healthDetails);
                 TargetTestSummary.Text =
                     "Kapsam doğrulaması: " + _lastTargetTestSummary;
             }
@@ -2178,12 +2179,12 @@ public partial class MainWindow : Window, IDisposable
             _diagnostics.Info(
                 "ui.targetTest.complete",
                 "Kapsam doğrulaması tamamlandı.",
-                diagnosticDetails);
+                healthDetails);
             _diagnostics.WriteHealth(
                 failedCount > 0
                     ? "hedef erisimi dogrulanamadi"
                     : "kapsam doğrulaması tamamlandı",
-                diagnosticDetails);
+                healthDetails);
         }
         catch (OperationCanceledException)
         {
@@ -2288,6 +2289,14 @@ public partial class MainWindow : Window, IDisposable
             return false;
         }
 
+        if (!controllerProofDetails.TryGetValue(
+                "webProxyProof.verifiedTargetIds",
+                out var verifiedTargetIds)
+            || !ContainsDelimitedValue(verifiedTargetIds, target.Id))
+        {
+            return false;
+        }
+
         result = new TargetProbeResult(
             TargetProbeStatus.Success,
             string.Join(", ", hosts),
@@ -2308,6 +2317,18 @@ public partial class MainWindow : Window, IDisposable
                 CultureInfo.InvariantCulture,
                 out var count)
             && count >= minimum;
+    }
+
+    private static bool ContainsDelimitedValue(string? value, string expected)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return value
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Any(item => string.Equals(item, expected, StringComparison.OrdinalIgnoreCase));
     }
 
     private static async Task<(TargetDefinition Target, TargetProbeResult Result)> ProbeTargetHostsViaScopedProxyAsync(
@@ -2655,6 +2676,38 @@ public partial class MainWindow : Window, IDisposable
 
         details["resultCount"] = results.Count.ToString(CultureInfo.InvariantCulture);
         return details;
+    }
+
+    private Dictionary<string, string?> CreateTargetTestHealthDetails(
+        IReadOnlyDictionary<string, string?> targetTestDetails)
+    {
+        var details = new Dictionary<string, string?>(
+            targetTestDetails,
+            StringComparer.Ordinal);
+        foreach (var pair in _controller.CreateDiagnosticDetails())
+        {
+            if (IsControllerProofDiagnosticKey(pair.Key))
+            {
+                details[pair.Key] = pair.Value;
+            }
+        }
+
+        return details;
+    }
+
+    private static bool IsControllerProofDiagnosticKey(string key)
+    {
+        return key.StartsWith("webProxyProof.", StringComparison.Ordinal)
+            || key.StartsWith("webProxyScope.", StringComparison.Ordinal)
+            || key.StartsWith("webProxyRuntime.", StringComparison.Ordinal)
+            || key.StartsWith("targetAppProof.", StringComparison.Ordinal)
+            || key.StartsWith("targetProcessRefresh.", StringComparison.Ordinal)
+            || key.StartsWith("wireSock", StringComparison.Ordinal)
+            || key.StartsWith("tunnelReadiness", StringComparison.Ordinal)
+            || key.Equals("applicationTunnelProofRequired", StringComparison.Ordinal)
+            || key.Equals("applicationTunnelProofEnforced", StringComparison.Ordinal)
+            || key.Equals("routingSummary", StringComparison.Ordinal)
+            || key.Equals("routingScope", StringComparison.Ordinal);
     }
 
     private enum TargetCardState

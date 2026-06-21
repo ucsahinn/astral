@@ -42,6 +42,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Web proxy PAC sapmasında kapsamı yeniden uygular", ScopedWebProxyEnsureReappliesMissingPacScopeAsync),
     ("Web proxy erken kapanırsa PAC uygulanmaz", ScopedWebProxyRejectsExitedProcessBeforeApplyingPacAsync),
     ("Web proxy kanıtı seçili her web hedefinden başarı ister", ScopedWebProxyProofRequiresEverySelectedWebTargetAsync),
+    ("Web proxy kanıtı doğrulanan hedef kimliklerini tanıya yazar", ScopedWebProxyProofWritesVerifiedTargetIdsAsync),
     ("Web proxy kanıtı toplu hedeflerde seri beklemeye dönmez", ScopedWebProxyProofKeepsBoundedParallelismAsync),
     ("Web proxy kanıtı gecikmeli hedefleri paralel ölçer", ScopedWebProxyProofRunsDelayedTargetsInParallelAsync),
     ("Discord kapsamı parametresiz çağrıda sadece uygulamayı içerir", DiscordScopeDefaultsToAppOnlyAsync),
@@ -1011,6 +1012,69 @@ static async Task ScopedWebProxyProofRequiresEverySelectedWebTargetAsync()
         var failedTargets = proof.FailedTargets ?? string.Empty;
         Assert(failedTargets.Contains("Blogspot", StringComparison.Ordinal));
         Assert(!failedTargets.Contains("Wattpad", StringComparison.Ordinal));
+    }
+    finally
+    {
+        await service.ClearAsync(CancellationToken.None);
+        await launcher.DisposeAsync();
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task ScopedWebProxyProofWritesVerifiedTargetIdsAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var paths = new AppPaths(root);
+    var expectedPacUri = new Uri(paths.WebProxyPacFile).AbsoluteUri;
+    var healthyPacStatus = JsonSerializer.Serialize(new
+    {
+        CurrentAutoConfigURL = expectedPacUri,
+        ExpectedAutoConfigURL = expectedPacUri,
+        PacFileExists = true,
+        StateFileExists = true,
+        StateOwner = "Astral",
+        StateAppliedAutoConfigURL = expectedPacUri
+    });
+    var runner = new SequencedCommandRunner(
+        new CommandResult(0, string.Empty, string.Empty),
+        new CommandResult(0, healthyPacStatus, string.Empty));
+    var launcher = new ConnectProofProcessLauncher(_ => true);
+    var webProxyExecutable = Path.Combine(root, "Astral.WebProxy.exe");
+    var service = new WindowsScopedWebProxyService(
+        paths,
+        runner,
+        launcher,
+        webProxyExecutable,
+        powerShellPath: "powershell.exe",
+        preferredProxyPort: ReserveTcpPort());
+    File.WriteAllText(webProxyExecutable, "proxy");
+
+    var resolver = new TargetScopeResolver(
+        TargetRegistry.CreateDefault(),
+        new DiscordAppScope(root, root, root),
+        webProxyExecutable);
+    var plan = resolver.Resolve(new TargetSelection(
+        [TargetIds.Wattpad, TargetIds.Blogspot]));
+
+    try
+    {
+        await service.ApplyAsync(plan, progress: null, CancellationToken.None);
+
+        var proof = await service.VerifyTargetAccessAsync(
+            plan,
+            CancellationToken.None);
+        var details = proof.ToDiagnosticDetails();
+
+        Assert(proof.IsVerified);
+        var modelVerifiedIds = proof.VerifiedTargetIds ?? string.Empty;
+        Assert(!string.IsNullOrWhiteSpace(modelVerifiedIds));
+        Assert(modelVerifiedIds.Contains(TargetIds.Wattpad, StringComparison.OrdinalIgnoreCase));
+        Assert(modelVerifiedIds.Contains(TargetIds.Blogspot, StringComparison.OrdinalIgnoreCase));
+        Assert(details.TryGetValue("webProxyProof.verifiedTargetIds", out var verifiedIds));
+        verifiedIds ??= string.Empty;
+        Assert(!string.IsNullOrWhiteSpace(verifiedIds));
+        Assert(verifiedIds.Contains(TargetIds.Wattpad, StringComparison.OrdinalIgnoreCase));
+        Assert(verifiedIds.Contains(TargetIds.Blogspot, StringComparison.OrdinalIgnoreCase));
     }
     finally
     {
