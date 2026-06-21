@@ -233,7 +233,7 @@ public sealed class WindowsScopedWebProxyService : IScopedWebProxyService, IAsyn
 {
     private const int DefaultProxyPort = 18088;
     private const int MaxProbeHostsPerTarget = 2;
-    internal const int MaxConcurrentProbeTargetsForTesting = 8;
+    internal const int MaxConcurrentProbeTargetsForTesting = 4;
     internal static TimeSpan TargetProofTimeoutForTesting => TargetProofTimeout;
 
     private const int MaxConcurrentProbeTargets = MaxConcurrentProbeTargetsForTesting;

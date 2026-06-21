@@ -71,7 +71,7 @@ public partial class MainWindow : Window, IDisposable
     private static readonly Uri RepositoryUri = new(
         "https://github.com/ucsahinn/astral");
     private static readonly Uri ReleaseNotesUri = new(
-        "https://github.com/ucsahinn/astral/releases/tag/v2.2.30");
+        "https://github.com/ucsahinn/astral/releases/tag/v2.2.31");
     private static readonly Uri BackgroundVideoCdnUri = new(
         "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260328_105406_16f4600d-7a92-4292-b96e-b19156c7830a.mp4");
     private static readonly string LocalBackgroundVideoPath = Path.Combine(
@@ -2081,6 +2081,8 @@ public partial class MainWindow : Window, IDisposable
             }
 
             var networkTargets = new List<(TargetDefinition Target, string[] Hosts)>();
+            var controllerProofDetails = _controller.CreateDiagnosticDetails();
+            var selectedWebTargetCount = selectedTargets.Count(target => target.HasWebScope);
             foreach (var target in selectedTargets)
             {
                 linkedSource.Token.ThrowIfCancellationRequested();
@@ -2091,6 +2093,21 @@ public partial class MainWindow : Window, IDisposable
                     _targetProbeResults[target.Id] = scoped;
                     results.Add(scoped);
                     LogTargetProbeResult(target, scoped);
+                    RefreshTargetScopeView(_controller.Snapshot.IsBusy
+                        || _controller.Snapshot.IsTunnelActive);
+                    continue;
+                }
+
+                if (TryCreateControllerWebProofProbeResult(
+                        target,
+                        hosts,
+                        controllerProofDetails,
+                        selectedWebTargetCount,
+                        out var controllerProofResult))
+                {
+                    _targetProbeResults[target.Id] = controllerProofResult;
+                    results.Add(controllerProofResult);
+                    LogTargetProbeResult(target, controllerProofResult);
                     RefreshTargetScopeView(_controller.Snapshot.IsBusy
                         || _controller.Snapshot.IsTunnelActive);
                     continue;
@@ -2148,13 +2165,25 @@ public partial class MainWindow : Window, IDisposable
                 skippedCount);
             _lastTargetTestElapsedMilliseconds = testStopwatch.ElapsedMilliseconds;
             TargetTestSummary.Text = "Kapsam doğrulaması: " + _lastTargetTestSummary;
+            var diagnosticDetails = CreateTargetTestDiagnosticDetails(results);
+            if (failedCount > 0)
+            {
+                snapshot = _controller.ReportTargetAccessProofFailure(
+                    "Hedef testi gecmedi: " + _lastTargetTestSummary,
+                    diagnosticDetails);
+                TargetTestSummary.Text =
+                    "Kapsam doğrulaması: " + _lastTargetTestSummary;
+            }
+
             _diagnostics.Info(
                 "ui.targetTest.complete",
                 "Kapsam doğrulaması tamamlandı.",
-                CreateTargetTestDiagnosticDetails(results));
+                diagnosticDetails);
             _diagnostics.WriteHealth(
-                "kapsam doğrulaması tamamlandı",
-                CreateTargetTestDiagnosticDetails(results));
+                failedCount > 0
+                    ? "hedef erisimi dogrulanamadi"
+                    : "kapsam doğrulaması tamamlandı",
+                diagnosticDetails);
         }
         catch (OperationCanceledException)
         {
@@ -2214,6 +2243,73 @@ public partial class MainWindow : Window, IDisposable
             DateTimeOffset.Now);
     }
 
+    private static bool TryCreateControllerWebProofProbeResult(
+        TargetDefinition target,
+        string[] hosts,
+        IReadOnlyDictionary<string, string?> controllerProofDetails,
+        int selectedWebTargetCount,
+        out TargetProbeResult result)
+    {
+        result = new TargetProbeResult(
+            TargetProbeStatus.Skipped,
+            null,
+            string.Empty,
+            DateTimeOffset.MinValue);
+        if (!target.HasWebScope || selectedWebTargetCount <= 0)
+        {
+            return false;
+        }
+
+        if (!controllerProofDetails.TryGetValue(
+                "webProxyProof.verified",
+                out var verified)
+            || !string.Equals(verified, "True", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (controllerProofDetails.TryGetValue(
+                "webProxyProof.failedTargets",
+                out var failedTargets)
+            && !string.IsNullOrWhiteSpace(failedTargets))
+        {
+            return false;
+        }
+
+        if (!TryReadMinimumProofCount(
+                controllerProofDetails,
+                "webProxyProof.requiredTargetCount",
+                selectedWebTargetCount)
+            || !TryReadMinimumProofCount(
+                controllerProofDetails,
+                "webProxyProof.verifiedTargetCount",
+                selectedWebTargetCount))
+        {
+            return false;
+        }
+
+        result = new TargetProbeResult(
+            TargetProbeStatus.Success,
+            string.Join(", ", hosts),
+            "Son tunel web kaniti OK.",
+            DateTimeOffset.Now);
+        return true;
+    }
+
+    private static bool TryReadMinimumProofCount(
+        IReadOnlyDictionary<string, string?> details,
+        string key,
+        int minimum)
+    {
+        return details.TryGetValue(key, out var value)
+            && int.TryParse(
+                value,
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out var count)
+            && count >= minimum;
+    }
+
     private static async Task<(TargetDefinition Target, TargetProbeResult Result)> ProbeTargetHostsViaScopedProxyAsync(
         TargetDefinition target,
         string[] hosts,
@@ -2222,7 +2318,6 @@ public partial class MainWindow : Window, IDisposable
     {
         var startedAt = DateTimeOffset.Now;
         var tested = 0;
-        var succeeded = 0;
         var failures = new List<TargetProbeResult>();
         try
         {
@@ -2236,20 +2331,14 @@ public partial class MainWindow : Window, IDisposable
                     .ConfigureAwait(false);
                 if (hostResult is null)
                 {
-                    succeeded++;
-                    continue;
+                    return (target, new TargetProbeResult(
+                        TargetProbeStatus.Success,
+                        string.Join(", ", hosts),
+                        $"CONNECT 443 rota OK: {tested.ToString(CultureInfo.InvariantCulture)}/{hosts.Length.ToString(CultureInfo.InvariantCulture)} host.",
+                        startedAt));
                 }
 
                 failures.Add(hostResult);
-            }
-
-            if (succeeded > 0)
-            {
-                return (target, new TargetProbeResult(
-                    TargetProbeStatus.Success,
-                    string.Join(", ", hosts),
-                    $"CONNECT 443 rota OK: {succeeded.ToString(CultureInfo.InvariantCulture)}/{hosts.Length.ToString(CultureInfo.InvariantCulture)} host.",
-                    startedAt));
             }
 
             return (target, new TargetProbeResult(

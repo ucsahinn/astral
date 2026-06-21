@@ -82,7 +82,7 @@
                                 VerticalAlignment="Center">
                         <TextBlock FontSize="22"
                                    FontWeight="SemiBold"
-                                   Text="Astral VPN v2.2.30" />
+                                   Text="Astral VPN v2.2.31" />
                         <TextBlock Margin="0,5,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
@@ -109,7 +109,7 @@
                                            FontSize="14"
                                            LineHeight="21"
                                            TextWrapping="Wrap"
-                                           Text="Bu sürüm v2.2.29 üzerinde kalan app+web yanlış bağlı pozitiflerini, cleanup doğrulama boşluklarını ve live smoke kanıt kapısını düzeltir. Astral VPN hâlâ yalnız seçili hedefleri kapsar; genel sistem VPN'i gibi davranmaz." />
+                                           Text="Bu sürüm v2.2.30 üzerinde kalan Discord dahil uygulama hedefi yanlış bağlı pozitiflerini kapatır. Astral VPN artık uygulama kapsamlı hedeflerde seçili hedef process'inin hedef host'a ait bağlantısını kanıtlamadan tam bağlı demez; genel sistem VPN'i gibi davranmaz." />
                             </StackPanel>
                         </Border>
 
@@ -208,6 +208,14 @@
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
+                                           Text="&#x2022; Discord dahil uygulama kapsamlı hedeflerde seçili hedef process'inin hedef host'a ait owned TCP bağlantısı kanıtlanmadan Astral tam bağlı durumuna geçmez." />
+                                <TextBlock FontSize="13"
+                                           LineHeight="22"
+                                           TextWrapping="Wrap"
+                                           Text="&#x2022; Tanılama ve live smoke çıktıları targetAppProof alanlarıyla hangi hedefte uygulama kanıtı eksik olduğunu açıkça yazar." />
+                                <TextBlock FontSize="13"
+                                           LineHeight="22"
+                                           TextWrapping="Wrap"
                                            Text="&#x2022; Scoped web proxy kanıtından sonra adapter trafik baseline'ı sıfırlanır; WebProxy'nin kendi CONNECT trafiği app kanıtı gibi sayılmaz." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
@@ -236,7 +244,7 @@
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Sürüm metadata'sı, updater, web proxy ve uygulama içi release bağlantısı v2.2.30 ile hizalandı." />
+                                           Text="&#x2022; Sürüm metadata'sı, updater, web proxy ve uygulama içi release bağlantısı v2.2.31 ile hizalandı." />
                             </StackPanel>
                         </Border>
 
@@ -268,7 +276,7 @@
                                    LineHeight="18"
                                    Foreground="{StaticResource MutedTextBrush}"
                                    TextWrapping="Wrap"
-                                   Text="SHA256: Paket üretildikten sonra GitHub release asset'i ile doğrulanır." />
+                                   Text="SHA256: GitHub release içindeki sürüm ZIP'i ve .sha256.txt dosyasıyla doğrulanır." />
                     </StackPanel>
                 </ScrollViewer>
 
@@ -282,7 +290,7 @@
                     <TextBlock VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource MutedTextBrush}"
-                                   Text="Bu not, v2.2.30 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
+                                   Text="Bu not, v2.2.31 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
                     <Button Grid.Column="1"
                             Margin="0,0,10,0"
                             Height="40"

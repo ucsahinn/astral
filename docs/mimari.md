@@ -53,7 +53,9 @@ Seçili web domainlerini taşıyan küçük loopback proxy exe'sidir. `--allow <
 11. Web hedefleri varsa PAC dosyası oluşturulur ve `Astral.WebProxy.exe` allowlist ile başlatılır.
 12. WireSock VPN Client `run -config <profile> -lac -log-level info` komutuyla scoped sanal ağ arayüzü modunda kullanıcı süreci olarak başlar.
 13. Readiness doğrulaması virtual-adapter modunda WireSock sürecinin sağlıklı kalmasını, scoped adapter'ın hazır olmasını ve tünel başlangıç logu ya da süreç başlangıcından sonra artan adapter trafik kanıtı üretmesini ister. Web hedefleri ayrıca seçili hostlar için scoped `CONNECT` kanıtı üretmelidir; bu kanıt app hedeflerinin yerine geçmez.
-14. Bağlantı kesilirken WireSock süreci sonlandırılır, PAC/proxy state'i geri alınır ve bağlantı koruması tekrar etkinleştirilir.
+14. Discord dışı uygulama kapsamlı hedeflerde genel profil kapsamı tek başına tam bağlantı kanıtı sayılmaz; `targetAppProof.*` alanları hedefe özel uygulama kanıtının gerekli, doğrulanmış veya eksik olduğunu gösterir. Windows sağlayıcısı hedef exe ipuçlarından çalışan süreci bulur, hedef probe hostlarını DNS ile çözer ve hedef sürecin bu IPv4/IPv6 adreslerine sahip olduğu established TCP bağlantısını arar. Kanıt eksikse fail-closed davranır ve `TargetActionRequired` durumunda kalır.
+15. Bağlantı açıkken `Astral.WebProxy` upstream `CONNECT` hataları ortak `tunnel.log` içinde izlenir; tanılama detayları `webProxyRuntime.*` alanlarıyla ilk kanıttan sonra oluşan runtime hedef hatasını görünür kılar.
+16. Bağlantı kesilirken WireSock süreci sonlandırılır, PAC/proxy state'i geri alınır ve bağlantı koruması tekrar etkinleştirilir. Process handle artık dispose sonrasında okunamadığında kapanış akışı fatal hataya düşmeden güvenli tanılama üretir.
 
 ## Hedef Modeli
 

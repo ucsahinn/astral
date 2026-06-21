@@ -154,7 +154,7 @@ static void RenderMainWindow()
         SaveWindowPng(window, Path.Combine(
             FindRepositoryRoot(),
             "artifacts",
-            "ui-main-window-v2.2.30.png"));
+            "ui-main-window-v2.2.31.png"));
 
         Assert(window.ResizeMode == ResizeMode.NoResize);
         Assert(window.Width == 1280);
@@ -597,7 +597,7 @@ static void VerifyBackgroundVideoRespectsReducedMotion()
         SaveWindowPng(window, Path.Combine(
             FindRepositoryRoot(),
             "artifacts",
-            "ui-main-window-video-v2.2.30.png"));
+            "ui-main-window-video-v2.2.31.png"));
     }
     finally
     {

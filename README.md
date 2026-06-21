@@ -69,7 +69,7 @@ Başlangıç presetleri:
 | İlk ekranda hedef kartları | Discord, Wattpad, Blogspot, medya/haber/araç presetleri ve diğer hazır hedefler ana ekrandan seçilir. |
 | Domain kapsamı | Web hedeflerinde yalnızca seçili domainler Astral.WebProxy üzerinden gider; diğer domainler DIRECT kalır. |
 | Canlı durum kartları | DNS, bağlantı durumu ve hedef kapsamını sade biçimde gösterir. |
-| Tanılama paketi | Bağlantı sorunlarını incelemek için paylaşıma uygun rapor hazırlar. |
+| Tanılama paketi | Bağlantı sorunlarını, hedef uygulama kanıtını, WebProxy runtime upstream hatalarını ve kapanış temizliği durumunu incelemek için paylaşıma uygun rapor hazırlar. |
 | Portable kullanım | Kurulum sihirbazı olmadan ZIP içinden çalışır. |
 | Güncelleme akışı | Yeni sürümü arka planda sessizce denetler; yalnız yeni sürüm varsa **Güncelle** düğmesini gösterir. |
 
@@ -106,7 +106,7 @@ Release sayfasındaki ZIP paketini manuel indirdiğinizde yanında verilen SHA-2
 | Sorun giderme | [docs/sorun-giderme.md](docs/sorun-giderme.md) |
 | Mimari | [docs/mimari.md](docs/mimari.md) |
 | Kaynak sorun denetimi | [docs/kaynak-sorun-denetimi.md](docs/kaynak-sorun-denetimi.md) |
-| v2.2.30 release notu | [docs/releases/v2.2.30.md](docs/releases/v2.2.30.md) |
+| v2.2.31 release notu | [docs/releases/v2.2.31.md](docs/releases/v2.2.31.md) |
 
 ## Geliştirme
 

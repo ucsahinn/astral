@@ -1,4 +1,4 @@
-using Astral.Core.Configuration;
+﻿using Astral.Core.Configuration;
 using Astral.Core.Diagnostics;
 using Astral.Core.Discord;
 using Astral.Core.Firewall;
@@ -55,6 +55,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
     private readonly ITunnelReadinessProbe _tunnelReadinessProbe;
     private readonly TargetScopeResolver _targetScopeResolver;
     private readonly IScopedWebProxyService _webProxyService;
+    private readonly ITargetApplicationProofProvider _targetApplicationProofProvider;
     private readonly SemaphoreSlim _operationGate = new(1, 1);
     private readonly TimeSpan _startupGracePeriod;
     private readonly TimeSpan _tunnelReadinessRetryDelay;
@@ -87,12 +88,15 @@ public sealed class DiscordTunnelController : IAsyncDisposable
     private string? _lastWireSockProcessExitCode;
     private string _lastWireSockMode = WireSockVirtualAdapterMode;
     private long _lastTunnelLogStartPosition;
+    private long? _lastWebProxyRuntimeObservationStartPosition;
     private IReadOnlyDictionary<string, string?> _lastRoutingSummary =
         new Dictionary<string, string?>();
     private ScopedWebProxyStatus _lastWebProxyStatus =
         ScopedWebProxyStatus.NotRequired("Web proxy kapsamı henüz denetlenmedi.");
     private ScopedWebProxyProof _lastWebProxyProof =
         ScopedWebProxyProof.NotRequired("Web proxy target proof has not run.");
+    private TargetApplicationProofResult _lastTargetApplicationProof =
+        TargetApplicationProofResult.NotRun();
     private TargetProcessRefreshResult _lastTargetProcessRefresh =
         TargetProcessRefreshResult.NotRun();
 
@@ -109,7 +113,8 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         ITunnelReadinessProbe? tunnelReadinessProbe = null,
         TimeSpan? tunnelReadinessRetryDelay = null,
         TargetScopeResolver? targetScopeResolver = null,
-        IScopedWebProxyService? webProxyService = null)
+        IScopedWebProxyService? webProxyService = null,
+        ITargetApplicationProofProvider? targetApplicationProofProvider = null)
     {
         _paths = paths ?? throw new ArgumentNullException(nameof(paths));
         _discordScope = discordScope ?? throw new ArgumentNullException(nameof(discordScope));
@@ -129,6 +134,8 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 _discordScope,
                 Path.Combine(AppContext.BaseDirectory, "Astral.WebProxy.exe"));
         _webProxyService = webProxyService ?? NullScopedWebProxyService.Instance;
+        _targetApplicationProofProvider = targetApplicationProofProvider
+            ?? NullTargetApplicationProofProvider.Instance;
         _startupGracePeriod = startupGracePeriod ?? TimeSpan.FromSeconds(2);
         _tunnelReadinessRetryDelay =
             tunnelReadinessRetryDelay ?? TunnelReadinessRetryDelay;
@@ -283,6 +290,18 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         foreach (var webProxyProofDetail in _lastWebProxyProof.ToDiagnosticDetails())
         {
             details[webProxyProofDetail.Key] = webProxyProofDetail.Value;
+        }
+
+        foreach (var webProxyRuntimeDetail in CreateWebProxyRuntimeFailureDetails())
+        {
+            details[webProxyRuntimeDetail.Key] = webProxyRuntimeDetail.Value;
+        }
+
+        foreach (var targetApplicationProofDetail in _lastTargetApplicationProof
+            .ToDiagnosticDetails())
+        {
+            details[targetApplicationProofDetail.Key] =
+                targetApplicationProofDetail.Value;
         }
 
         foreach (var targetProcessDetail in _lastTargetProcessRefresh.ToDiagnosticDetails())
@@ -443,6 +462,8 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     _lastWebProxyProof.Message);
             }
 
+            MarkWebProxyRuntimeObservationStart(_lastWebProxyProof);
+
             if (RoutingPlanRequiresApplicationTunnelProof(routingPlan))
             {
                 CaptureWireSockTrafficBaseline();
@@ -494,10 +515,26 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                         ["wireSockRunning"] = "True"
                     }.Concat(_lastWebProxyStatus.ToDiagnosticDetails())
                         .Concat(_lastWebProxyProof.ToDiagnosticDetails())
+                        .Concat(_lastTargetApplicationProof.ToDiagnosticDetails())
                         .Concat(_lastTargetProcessRefresh.ToDiagnosticDetails())
                         .Concat(CreateTunnelReadinessDetails())
                         .ToDictionary(pair => pair.Key, pair => pair.Value));
                 return _snapshot;
+            }
+
+            if (_lastWebProxyProof.Required)
+            {
+                _lastWebProxyProof = await VerifyScopedWebProxyTargetAccessWithRetryAsync(
+                    routingPlan,
+                    cancellationToken);
+                if (!_lastWebProxyProof.IsVerified)
+                {
+                    throw new InvalidOperationException(
+                        "Seçili web hedeflerine tünel hazır olduktan sonra scoped proxy üzerinden çıkış doğrulanamadı: " +
+                        _lastWebProxyProof.Message);
+                }
+
+                MarkWebProxyRuntimeObservationStart(_lastWebProxyProof);
             }
 
             var finalState = _lastTargetProcessRefresh.RequiresManualAction
@@ -527,6 +564,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     ["wireSockRunning"] = "True"
                 }.Concat(_lastWebProxyStatus.ToDiagnosticDetails())
                     .Concat(_lastWebProxyProof.ToDiagnosticDetails())
+                    .Concat(_lastTargetApplicationProof.ToDiagnosticDetails())
                     .Concat(_lastTargetProcessRefresh.ToDiagnosticDetails())
                     .Concat(CreateTunnelReadinessDetails())
                     .ToDictionary(pair => pair.Key, pair => pair.Value));
@@ -551,6 +589,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     ["wireSockRunning"] = "True"
                 }.Concat(_lastWebProxyStatus.ToDiagnosticDetails())
                     .Concat(_lastWebProxyProof.ToDiagnosticDetails())
+                    .Concat(_lastTargetApplicationProof.ToDiagnosticDetails())
                     .Concat(_lastTargetProcessRefresh.ToDiagnosticDetails())
                     .Concat(CreateTunnelReadinessDetails())
                     .ToDictionary(pair => pair.Key, pair => pair.Value));
@@ -585,6 +624,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                         ["wireSockRunning"] = "True"
                     }.Concat(_lastWebProxyStatus.ToDiagnosticDetails())
                         .Concat(_lastWebProxyProof.ToDiagnosticDetails())
+                        .Concat(_lastTargetApplicationProof.ToDiagnosticDetails())
                         .Concat(_lastTargetProcessRefresh.ToDiagnosticDetails())
                         .Concat(CreateTunnelReadinessDetails())
                         .ToDictionary(pair => pair.Key, pair => pair.Value));
@@ -620,6 +660,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                         ["wireSockRunning"] = "True"
                     }.Concat(_lastWebProxyStatus.ToDiagnosticDetails())
                         .Concat(_lastWebProxyProof.ToDiagnosticDetails())
+                        .Concat(_lastTargetApplicationProof.ToDiagnosticDetails())
                         .Concat(_lastTargetProcessRefresh.ToDiagnosticDetails())
                         .Concat(CreateTunnelReadinessDetails())
                         .ToDictionary(pair => pair.Key, pair => pair.Value));
@@ -640,6 +681,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     ["selectedTargets"] = routingPlan.Summary
                 }.Concat(_lastWebProxyStatus.ToDiagnosticDetails())
                     .Concat(_lastWebProxyProof.ToDiagnosticDetails())
+                    .Concat(_lastTargetApplicationProof.ToDiagnosticDetails())
                     .Concat(_lastTargetProcessRefresh.ToDiagnosticDetails())
                     .Concat(CreateTunnelReadinessDetails())
                     .ToDictionary(pair => pair.Key, pair => pair.Value));
@@ -691,6 +733,8 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             _lastWireSockMode = WireSockVirtualAdapterMode;
             _lastWebProxyProof =
                 ScopedWebProxyProof.NotRequired("Web proxy target proof has not run.");
+            _lastWebProxyRuntimeObservationStartPosition = null;
+            _lastTargetApplicationProof = TargetApplicationProofResult.NotRun();
             _lastTargetProcessRefresh = TargetProcessRefreshResult.NotRun();
             var routingPlan = _targetScopeResolver.Resolve(_targetSelection);
             _lastRoutingPlan = routingPlan;
@@ -788,6 +832,8 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     _lastWebProxyProof.Message);
             }
 
+            MarkWebProxyRuntimeObservationStart(_lastWebProxyProof);
+
             if (RoutingPlanRequiresApplicationTunnelProof(routingPlan)
                 && _lastWebProxyProof.Required
                 && _lastWebProxyProof.IsVerified)
@@ -812,6 +858,22 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 enforceApplicationTunnelProof,
                 cancellationToken);
             LogConnectPhase("tunnel-ready");
+
+            if (_lastWebProxyProof.Required)
+            {
+                _lastWebProxyProof = await VerifyScopedWebProxyTargetAccessWithRetryAsync(
+                    routingPlan,
+                    cancellationToken);
+                LogConnectPhase("web-proxy-proof-final");
+                if (!_lastWebProxyProof.IsVerified)
+                {
+                    throw new InvalidOperationException(
+                        "Seçili web hedeflerine tünel hazır olduktan sonra scoped proxy üzerinden çıkış doğrulanamadı: " +
+                        _lastWebProxyProof.Message);
+                }
+
+                MarkWebProxyRuntimeObservationStart(_lastWebProxyProof);
+            }
 
             var finalState = _lastTargetProcessRefresh.RequiresManualAction
                 ? TunnelState.TargetActionRequired
@@ -849,6 +911,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     ["wireSockRunning"] = "True"
                 }.Concat(_lastWebProxyStatus.ToDiagnosticDetails())
                     .Concat(_lastWebProxyProof.ToDiagnosticDetails())
+                    .Concat(_lastTargetApplicationProof.ToDiagnosticDetails())
                     .Concat(_lastTargetProcessRefresh.ToDiagnosticDetails())
                     .Concat(CreateTunnelReadinessDetails())
                     .ToDictionary(pair => pair.Key, pair => pair.Value));
@@ -876,6 +939,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     ["wireSockRunning"] = "True"
                 }.Concat(_lastWebProxyStatus.ToDiagnosticDetails())
                     .Concat(_lastWebProxyProof.ToDiagnosticDetails())
+                    .Concat(_lastTargetApplicationProof.ToDiagnosticDetails())
                     .Concat(_lastTargetProcessRefresh.ToDiagnosticDetails())
                     .Concat(CreateTunnelReadinessDetails())
                     .ToDictionary(pair => pair.Key, pair => pair.Value));
@@ -907,6 +971,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     ["diagnostic"] = exception.Message
                 }.Concat(_lastWebProxyStatus.ToDiagnosticDetails())
                     .Concat(_lastWebProxyProof.ToDiagnosticDetails())
+                    .Concat(_lastTargetApplicationProof.ToDiagnosticDetails())
                     .Concat(_lastTargetProcessRefresh.ToDiagnosticDetails())
                     .Concat(CreateTunnelReadinessDetails())
                     .ToDictionary(pair => pair.Key, pair => pair.Value));
@@ -971,24 +1036,19 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         RoutingPlan routingPlan,
         CancellationToken cancellationToken)
     {
-        var nonDiscordApplicationTargets = routingPlan.SelectedTargets
-            .Where(target =>
-                target.HasApplicationScope
-                && !target.Id.Equals(TargetIds.Discord, StringComparison.OrdinalIgnoreCase))
+        var applicationTargets = routingPlan.SelectedTargets
+            .Where(target => target.HasApplicationScope)
             .ToArray();
 
         if (!RoutingPlanRequiresDiscordProcessRefresh(routingPlan))
         {
-            if (nonDiscordApplicationTargets.Length > 0)
+            if (applicationTargets.Length > 0)
             {
-                var manualAction = TargetProcessRefreshResult.ApplicationManualActionRequired(
-                    nonDiscordApplicationTargets,
-                    routingPlan.AllowedApplications);
-                _diagnostics.Info(
-                    "controller.targetProcess.refresh",
-                    manualAction.Message,
-                    manualAction.ToDiagnosticDetails());
-                return manualAction;
+                return await VerifyApplicationTargetsAsync(
+                    routingPlan,
+                    applicationTargets,
+                    refreshedExistingTargets: false,
+                    cancellationToken);
             }
 
             return TargetProcessRefreshResult.NotRequired();
@@ -1060,20 +1120,154 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             refreshed.Message,
             refreshed.ToDiagnosticDetails());
 
-        if (nonDiscordApplicationTargets.Length > 0)
+        if (applicationTargets.Length > 0)
         {
-            var manualAction = TargetProcessRefreshResult.ApplicationManualActionRequired(
-                nonDiscordApplicationTargets,
-                routingPlan.AllowedApplications,
-                refreshedExistingTargets: true);
-            _diagnostics.Info(
-                "controller.targetProcess.refresh",
-                manualAction.Message,
-                manualAction.ToDiagnosticDetails());
-            return manualAction;
+            return await VerifyApplicationTargetsAsync(
+                routingPlan,
+                applicationTargets,
+                refreshedExistingTargets: true,
+                cancellationToken);
         }
 
         return refreshed;
+    }
+
+    private async Task<TargetProcessRefreshResult> VerifyApplicationTargetsAsync(
+        RoutingPlan routingPlan,
+        IReadOnlyList<TargetDefinition> applicationTargets,
+        bool refreshedExistingTargets,
+        CancellationToken cancellationToken)
+    {
+        _lastTargetApplicationProof = await VerifyTargetApplicationProofAsync(
+            routingPlan,
+            applicationTargets,
+            cancellationToken);
+        if (_lastTargetApplicationProof.IsVerified)
+        {
+            var verified = TargetProcessRefreshResult.ApplicationProofVerified(
+                applicationTargets,
+                routingPlan.AllowedApplications,
+                _lastTargetApplicationProof,
+                refreshedExistingTargets);
+            _diagnostics.Info(
+                "controller.targetProcess.refresh",
+                verified.Message,
+                verified.ToDiagnosticDetails()
+                    .Concat(_lastTargetApplicationProof.ToDiagnosticDetails())
+                    .ToDictionary(pair => pair.Key, pair => pair.Value));
+            return verified;
+        }
+
+        var manualAction = TargetProcessRefreshResult.ApplicationManualActionRequired(
+            applicationTargets,
+            routingPlan.AllowedApplications,
+            _lastTargetApplicationProof,
+            refreshedExistingTargets);
+        _diagnostics.Info(
+            "controller.targetProcess.refresh",
+            manualAction.Message,
+            manualAction.ToDiagnosticDetails()
+                .Concat(_lastTargetApplicationProof.ToDiagnosticDetails())
+                .ToDictionary(pair => pair.Key, pair => pair.Value));
+        return manualAction;
+    }
+
+    private async Task<TargetApplicationProofResult> VerifyTargetApplicationProofAsync(
+        RoutingPlan routingPlan,
+        IReadOnlyList<TargetDefinition> requiredTargets,
+        CancellationToken cancellationToken)
+    {
+        if (requiredTargets.Count == 0)
+        {
+            return TargetApplicationProofResult.NotRequired();
+        }
+
+        try
+        {
+            var proof = await _targetApplicationProofProvider.VerifyAsync(
+                routingPlan,
+                cancellationToken);
+            return NormalizeTargetApplicationProof(
+                proof,
+                requiredTargets);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            return TargetApplicationProofResult.Failed(
+                requiredTargets,
+                "Selected application target proof failed before Astral could report connected.",
+                "TargetApplicationProofFailed",
+                exception.Message);
+        }
+    }
+
+    private static TargetApplicationProofResult NormalizeTargetApplicationProof(
+        TargetApplicationProofResult proof,
+        IReadOnlyList<TargetDefinition> requiredTargets)
+    {
+        var requiredIds = requiredTargets
+            .Select(target => target.Id)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(id => id, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var verifiedIds = proof.VerifiedTargetIds
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var missingIds = requiredIds
+            .Where(requiredId => !verifiedIds.Contains(
+                requiredId,
+                StringComparer.OrdinalIgnoreCase))
+            .ToArray();
+
+        if (proof.IsVerified && missingIds.Length == 0)
+        {
+            return proof with
+            {
+                Required = true,
+                VerifiedTargetIds = requiredIds,
+                MissingTargetIds = []
+            };
+        }
+
+        if (proof.IsVerified)
+        {
+            return proof with
+            {
+                Required = true,
+                IsVerified = false,
+                VerifiedTargetIds = verifiedIds,
+                MissingTargetIds = missingIds,
+                Message = "Target application proof did not cover every selected application target.",
+                FailureKind = "TargetApplicationProofIncomplete"
+            };
+        }
+
+        var reportedMissingIds = proof.MissingTargetIds
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var normalizedMissingIds = reportedMissingIds
+            .Concat(missingIds)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(id => id, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        return proof with
+        {
+            Required = true,
+            VerifiedTargetIds = verifiedIds
+                .Where(verifiedId => requiredIds.Contains(
+                    verifiedId,
+                    StringComparer.OrdinalIgnoreCase))
+                .OrderBy(id => id, StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
+            MissingTargetIds = normalizedMissingIds.Length > 0
+                ? normalizedMissingIds
+                : requiredIds
+        };
     }
 
     private async Task<ScopedWebProxyProof> VerifyScopedWebProxyTargetAccessWithRetryAsync(
@@ -1125,6 +1319,83 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         }
 
         return proof;
+    }
+
+    public TunnelSnapshot ReportTargetAccessProofFailure(
+        string message,
+        IReadOnlyDictionary<string, string?> details)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(message);
+        ArgumentNullException.ThrowIfNull(details);
+
+        if (!_snapshot.IsTunnelActive)
+        {
+            return _snapshot;
+        }
+
+        var routingPlan = CurrentRoutingPlan;
+        _lastNextAction =
+            "Hedef testi gecmedi; baglantiyi kesip tekrar deneyin veya Onar akisina gecin.";
+        var diagnostic = AstralDiagnostics.RedactForLog(message);
+        var healthDetails = new Dictionary<string, string?>
+        {
+            ["operation"] = "target-access-proof",
+            ["message"] = message,
+            ["diagnostic"] = diagnostic,
+            ["selectedTargets"] = routingPlan.Summary,
+            ["routingScope"] = CreateRoutingScopeDescription(routingPlan),
+            ["routingSummary"] = FormatRoutingSummary(_lastRoutingSummary),
+            ["nextAction"] = _lastNextAction,
+            ["wireSockRunning"] =
+                (_wireSockProcess is not null && !_wireSockProcess.HasExited).ToString()
+        };
+
+        foreach (var pair in details)
+        {
+            healthDetails["targetTest." + pair.Key] =
+                AstralDiagnostics.RedactForLog(pair.Value);
+        }
+
+        foreach (var pair in _lastWebProxyStatus.ToDiagnosticDetails())
+        {
+            healthDetails[pair.Key] = pair.Value;
+        }
+
+        foreach (var pair in _lastWebProxyProof.ToDiagnosticDetails())
+        {
+            healthDetails[pair.Key] = pair.Value;
+        }
+
+        foreach (var pair in CreateWebProxyRuntimeFailureDetails())
+        {
+            healthDetails[pair.Key] = pair.Value;
+        }
+
+        foreach (var pair in _lastTargetApplicationProof.ToDiagnosticDetails())
+        {
+            healthDetails[pair.Key] = pair.Value;
+        }
+
+        foreach (var pair in _lastTargetProcessRefresh.ToDiagnosticDetails())
+        {
+            healthDetails[pair.Key] = pair.Value;
+        }
+
+        foreach (var pair in CreateTunnelReadinessDetails())
+        {
+            healthDetails[pair.Key] = pair.Value;
+        }
+
+        SetStatus(
+            TunnelState.TargetActionRequired,
+            "Hedef erisimi dogrulanamadi",
+            diagnostic);
+        _diagnostics.Warning(
+            "controller.targetAccessProof",
+            "Hedef testi basarisiz oldugu icin bagli durumu geri alindi.",
+            healthDetails);
+        _diagnostics.WriteHealth("hedef erisimi dogrulanamadi", healthDetails);
+        return _snapshot;
     }
 
     private async Task VerifyTunnelReadinessAsync(
@@ -1513,13 +1784,12 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             return;
         }
 
-        _lastWireSockProcessId =
-            process.ProcessId.ToString(CultureInfo.InvariantCulture);
-        _lastWireSockProcessExited = process.HasExited;
-        if (process.HasExited)
+        _lastWireSockProcessId = GetManagedProcessIdForDiagnostics(process);
+        _lastWireSockProcessExited = TryGetManagedProcessHasExited(process);
+        if (_lastWireSockProcessExited == true)
         {
             _lastWireSockProcessExitCode =
-                process.ExitCode?.ToString(CultureInfo.InvariantCulture)
+                TryGetManagedProcessExitCode(process)?.ToString(CultureInfo.InvariantCulture)
                 ?? "unknown";
             return;
         }
@@ -1594,6 +1864,125 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 AstralDiagnostics.RedactForLog(exception.Message);
             return false;
         }
+    }
+
+    private void MarkWebProxyRuntimeObservationStart(ScopedWebProxyProof proof)
+    {
+        _lastWebProxyRuntimeObservationStartPosition =
+            proof.Required && proof.IsVerified
+                ? GetFileLength(_paths.TunnelLog)
+                : null;
+    }
+
+    private Dictionary<string, string?> CreateWebProxyRuntimeFailureDetails()
+    {
+        var routingPlan = CurrentRoutingPlan;
+        var details = new Dictionary<string, string?>
+        {
+            ["webProxyRuntime.failuresDetected"] = "False",
+            ["webProxyRuntime.failureCount"] = "0"
+        };
+
+        if (!routingPlan.RequiresWebProxy)
+        {
+            details["webProxyRuntime.message"] =
+                "Web proxy runtime observation is not required for this target scope.";
+            return details;
+        }
+
+        if (!_snapshot.IsTunnelActive)
+        {
+            details["webProxyRuntime.message"] =
+                "Web proxy runtime observation is only evaluated while the tunnel is active.";
+            return details;
+        }
+
+        if (_lastWebProxyRuntimeObservationStartPosition is not long startPosition)
+        {
+            details["webProxyRuntime.message"] =
+                "Web proxy runtime observation has not started after a verified proof.";
+            return details;
+        }
+
+        try
+        {
+            if (!File.Exists(_paths.TunnelLog))
+            {
+                details["webProxyRuntime.message"] = "Tunnel log is not available.";
+                return details;
+            }
+
+            using var stream = new FileStream(
+                _paths.TunnelLog,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete);
+            if (stream.Length <= startPosition)
+            {
+                details["webProxyRuntime.message"] =
+                    "No WebProxy runtime log entry has been recorded for this tunnel.";
+                return details;
+            }
+
+            var readStart = Math.Max(
+                startPosition,
+                stream.Length - MaxWireSockLogReadBytes);
+            stream.Seek(readStart, SeekOrigin.Begin);
+            using var reader = new StreamReader(
+                stream,
+                Encoding.UTF8,
+                detectEncodingFromByteOrderMarks: true,
+                leaveOpen: false);
+            var failures = reader
+                .ReadToEnd()
+                .Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries)
+                .Where(line => line.Contains(
+                    "Astral.WebProxy upstream failed",
+                    StringComparison.OrdinalIgnoreCase))
+                .Select(NormalizeWebProxyRuntimeFailure)
+                .Where(line => !string.IsNullOrWhiteSpace(line))
+                .ToArray();
+
+            if (failures.Length == 0)
+            {
+                details["webProxyRuntime.message"] =
+                    "No WebProxy upstream failure has been recorded for this tunnel.";
+                return details;
+            }
+
+            details["webProxyRuntime.failuresDetected"] = "True";
+            details["webProxyRuntime.failureCount"] =
+                failures.Length.ToString(CultureInfo.InvariantCulture);
+            details["webProxyRuntime.lastFailure"] = failures[^1];
+            details["webProxyRuntime.message"] =
+                "WebProxy recorded upstream failures after the initial proof succeeded.";
+            return details;
+        }
+        catch (Exception exception)
+            when (exception is IOException
+                or UnauthorizedAccessException
+                or NotSupportedException)
+        {
+            details["webProxyRuntime.message"] =
+                AstralDiagnostics.RedactForLog(exception.Message);
+            return details;
+        }
+    }
+
+    private static string NormalizeWebProxyRuntimeFailure(string line)
+    {
+        const string Marker = "Astral.WebProxy upstream failed";
+        var sanitized = AstralDiagnostics.RedactForLog(line.Trim()) ?? string.Empty;
+        var markerIndex = sanitized.IndexOf(Marker, StringComparison.OrdinalIgnoreCase);
+        if (markerIndex >= 0)
+        {
+            sanitized = sanitized[markerIndex..];
+        }
+
+        const int MaxLength = 240;
+        return sanitized.Length <= MaxLength
+            ? sanitized
+            : sanitized[..MaxLength];
     }
 
     private static long GetFileLength(string path)
@@ -2015,7 +2404,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 Policy: "not-started-by-astral",
                 Message: "Target process refresh has not run.",
                 NextAction: "Seçili hedefleri şimdi açabilirsiniz.",
-                RunningProcessCount: 0,
+                RunningProcessCount: -1,
                 KnownExecutablePathCount: 0);
 
         public static TargetProcessRefreshResult NotRequired() =>
@@ -2026,7 +2415,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 Policy: "not-required",
                 Message: "Seçili hedefler için uygulama yenilemesi gerekmiyor.",
                 NextAction: "Seçili hedefleri şimdi açabilirsiniz.",
-                RunningProcessCount: 0,
+                RunningProcessCount: -1,
                 KnownExecutablePathCount: 0);
 
         public static TargetProcessRefreshResult NotRunning(
@@ -2044,6 +2433,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         public static TargetProcessRefreshResult ApplicationManualActionRequired(
             IReadOnlyList<TargetDefinition> targets,
             IReadOnlyList<string> allowedApplications,
+            TargetApplicationProofResult? proof = null,
             bool refreshedExistingTargets = false)
         {
             var targetSummary = string.Join(
@@ -2065,10 +2455,42 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     : "manual-start-required",
                 Message: message,
                 NextAction: "Seçili uygulamayı kapatıp yeniden açın; web hedefleri tünel açıkken ayrıca test edilir.",
-                RunningProcessCount: 0,
+                RunningProcessCount: -1,
                 KnownExecutablePathCount: knownExecutableCount,
-                FailureKind: "TargetSpecificAppProofUnavailable",
-                Diagnostic: "Non-Discord application targets are scoped in the WireSock profile, but Astral does not have target-specific app process/access proof for them yet.");
+                FailureKind: proof?.FailureKind ?? "TargetSpecificAppProofUnavailable",
+                Diagnostic: proof?.Diagnostic
+                    ?? "Application targets are scoped in the WireSock profile, but Astral does not have target-specific app process/access proof for them yet.");
+        }
+
+        public static TargetProcessRefreshResult ApplicationProofVerified(
+            IReadOnlyList<TargetDefinition> targets,
+            IReadOnlyList<string> allowedApplications,
+            TargetApplicationProofResult proof,
+            bool refreshedExistingTargets = false)
+        {
+            var targetSummary = string.Join(
+                ", ",
+                targets.Select(target => target.Label)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(label => label, StringComparer.OrdinalIgnoreCase));
+            var knownExecutableCount = allowedApplications.Count(IsApplicationTunnelExecutable);
+            var message = string.IsNullOrWhiteSpace(targetSummary)
+                ? "Selected application target was verified for the tunnel scope."
+                : $"{targetSummary} application scope was verified with tunnel proof.";
+
+            return new(
+                Required: true,
+                Refreshed: refreshedExistingTargets,
+                RequiresManualAction: false,
+                Policy: refreshedExistingTargets
+                    ? "partial-refresh-target-app-proof-verified"
+                    : "target-app-proof-verified",
+                Message: string.IsNullOrWhiteSpace(proof.Message)
+                    ? message
+                    : proof.Message,
+                NextAction: "Selected application targets were verified with tunnel proof.",
+                RunningProcessCount: -1,
+                KnownExecutablePathCount: knownExecutableCount);
         }
 
         public static TargetProcessRefreshResult Succeeded(
@@ -2111,7 +2533,9 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 ["targetProcessRefresh.policy"] = Policy,
                 ["targetProcessRefresh.message"] = Message,
                 ["targetProcessRefresh.runningProcessCount"] =
-                    RunningProcessCount.ToString(CultureInfo.InvariantCulture),
+                    RunningProcessCount < 0
+                        ? "not-measured"
+                        : RunningProcessCount.ToString(CultureInfo.InvariantCulture),
                 ["targetProcessRefresh.knownExecutablePathCount"] =
                     KnownExecutablePathCount.ToString(CultureInfo.InvariantCulture),
                 ["targetProcessRefresh.failureKind"] = FailureKind,
@@ -2351,17 +2775,24 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
         _wireSockProcess.Exited -= OnWireSockExited;
         var process = _wireSockProcess;
-        var processId = process.ProcessId.ToString(CultureInfo.InvariantCulture);
+        var processId = GetManagedProcessIdForDiagnostics(process);
         CaptureWireSockProcessState();
+        var exitedBeforeDispose = _lastWireSockProcessExited;
+        var exitCodeBeforeDispose = _lastWireSockProcessExitCode;
         await process.DisposeAsync();
         _lastWireSockProcessId = processId;
-        _lastWireSockProcessExited = process.HasExited;
-        _lastWireSockProcessExitCode = process.HasExited
-            ? process.ExitCode?.ToString(CultureInfo.InvariantCulture)
-                ?? "unknown"
-            : null;
+        var exitedAfterDispose = TryGetManagedProcessHasExited(process);
+        _lastWireSockProcessExited = exitedAfterDispose ?? exitedBeforeDispose;
+        var exitCodeAfterDispose = TryGetManagedProcessExitCode(process);
+        _lastWireSockProcessExitCode = exitCodeAfterDispose is not null
+            ? exitCodeAfterDispose.Value.ToString(CultureInfo.InvariantCulture)
+            : _lastWireSockProcessExited == true
+                ? exitCodeBeforeDispose ?? "unknown"
+                : exitCodeBeforeDispose;
         _wireSockProcess = null;
-        if (process.ExitConfirmed)
+        var exitConfirmed = TryGetManagedProcessExitConfirmed(process)
+            ?? _lastWireSockProcessExited == true;
+        if (exitConfirmed)
         {
             DeleteWireSockProcessMarker();
         }
@@ -2372,6 +2803,59 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                 "WireSock kapanışı doğrulanamadı; süreç işareti sonraki açılış için korunuyor.");
         }
     }
+
+    private static string GetManagedProcessIdForDiagnostics(IManagedProcess process)
+    {
+        try
+        {
+            return process.ProcessId.ToString(CultureInfo.InvariantCulture);
+        }
+        catch (Exception exception) when (IsProcessStateException(exception))
+        {
+            return "unknown";
+        }
+    }
+
+    private static bool? TryGetManagedProcessHasExited(IManagedProcess process)
+    {
+        try
+        {
+            return process.HasExited;
+        }
+        catch (Exception exception) when (IsProcessStateException(exception))
+        {
+            return null;
+        }
+    }
+
+    private static bool? TryGetManagedProcessExitConfirmed(IManagedProcess process)
+    {
+        try
+        {
+            return process.ExitConfirmed;
+        }
+        catch (Exception exception) when (IsProcessStateException(exception))
+        {
+            return null;
+        }
+    }
+
+    private static int? TryGetManagedProcessExitCode(IManagedProcess process)
+    {
+        try
+        {
+            return process.ExitCode;
+        }
+        catch (Exception exception) when (IsProcessStateException(exception))
+        {
+            return null;
+        }
+    }
+
+    private static bool IsProcessStateException(Exception exception) =>
+        exception is ObjectDisposedException
+            or InvalidOperationException
+            or System.ComponentModel.Win32Exception;
 
     private async Task<bool> TryEnableAccessLockAsync(string operation)
     {

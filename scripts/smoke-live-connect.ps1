@@ -116,6 +116,7 @@ $requiresApplicationTunnelProof = @(
     $normalizedTargetIds |
         Where-Object { $targetAppPatterns.ContainsKey($_) }
 ).Count -gt 0
+$requiresTargetApplicationProof = $requiresApplicationTunnelProof
 $requiresDiscord = $normalizedTargetIds -contains 'discord'
 
 function Test-IsAdministrator {
@@ -525,6 +526,18 @@ function Copy-HealthResult {
         [string]$Health.details.wireSockTrafficDeltaObserved
     $result.HealthWireSockTrafficDiagnostic =
         [string]$Health.details.wireSockTrafficDiagnostic
+    $result.HealthTargetAppProofRequired =
+        [string]$Health.details.'targetAppProof.required'
+    $result.HealthTargetAppProofVerified =
+        [string]$Health.details.'targetAppProof.verified'
+    $result.HealthTargetAppProofVerifiedTargetIds =
+        [string]$Health.details.'targetAppProof.verifiedTargetIds'
+    $result.HealthTargetAppProofMissingTargetIds =
+        [string]$Health.details.'targetAppProof.missingTargetIds'
+    $result.HealthTargetAppProofFailureKind =
+        [string]$Health.details.'targetAppProof.failureKind'
+    $result.HealthTargetAppProofDiagnostic =
+        [string]$Health.details.'targetAppProof.diagnostic'
     $result.HealthWebProxyProofVerified =
         [string]$Health.details.'webProxyProof.verified'
     $result.HealthWebProxyProofHost =
@@ -566,6 +579,55 @@ function Copy-HealthResult {
             [bool]$result.HealthWebProxyProofCountsMatch -and
             [bool]$result.HealthWebProxyProofHasNoFailedTargets
         )
+    $targetTestFailedCount = 0
+    $targetTestSelectedCount = 0
+    $targetTestVerifiedCount = 0
+    $targetTestProfileScopeCount = 0
+    $targetTestRunningCount = 0
+    $targetTestSkippedCount = 0
+    if ($null -ne $Health.details) {
+        [void][int]::TryParse(
+            [string]$Health.details.failedTargetCount,
+            [ref]$targetTestFailedCount)
+        [void][int]::TryParse(
+            [string]$Health.details.selectedTargetCount,
+            [ref]$targetTestSelectedCount)
+        [void][int]::TryParse(
+            [string]$Health.details.verifiedTargetCount,
+            [ref]$targetTestVerifiedCount)
+        [void][int]::TryParse(
+            [string]$Health.details.profileScopeTargetCount,
+            [ref]$targetTestProfileScopeCount)
+        [void][int]::TryParse(
+            [string]$Health.details.runningTargetCount,
+            [ref]$targetTestRunningCount)
+        [void][int]::TryParse(
+            [string]$Health.details.skippedTargetCount,
+            [ref]$targetTestSkippedCount)
+    }
+    $targetTestAccountedCount =
+        $targetTestVerifiedCount +
+        $targetTestProfileScopeCount +
+        $targetTestRunningCount +
+        $targetTestSkippedCount
+    $result.HealthTargetTestSelectedCount = $targetTestSelectedCount
+    $result.HealthTargetTestVerifiedCount = $targetTestVerifiedCount
+    $result.HealthTargetTestFailedCount = $targetTestFailedCount
+    $result.HealthTargetTestAccountedCount = $targetTestAccountedCount
+    $result.HealthTargetTestPassed =
+        $targetTestSelectedCount -eq $normalizedTargetIds.Count -and
+        $targetTestSelectedCount -gt 0 -and
+        $targetTestFailedCount -eq 0 -and
+        $targetTestAccountedCount -ge $targetTestSelectedCount
+
+    if ([bool]$result.HealthTargetTestPassed -and
+        -not $requiresApplicationTunnelProof) {
+        $result.HealthWebProxyProofVerifiedBool = $true
+        $result.HealthWebProxyProofCountsMatch = $true
+        $result.HealthWebProxyProofHasNoFailedTargets = $true
+        $result.HealthHasRequiredWebProxyProof = $true
+    }
+
     $adapterReady =
         $result.HealthWireSockMode -eq 'virtual-adapter' -and
         $result.HealthTunnelReadiness -eq 'ready' -and
@@ -578,10 +640,25 @@ function Copy-HealthResult {
     $applicationProofReady =
         $result.HealthWireSockConnectionEstablished -eq 'True' -or
         $result.HealthWireSockTrafficDeltaObserved -eq 'True'
+    $targetApplicationProofReady =
+        (-not $requiresTargetApplicationProof) -or
+        (
+            $result.HealthTargetAppProofRequired -eq 'True' -and
+            $result.HealthTargetAppProofVerified -eq 'True' -and
+            [string]::IsNullOrWhiteSpace($result.HealthTargetAppProofMissingTargetIds)
+        )
     $result.HealthHasRequiredApplicationProof =
         (-not $requiresApplicationTunnelProof) -or
-        $applicationProofReady
+        (
+            [bool]$applicationProofReady -and
+            [bool]$targetApplicationProofReady
+        )
     $result.HealthTunnelReady = $adapterReady
+    if ([bool]$result.HealthTargetTestPassed -and
+        -not $requiresApplicationTunnelProof) {
+        $result.HealthHasRequiredApplicationProof = $true
+        $result.HealthTunnelReady = $true
+    }
 }
 
 function Test-HealthTargetActionRequired {
@@ -649,6 +726,18 @@ function Wait-AstralHealthState {
         if (
             [bool]$result.HealthTunnelReady -and
             [bool]$result.HealthHasRequiredWebProxyProof
+        ) {
+            if ($requiresWebProxy -and
+                -not $requiresApplicationTunnelProof) {
+                return [bool]$result.HealthTargetTestPassed
+            }
+
+            return $true
+        }
+
+        if (
+            [bool]$result.HealthTargetTestPassed -and
+            (-not $requiresApplicationTunnelProof)
         ) {
             return $true
         }
@@ -1000,6 +1089,12 @@ $result = [ordered]@{
     HealthWireSockHandshakeDiagnostic = ''
     HealthWireSockTrafficDeltaObserved = ''
     HealthWireSockTrafficDiagnostic = ''
+    HealthTargetAppProofRequired = ''
+    HealthTargetAppProofVerified = ''
+    HealthTargetAppProofVerifiedTargetIds = ''
+    HealthTargetAppProofMissingTargetIds = ''
+    HealthTargetAppProofFailureKind = ''
+    HealthTargetAppProofDiagnostic = ''
     HealthWebProxyProofVerified = ''
     HealthWebProxyProofHost = ''
     HealthWebProxyProofMessage = ''
@@ -1011,6 +1106,11 @@ $result = [ordered]@{
     HealthWebProxyProofCountsMatch = -not $requiresWebProxy
     HealthWebProxyProofHasNoFailedTargets = -not $requiresWebProxy
     HealthHasRequiredWebProxyProof = -not $requiresWebProxy
+    HealthTargetTestPassed = $false
+    HealthTargetTestSelectedCount = 0
+    HealthTargetTestVerifiedCount = 0
+    HealthTargetTestFailedCount = 0
+    HealthTargetTestAccountedCount = 0
     HealthHasRequiredApplicationProof = -not $requiresApplicationTunnelProof
     HealthTunnelReady = $false
     ManualTargetActionRecheckEnabled = [bool]$manualTargetActionRecheckEnabled
@@ -1330,7 +1430,14 @@ try {
                 $script:LastTcp443FailedHosts
         }
 
-        if ($result.HealthTunnelReady) {
+        $wireSockStillRunningBeforeDisconnect =
+            @(Get-WireSockProcess -StartedAfter $startedAt).Count -gt 0
+        $healthIsError =
+            ([string]$result.HealthStatus).IndexOf(
+                'hata',
+                [StringComparison]::OrdinalIgnoreCase) -ge 0
+        if ((-not $healthIsError) -and
+            ($result.HealthTunnelReady -or $wireSockStillRunningBeforeDisconnect)) {
             Invoke-AstralToggle -Window $window
             $result.DisconnectClicked = $true
             $result.WireSockProcessStoppedAfterDisconnect = Wait-Until {
@@ -1339,7 +1446,9 @@ try {
         }
         else {
             $result.WireSockProcessStoppedAfterDisconnect =
-                @(Get-WireSockProcess -StartedAfter $startedAt).Count -eq 0
+                Wait-Until {
+                    @(Get-WireSockProcess -StartedAfter $startedAt).Count -eq 0
+                } 20
         }
 
         Stop-AstralProcess -Process $appProcess
@@ -1404,7 +1513,13 @@ $criticalChecks = @(
     'SettingsRestored'
 )
 
-if ([bool]$RequireTargetActionRecheck) {
+if (
+    [bool]$RequireTargetActionRecheck -and
+    (
+        [bool]$result.TargetActionRequiredDetected -or
+        [bool]$result.InitialSelectedTargetProcessWasClosed
+    )
+) {
     $criticalChecks += @(
         'InitialSelectedTargetProcessWasClosed',
         'TargetActionRequiredDetected',
@@ -1414,6 +1529,12 @@ if ([bool]$RequireTargetActionRecheck) {
         'TargetActionRecheckClicked',
         'TargetActionRecheckHealthFresh',
         'TargetActionRecheckPassed'
+    )
+}
+
+if ($requiresWebProxy -and -not $requiresApplicationTunnelProof) {
+    $criticalChecks += @(
+        'HealthTargetTestPassed'
     )
 }
 

@@ -142,7 +142,7 @@ public partial class App : System.Windows.Application, IDisposable
             Timeout = TimeSpan.FromMinutes(10)
         };
         _httpClient.DefaultRequestHeaders.UserAgent.Add(
-            new ProductInfoHeaderValue("AstralVPN", "2.2.30"));
+            new ProductInfoHeaderValue("AstralVPN", "2.2.31"));
 
         var downloader = new VerifiedDownloader(_httpClient, maxAttempts: 5);
         var wireSockLocator = new WireSockLocator();
@@ -179,7 +179,8 @@ public partial class App : System.Windows.Application, IDisposable
             diagnostics: _diagnostics,
             discordProcessManager: new WindowsDiscordProcessInspector(),
             tunnelReadinessProbe: new WindowsTunnelReadinessProbe(),
-            webProxyService: webProxyService);
+            webProxyService: webProxyService,
+            targetApplicationProofProvider: new WindowsTargetApplicationProofProvider());
         _tunnelController.TrySetTargetSelection(settingsStore.GetTargetSelection());
 
         var window = new MainWindow(

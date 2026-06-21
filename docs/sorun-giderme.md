@@ -50,6 +50,10 @@ Bu durumda Astral bağlantıyı başarılı saymaz ve proxy/PAC kapsamını geri
 
 Güncel tanılama paketinde `wireSockMode=virtual-adapter`, `tunnelReadiness=ready`, `webProxyProof.verified=True`, `webProxyProof.requiredTargetCount` ile `webProxyProof.verifiedTargetCount` eşit, `allowedBareBrowserNameCount=0`, `allowedBrowserApplicationCount=0`, `webProxy=included` ve app hedeflerinde `wireSockConnectionEstablished=True` veya `wireSockTrafficDeltaObserved=True` görünüyorsa seçili hedefler için kapsam planı dar ve beklenen biçimde kurulmuştur.
 
+`webProxyProof.verified=True` ilk scoped `CONNECT` kanıtının geçtiğini gösterir. Bağlantı açıldıktan sonra sayfa geç açılıyor veya seçili web hedefi 502/time-out veriyorsa tanılama paketindeki `webProxyRuntime.failuresDetected`, `webProxyRuntime.failureCount` ve `webProxyRuntime.lastFailure` alanlarını da kontrol edin. Bu alanlar ilk kanıt geçtikten sonra `Astral.WebProxy` tarafından görülen upstream `CONNECT` hatalarını gösterir; browser'ın WireSock kapsamına alındığı anlamına gelmez.
+
+Discord dışı uygulama kapsamlı hedeflerde `targetAppProof.required=True` ve `targetAppProof.verified=False` görülüyorsa Astral profil kapsamını hazırlamış ama hedef uygulamanın tünel yolundan çıktığını kanıtlayamamış demektir. Bu durumda uygulama kapatılıp tünel açıkken yeniden açılmalı veya hedefe özel canlı smoke kanıtı alınmalıdır; Astral bu kanıt eksikken tam `Connected` raporu vermez.
+
 ## Proxy/PAC Temizlenmedi Şüphesi
 
 Astral bağlantı kapanırken PAC/proxy state'ini geri alır. Şüphe varsa:
