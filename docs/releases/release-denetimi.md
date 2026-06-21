@@ -42,7 +42,7 @@ Neden `v2.2.32`?
 
 | Release | Canlı durum | Asset durumu | Karar | Gerekçe |
 | --- | --- | --- | --- | --- |
-| `v2.2.32` | Aday | Yerel artefact bekliyor | Güncel aday | Exact `verifiedTargetIds` WebProxy kanıtı, target-test health proof detayları ve public DNS fallback'in varsayılan kapalı olması. |
+| `v2.2.32` | Yayında | 4 asset | Güncel yayın | Exact `verifiedTargetIds` WebProxy kanıtı, target-test health proof detayları ve public DNS fallback'in varsayılan kapalı olması. |
 | `v2.2.31` | Yayında | 4 asset | v2.2.32 ile üstlen | Discord dahil app hedeflerinde target-owned TCP proof kapısı, tünel hazırlandıktan sonra final scoped WebProxy proof kapısı, live smoke script'inde hedef app proof alanları ve 2.2.31 sürüm hizalaması. |
 | `v2.2.30` | Yayında | 4 asset | v2.2.31 ile üstlen | App+web yanlış bağlı pozitifinin kapatılması, Discord dışı app hedeflerinin target-specific proof kapısı, cleanup doğrulama kapısı ve 2.2.30 sürüm hizalaması. |
 | `v2.2.29` | Aday | Yerine geçti | v2.2.30 ile üstlen | Üretim Discord process yenileme, cleanup timeout dayanıklılığı ve 2.2.29 sürüm hizalaması. |
