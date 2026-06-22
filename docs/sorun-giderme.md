@@ -31,10 +31,9 @@ Kontrol edin:
 
 ## WireSock Hazırlığı Doğrulanamadı
 
-Astral WireSock'u `-lac` scoped sanal ağ arayüzü moduyla başlatır. Bu modda WireSock sürecinin yaşıyor olması tek başına yeterli kanıt değildir. Bağlantı başarılı sayılmadan önce şu kanıtlar aranır:
+Astral web-only hedeflerde WireSock'u sanal adaptör açmadan transparent process modunda başlatır; uygulama kapsamı olan hedeflerde `-lac` scoped sanal ağ arayüzü modunu kullanır. WireSock sürecinin yaşıyor olması tek başına yeterli kanıt değildir. Bağlantı başarılı sayılmadan önce şu kanıtlar aranır:
 
-- WireSock logunda tünelin başladığını gösteren onay.
-- WireSock adapter sayaçlarında süreç başladıktan sonra trafik artışı.
+- Uygulama kapsamı varsa WireSock logunda tünelin başladığını gösteren onay veya adapter sayaçlarında süreç başladıktan sonra trafik artışı.
 - Web hedefi seçildiyse `Astral.WebProxy.exe` üzerinden seçili her web hedefi için en az bir başarılı scoped `CONNECT` kanıtı.
 - App hedefi seçildiyse WireSock handshake veya adapter trafik kanıtı; web proxy kanıtı app hedefi yerine geçmez.
 
@@ -42,13 +41,13 @@ Tanılama paketinde şu imzalar birlikte görünüyorsa bağlantı motoru gerçe
 
 - `wireSockProcessExited=True`
 - `wireSockProcessExitCode` değerinin beklenmeyen şekilde dolu olması
-- `wireSockMode=virtual-adapter`
-- `tunnelReadiness` değerinin `ready` olmaması
+- `wireSockMode=virtual-adapter` ise `tunnelReadiness` değerinin `ready` olmaması
+- `wireSockMode=transparent` ise `tunnelReadiness` değerinin `transparent-process-running` olmaması
 - `wireSockConnectionEstablished=False` ve `wireSockTrafficDeltaObserved=False` değerlerinin birlikte görünmesi
 
 Bu durumda Astral bağlantıyı başarılı saymaz ve proxy/PAC kapsamını geri temizler. Önce **Onar** akışını çalıştırın, ardından tekrar deneyin. Devam ederse WireSock kurulumu, güvenlik yazılımı, profil üretimi veya Windows ağ yığını ayrıca incelenmelidir.
 
-Güncel tanılama paketinde `wireSockMode=virtual-adapter`, `tunnelReadiness=ready`, `webProxyProof.verified=True`, `webProxyProof.requiredTargetCount` ile `webProxyProof.verifiedTargetCount` eşit, `allowedBareBrowserNameCount=0`, `allowedBrowserApplicationCount=0`, `webProxy=included` ve app hedeflerinde `wireSockConnectionEstablished=True` veya `wireSockTrafficDeltaObserved=True` görünüyorsa seçili hedefler için kapsam planı dar ve beklenen biçimde kurulmuştur.
+Güncel tanılama paketinde web-only hedeflerde `wireSockMode=transparent`, `tunnelReadiness=transparent-process-running`, `webProxyProof.verified=True`, `webProxyProof.requiredTargetCount` ile `webProxyProof.verifiedTargetCount` eşit, `allowedBareBrowserNameCount=0`, `allowedBrowserApplicationCount=0` ve `webProxy=included` görünüyorsa web kapsamı dar kurulmuştur. Uygulama kapsamı olan hedeflerde ayrıca `wireSockMode=virtual-adapter`, `tunnelReadiness=ready` ve app hedeflerinde `wireSockConnectionEstablished=True` veya `wireSockTrafficDeltaObserved=True` gerekir.
 
 `webProxyProof.verified=True` ilk scoped `CONNECT` kanıtının geçtiğini gösterir. Bağlantı açıldıktan sonra sayfa geç açılıyor veya seçili web hedefi 502/time-out veriyorsa tanılama paketindeki `webProxyRuntime.failuresDetected`, `webProxyRuntime.failureCount` ve `webProxyRuntime.lastFailure` alanlarını da kontrol edin. Bu alanlar ilk kanıt geçtikten sonra `Astral.WebProxy` tarafından görülen upstream `CONNECT` hatalarını gösterir; browser'ın WireSock kapsamına alındığı anlamına gelmez.
 

@@ -52,7 +52,15 @@ public sealed class TargetRegistry
                 "discord",
                 [
                     "discord.com",
-                    "discord.gg"
+                    "discord.gg",
+                    "discordapp.com",
+                    "discordapp.net",
+                    "discordcdn.com",
+                    "cdn.discordapp.com",
+                    "dl.discordapp.net",
+                    "gateway.discord.gg",
+                    "media.discordapp.net",
+                    "updates.discord.com"
                 ],
                 "https://discord.com/app"),
             Create(

@@ -89,6 +89,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("WireSock hazırlığı doğrulanmış yerel kurucuyu indirmeden kullanır", BootstrapUsesVerifiedLocalInstallerAsync),
     ("WireSock hazırlığı yeniden başlatma gerektiren başarı kodunu kabul eder", BootstrapAcceptsRestartRequiredExitCodeAsync),
     ("Denetleyici idempotent bağlanır ve keser", ControllerLifecycleAsync),
+    ("Denetleyici web-only hedeflerde sanal adapter modunu açmaz", ControllerUsesTransparentWireSockModeForWebOnlyTargetsAsync),
     ("Denetleyici kapatma koruması yenilenemezse başarı raporlamaz", ControllerDisconnectDoesNotReportProtectedWhenAccessLockRestoreFailsAsync),
     ("Denetleyici scoped PAC doğrulanmazsa bağlı raporlamaz", ControllerDoesNotReportConnectedWhenScopedPacMissingAsync),
     ("Denetleyici web-only hedefte Discord sürecine dokunmaz", ControllerConnectsWebOnlyTargetWithoutDiscordProcessAsync),
@@ -108,7 +109,8 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Denetleyici virtual adapter modda scoped web proxy kanıtıyla pasif adaptörü kabul etmez", ControllerRejectsScopedWebProxyProofWhenVirtualAdapterBlockedAsync),
     ("Denetleyici geçici scoped web proxy kanıt hatasını tekrar dener", ControllerRetriesScopedWebProxyProofAfterTransientFailureAsync),
     ("Denetleyici kalıcı scoped web proxy kanıt hatasında bağlı raporlamaz", ControllerRejectsScopedWebProxyProofAfterPermanentFailureAsync),
-    ("Denetleyici tünel hazır olduktan sonra web kanıtı düşerse bağlı raporlamaz", ControllerRejectsFinalScopedWebProxyProofAfterTunnelReadyAsync),
+    ("Denetleyici tam web kanıtını final bulk proof ile tekrar düşürmez", ControllerReusesCompleteScopedWebProxyProofAfterTunnelReadyAsync),
+    ("Denetleyici app aksiyonunda tam web kanıtını korur", ControllerKeepsCompleteWebProofWhenAppTargetsNeedActionAsync),
     ("Denetleyici hedef testi düşünce bağlı durumunu geri alır", ControllerDemotesConnectedStateWhenTargetAccessProbeFailsAsync),
     ("Denetleyici app+web hedeflerde app kanıtı yokken bağlı raporlamaz", ControllerRejectsAppWebTargetWhenOnlyScopedWebProxyProofExistsAsync),
     ("Denetleyici Discord dışı app hedeflerinde hedef aksiyonu olmadan bağlı raporlamaz", ControllerRequiresManualActionForNonDiscordAppTargetWithoutProcessProofAsync),
@@ -585,7 +587,9 @@ static Task TargetRegistryKeepsRouteOnlyDomainsOutOfProbeHostsAsync()
         Assert(registry.TryGet(TargetIds.Discord, out var discord));
         var discordProbes = GetProbeHosts(discord);
         Assert(discordProbes.Contains("discord.com"));
-        Assert(!discordProbes.Contains("discordapp.net"));
+        Assert(discordProbes.Contains("gateway.discord.gg"));
+        Assert(discordProbes.Contains("cdn.discordapp.com"));
+        Assert(discordProbes.Contains("media.discordapp.net"));
 
         Assert(registry.TryGet(TargetIds.Azar, out var azar));
         var azarProbes = GetProbeHosts(azar);
@@ -3034,6 +3038,70 @@ static async Task ControllerLifecycleAsync()
     }
 }
 
+static async Task ControllerUsesTransparentWireSockModeForWebOnlyTargetsAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var process = new FakeManagedProcess();
+    var processLauncher = new FakeProcessLauncher(process);
+    var paths = new AppPaths(root);
+    var diagnostics = new AstralDiagnostics(
+        paths,
+        TimeSpan.Zero);
+    var webProxyService = new FakeScopedWebProxyService
+    {
+        Proof = ScopedWebProxyProof.VerifiedAll(
+            ["Wattpad=wattpad.com"],
+            18088,
+            1,
+            [TargetIds.Wattpad])
+    };
+    var controller = new DiscordTunnelController(
+        paths,
+        new DiscordAppScope(root, root, root),
+        new FakeWireSockBootstrapper(Path.Combine(
+            root,
+            "WireSock VPN Client",
+            "bin",
+            WireSockPackage.CliExecutableFileName)),
+        new FakeProfileProvisioner(Path.Combine(root, "discord.conf")),
+        processLauncher,
+        TimeSpan.Zero,
+        new FakeDiscordAccessLock(),
+        diagnostics,
+        new FakeDiscordProcessManager(new DiscordProcessSnapshot(0, [], [])),
+        new FakeTunnelReadinessProbe(
+            TunnelReadinessSnapshot.ProbeUnavailable("adapter not required for transparent web-only scope")),
+        tunnelReadinessRetryDelay: TimeSpan.Zero,
+        webProxyService: webProxyService);
+    controller.TrySetTargetSelection(new TargetSelection([TargetIds.Wattpad]));
+
+    try
+    {
+        await controller.ConnectAsync();
+
+        Assert(controller.Snapshot.State == TunnelState.Connected);
+        Assert(processLauncher.LastArguments.SequenceEqual(
+            [
+                "run",
+                "-config",
+                Path.Combine(root, "discord.conf"),
+                "-log-level",
+                "info"
+            ],
+            StringComparer.Ordinal));
+        Assert(!processLauncher.LastArguments.Contains("-lac", StringComparer.Ordinal));
+
+        var health = await File.ReadAllTextAsync(paths.HealthReport);
+        Assert(health.Contains("\"wireSockMode\":\"transparent\"", StringComparison.Ordinal));
+        Assert(health.Contains("\"webProxyProof.verified\":\"True\"", StringComparison.Ordinal));
+    }
+    finally
+    {
+        await controller.DisposeAsync();
+        Directory.Delete(root, recursive: true);
+    }
+}
+
 static async Task ControllerDisconnectDoesNotReportProtectedWhenAccessLockRestoreFailsAsync()
 {
     var root = CreateTemporaryDirectory();
@@ -4137,7 +4205,7 @@ static async Task ControllerRejectsScopedWebProxyProofWhenVirtualAdapterBlockedA
     var webProxy = new FakeScopedWebProxyService
     {
         Proof = ScopedWebProxyProof.Verified(
-            "wattpad.com",
+            "discord.gg",
             18088,
             "Fake scoped web proxy target proof succeeded.")
     };
@@ -4158,7 +4226,7 @@ static async Task ControllerRejectsScopedWebProxyProofWhenVirtualAdapterBlockedA
         readinessProbe,
         tunnelReadinessRetryDelay: TimeSpan.Zero,
         webProxyService: webProxy);
-    controller.TrySetTargetSelection(new TargetSelection([TargetIds.Wattpad]));
+    controller.TrySetTargetSelection(new TargetSelection([TargetIds.Discord]));
 
     try
     {
@@ -4173,7 +4241,7 @@ static async Task ControllerRejectsScopedWebProxyProofWhenVirtualAdapterBlockedA
         Assert(details["wireSockConnectionEstablished"] == "False");
         Assert(details["wireSockAdapterStatus"] == "Down");
         Assert(details["webProxyProof.verified"] == "True");
-        Assert(details["webProxyProof.host"] == "wattpad.com");
+        Assert(details["webProxyProof.host"] == "discord.gg");
         Assert(details["tunnelReadiness"] == "wiresock-adapter-inactive");
         Assert(details["wireSockHandshakeDiagnostic"]!.Contains(
             "adapter",
@@ -4262,9 +4330,8 @@ static async Task ControllerRetriesScopedWebProxyProofAfterTransientFailureAsync
         var details = controller.CreateDiagnosticDetails();
         Assert(details["webProxyProof.verified"] == "True");
         Assert(details["webProxyProof.host"] == "wattpad.com");
-        Assert(details["wireSockMode"] == "virtual-adapter");
-        Assert(details["tunnelReadiness"] == "ready");
-        Assert(details["wireSockTrafficDeltaObserved"] == "True");
+        Assert(details["wireSockMode"] == "transparent");
+        Assert(details["tunnelReadiness"] == "transparent-process-running");
     }
     finally
     {
@@ -4333,7 +4400,7 @@ static async Task ControllerRejectsScopedWebProxyProofAfterPermanentFailureAsync
         Assert(webProxy.VerifyTargetAccessCount == 2);
 
         var details = controller.CreateDiagnosticDetails();
-        Assert(details["wireSockMode"] == "virtual-adapter");
+        Assert(details["wireSockMode"] == "transparent");
         Assert(details["webProxyProof.required"] == "True");
         Assert(details["webProxyProof.verified"] == "False");
         Assert(details["webProxyProof.failedTargets"]!.Contains(
@@ -4354,7 +4421,7 @@ static async Task ControllerRejectsScopedWebProxyProofAfterPermanentFailureAsync
     }
 }
 
-static async Task ControllerRejectsFinalScopedWebProxyProofAfterTunnelReadyAsync()
+static async Task ControllerReusesCompleteScopedWebProxyProofAfterTunnelReadyAsync()
 {
     var root = CreateTemporaryDirectory();
     var process = new FakeManagedProcess();
@@ -4379,10 +4446,11 @@ static async Task ControllerRejectsFinalScopedWebProxyProofAfterTunnelReadyAsync
     var webProxy = new FakeScopedWebProxyService
     {
         ProofFactory = (attempt, _) => attempt == 1
-            ? ScopedWebProxyProof.Verified(
-                "wattpad.com",
+            ? ScopedWebProxyProof.VerifiedAll(
+                ["Wattpad=wattpad.com"],
                 18088,
-                "Initial scoped web proxy target proof succeeded before tunnel readiness.")
+                1,
+                [TargetIds.Wattpad])
             : ScopedWebProxyProof.Failed(
                 "wattpad.com",
                 18088,
@@ -4414,24 +4482,123 @@ static async Task ControllerRejectsFinalScopedWebProxyProofAfterTunnelReadyAsync
     {
         await controller.ConnectAsync();
 
-        Assert(controller.Snapshot.State == TunnelState.Error);
-        Assert(process.HasExited);
-        Assert(webProxy.VerifyTargetAccessCount == 3);
+        Assert(controller.Snapshot.State == TunnelState.Connected);
+        Assert(!process.HasExited);
+        Assert(webProxy.VerifyTargetAccessCount == 1);
 
         var details = controller.CreateDiagnosticDetails();
         Assert(details["webProxyProof.required"] == "True");
-        Assert(details["webProxyProof.verified"] == "False");
-        Assert(details["webProxyProof.failedTargets"]!.Contains(
-            "Wattpad",
-            StringComparison.OrdinalIgnoreCase));
+        Assert(details["webProxyProof.verified"] == "True");
+        Assert(details["webProxyProof.verifiedTargetIds"] == TargetIds.Wattpad);
+        Assert(details["wireSockMode"] == "transparent");
+        Assert(details["tunnelReadiness"] == "transparent-process-running");
+
+        var health = await File.ReadAllTextAsync(paths.HealthReport);
+        Assert(health.Contains("\"status\":\"bağlantı hazır\"", StringComparison.Ordinal));
+        Assert(health.Contains(
+            "\"webProxyProof.verified\":\"True\"",
+            StringComparison.Ordinal));
+        Assert(health.Contains(
+            "\"webProxyProof.verifiedTargetIds\":\"wattpad\"",
+            StringComparison.Ordinal));
+    }
+    finally
+    {
+        await controller.DisposeAsync();
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task ControllerKeepsCompleteWebProofWhenAppTargetsNeedActionAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var process = new FakeManagedProcess();
+    var accessLock = new FakeDiscordAccessLock();
+    var paths = new AppPaths(root);
+    var diagnostics = new AstralDiagnostics(
+        paths,
+        TimeSpan.Zero);
+    var discordManager = new FakeDiscordProcessManager(
+        new DiscordProcessSnapshot(
+            1,
+            [Path.Combine(root, "Discord", "app-1.0.9999", "Discord.exe")],
+            [100]));
+    var readinessProbe = new ObservingTunnelReadinessProbe(() =>
+        discordManager.RestartCount > 0
+            ? TunnelReadinessSnapshot.Ready(
+                "Up",
+                128,
+                512,
+                "wt0",
+                "WireGuard Tunnel")
+            : TunnelReadinessSnapshot.Ready(
+                "Up",
+                128,
+                256,
+                "wt0",
+                "WireGuard Tunnel"));
+    var webProxy = new FakeScopedWebProxyService
+    {
+        ProofFactory = (attempt, _) => attempt == 1
+            ? ScopedWebProxyProof.VerifiedAll(
+                ["Discord=discord.com", "Azar=azarlive.com"],
+                18088,
+                2,
+                [TargetIds.Azar, TargetIds.Discord])
+            : ScopedWebProxyProof.Failed(
+                "azarlive.com",
+                18088,
+                "Selected target proxy proof failed after tunnel readiness: Azar=azarlive.com=Proxy CONNECT timed out.",
+                requiredTargetCount: 2,
+                verifiedTargetCount: 1,
+                failedTargets: "Azar=azarlive.com=Proxy CONNECT timed out.")
+    };
+    var controller = new DiscordTunnelController(
+        paths,
+        new DiscordAppScope(root, root, root),
+        new FakeWireSockBootstrapper(Path.Combine(
+            root,
+            "WireSock VPN Client",
+            "bin",
+            WireSockPackage.CliExecutableFileName)),
+        new FakeProfileProvisioner(Path.Combine(root, "mixed.conf")),
+        new FakeProcessLauncher(process, "WireSock started"),
+        TimeSpan.Zero,
+        accessLock,
+        diagnostics,
+        discordManager,
+        readinessProbe,
+        tunnelReadinessRetryDelay: TimeSpan.Zero,
+        webProxyService: webProxy,
+        targetApplicationProofProvider: VerifiedTargetProof(TargetIds.Discord));
+    controller.TrySetTargetSelection(new TargetSelection([TargetIds.Discord, TargetIds.Azar]));
+
+    try
+    {
+        await controller.ConnectAsync();
+
+        Assert(controller.Snapshot.State == TunnelState.TargetActionRequired);
+        Assert(!controller.Snapshot.IsConnected);
+        Assert(controller.Snapshot.IsTunnelActive);
+        Assert(controller.Snapshot.NeedsTargetAction);
+        Assert(!process.HasExited);
+        Assert(webProxy.VerifyTargetAccessCount == 1);
+
+        var details = controller.CreateDiagnosticDetails();
+        Assert(details["webProxyProof.verified"] == "True");
+        Assert(details["webProxyProof.verifiedTargetIds"] == "azar, discord");
+        Assert(details["targetAppProof.verified"] == "False");
+        Assert(details["targetAppProof.verifiedTargetIds"] == TargetIds.Discord);
+        Assert(details["targetAppProof.missingTargetIds"] == TargetIds.Azar);
+        Assert(details["targetProcessRefresh.manualActionRequired"] == "True");
         Assert(details["tunnelReadiness"] == "ready");
 
         var health = await File.ReadAllTextAsync(paths.HealthReport);
-        Assert(health.Contains("\"status\":\"hata\"", StringComparison.Ordinal));
-        Assert(health.Contains(
-            "\"webProxyProof.verified\":\"False\"",
-            StringComparison.Ordinal));
-        Assert(!health.Contains("\"state\":\"Connected\"", StringComparison.Ordinal));
+        Assert(health.Contains("\"status\":\"hedef için ek aksiyon gerekli\"", StringComparison.Ordinal));
+        Assert(health.Contains("\"webProxyProof.verified\":\"True\"", StringComparison.Ordinal));
+        Assert(health.Contains("\"webProxyProof.verifiedTargetIds\":\"azar, discord\"", StringComparison.Ordinal));
+        Assert(!health.Contains("Proxy CONNECT timed out", StringComparison.Ordinal));
+        Assert(!health.Contains("\"status\":\"hata\"", StringComparison.Ordinal));
     }
     finally
     {

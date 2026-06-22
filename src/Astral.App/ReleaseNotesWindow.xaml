@@ -82,7 +82,7 @@
                                 VerticalAlignment="Center">
                         <TextBlock FontSize="22"
                                    FontWeight="SemiBold"
-                                   Text="Astral VPN v2.2.32" />
+                                   Text="Astral VPN v2.2.33" />
                         <TextBlock Margin="0,5,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
@@ -204,6 +204,10 @@
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
+                                           Text="&#x2022; Web-only hedeflerde WireSock sanal adapter modu açılmaz; yalnız Astral.WebProxy tünele alınır ve seçili olmayan TCP/443 bağlantıları normal hatta kalır." />
+                                <TextBlock FontSize="13"
+                                           LineHeight="22"
+                                           TextWrapping="Wrap"
                                            Text="&#x2022; Azar, Tango, LiVU ve IMVU gibi Discord dışı uygulama hedefleri artık yalnız profil kapsamı veya başka bir hedefin kanıtıyla tam bağlı sayılmaz; hedef aksiyonu gerekir." />
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
@@ -244,7 +248,7 @@
                                 <TextBlock FontSize="13"
                                            LineHeight="22"
                                            TextWrapping="Wrap"
-                                           Text="&#x2022; Sürüm metadata'sı, updater, web proxy ve uygulama içi release bağlantısı v2.2.32 ile hizalandı." />
+                                           Text="&#x2022; Final WebProxy kanıtı artık daha önce tam doğrulanan hedef ID listesini gereksiz bulk re-probe ile düşürmez." />
                             </StackPanel>
                         </Border>
 
@@ -290,7 +294,7 @@
                     <TextBlock VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource MutedTextBrush}"
-                                   Text="Bu not, v2.2.32 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
+                                   Text="Bu not, v2.2.33 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
                     <Button Grid.Column="1"
                             Margin="0,0,10,0"
                             Height="40"

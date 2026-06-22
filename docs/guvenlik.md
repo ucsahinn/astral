@@ -10,7 +10,7 @@ Astral'ın güvenlik hedefi, seçili hedefler dışında kalan trafiği kapsam d
 - PAC kuralı seçili domainlerde PROXY, diğer tüm domainlerde DIRECT döndürür.
 - `Astral.WebProxy` varsayılan olarak sistem DNS davranışını kullanır; Cloudflare/Google gibi public DNS fallback yalnız `ASTRAL_WEBPROXY_ALLOW_PUBLIC_DNS_FALLBACK=1` / `true` / `yes` ile açılır.
 - Eski ayarlarda kalan özel hedef alanları yeni sürümde route planına taşınmaz.
-- WireSock `-lac` scoped sanal ağ arayüzü moduyla çalışır; `AllowedApps` kapsamı seçili uygulamalar ve gerektiğinde `Astral.WebProxy.exe` ile sınırlıdır.
+- WireSock `-lac` scoped sanal ağ arayüzü modu yalnız uygulama kapsamı gereken hedeflerde açılır. Web-only seçimlerde sanal adaptör açılmaz; yalnız `Astral.WebProxy.exe` `AllowedApps` kapsamına girer ve seçili olmayan domainler PAC tarafında `DIRECT` kalır.
 
 ## TLS ve İçerik
 

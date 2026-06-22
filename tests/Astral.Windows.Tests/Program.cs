@@ -154,7 +154,7 @@ static void RenderMainWindow()
         SaveWindowPng(window, Path.Combine(
             FindRepositoryRoot(),
             "artifacts",
-            "ui-main-window-v2.2.32.png"));
+            "ui-main-window-v2.2.33.png"));
 
         Assert(window.ResizeMode == ResizeMode.NoResize);
         Assert(window.Width == 1280);
@@ -386,7 +386,8 @@ static void RenderMainWindow()
         Assert(fallbackDiscordLaunchUri.AbsoluteUri == "https://discord.com/");
         var discordHosts = MainWindow.GetTargetTestHostsForTesting(discordTarget);
         Assert(discordHosts.Contains("discord.com", StringComparer.OrdinalIgnoreCase));
-        Assert(!discordHosts.Contains("discordapp.net", StringComparer.OrdinalIgnoreCase));
+        Assert(discordHosts.Contains("gateway.discord.gg", StringComparer.OrdinalIgnoreCase));
+        Assert(discordHosts.Contains("cdn.discordapp.com", StringComparer.OrdinalIgnoreCase));
         Assert(!MainWindow.IsSuccessfulTargetProbeApplicationScopeReadyForTesting(discordTarget));
         Assert(MainWindow.IsProfileScopeTargetProbeApplicationScopeReadyForTesting(discordTarget));
         Assert(MainWindow.MaxConcurrentTargetTestProbesForTesting == 8);
@@ -597,7 +598,7 @@ static void VerifyBackgroundVideoRespectsReducedMotion()
         SaveWindowPng(window, Path.Combine(
             FindRepositoryRoot(),
             "artifacts",
-            "ui-main-window-video-v2.2.32.png"));
+            "ui-main-window-video-v2.2.33.png"));
     }
     finally
     {

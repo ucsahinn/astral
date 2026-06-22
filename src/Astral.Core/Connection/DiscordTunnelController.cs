@@ -524,14 +524,28 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
             if (_lastWebProxyProof.Required)
             {
-                _lastWebProxyProof = await VerifyScopedWebProxyTargetAccessWithRetryAsync(
+                _lastWebProxyStatus = await _webProxyService.EnsureAppliedAsync(
                     routingPlan,
+                    progress: null,
                     cancellationToken);
-                if (!_lastWebProxyProof.IsVerified)
+                if (_lastWebProxyStatus.Required && !_lastWebProxyStatus.IsApplied)
                 {
                     throw new InvalidOperationException(
-                        "Seçili web hedeflerine tünel hazır olduktan sonra scoped proxy üzerinden çıkış doğrulanamadı: " +
-                        _lastWebProxyProof.Message);
+                        "Seçili web hedefleri için scoped proxy kapsamı tünel hazır olduktan sonra doğrulanamadı: " +
+                        _lastWebProxyStatus.Message);
+                }
+
+                if (!CanReuseCompleteScopedWebProxyProof(routingPlan, _lastWebProxyProof))
+                {
+                    _lastWebProxyProof = await VerifyScopedWebProxyTargetAccessWithRetryAsync(
+                        routingPlan,
+                        cancellationToken);
+                    if (!_lastWebProxyProof.IsVerified)
+                    {
+                        throw new InvalidOperationException(
+                            "Seçili web hedeflerine tünel hazır olduktan sonra scoped proxy üzerinden çıkış doğrulanamadı: " +
+                            _lastWebProxyProof.Message);
+                    }
                 }
 
                 MarkWebProxyRuntimeObservationStart(_lastWebProxyProof);
@@ -730,7 +744,6 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             _lastWireSockConnectionEstablished = false;
             _lastWireSockHandshakeDiagnostic =
                 "WireSock handshake has not been checked.";
-            _lastWireSockMode = WireSockVirtualAdapterMode;
             _lastWebProxyProof =
                 ScopedWebProxyProof.NotRequired("Web proxy target proof has not run.");
             _lastWebProxyRuntimeObservationStartPosition = null;
@@ -738,6 +751,9 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             _lastTargetProcessRefresh = TargetProcessRefreshResult.NotRun();
             var routingPlan = _targetScopeResolver.Resolve(_targetSelection);
             _lastRoutingPlan = routingPlan;
+            _lastWireSockMode = RoutingPlanRequiresApplicationTunnelProof(routingPlan)
+                ? WireSockVirtualAdapterMode
+                : WireSockTransparentMode;
             _lastWebProxyStatus = routingPlan.RequiresWebProxy
                 ? new ScopedWebProxyStatus(
                     Required: true,
@@ -800,6 +816,7 @@ public sealed class DiscordTunnelController : IAsyncDisposable
             _lastTunnelLogStartPosition = await StartWireSockProcessAsync(
                 wireSockExecutable,
                 profilePath,
+                RoutingPlanRequiresApplicationTunnelProof(routingPlan),
                 cancellationToken);
             LogConnectPhase("wiresock-process-started");
 
@@ -861,15 +878,29 @@ public sealed class DiscordTunnelController : IAsyncDisposable
 
             if (_lastWebProxyProof.Required)
             {
-                _lastWebProxyProof = await VerifyScopedWebProxyTargetAccessWithRetryAsync(
-                    routingPlan,
-                    cancellationToken);
                 LogConnectPhase("web-proxy-proof-final");
-                if (!_lastWebProxyProof.IsVerified)
+                _lastWebProxyStatus = await _webProxyService.EnsureAppliedAsync(
+                    routingPlan,
+                    progress,
+                    cancellationToken);
+                if (_lastWebProxyStatus.Required && !_lastWebProxyStatus.IsApplied)
                 {
                     throw new InvalidOperationException(
-                        "Seçili web hedeflerine tünel hazır olduktan sonra scoped proxy üzerinden çıkış doğrulanamadı: " +
-                        _lastWebProxyProof.Message);
+                        "Seçili web hedefleri için scoped proxy kapsamı tünel hazır olduktan sonra doğrulanamadı: " +
+                        _lastWebProxyStatus.Message);
+                }
+
+                if (!CanReuseCompleteScopedWebProxyProof(routingPlan, _lastWebProxyProof))
+                {
+                    _lastWebProxyProof = await VerifyScopedWebProxyTargetAccessWithRetryAsync(
+                        routingPlan,
+                        cancellationToken);
+                    if (!_lastWebProxyProof.IsVerified)
+                    {
+                        throw new InvalidOperationException(
+                            "Seçili web hedeflerine tünel hazır olduktan sonra scoped proxy üzerinden çıkış doğrulanamadı: " +
+                            _lastWebProxyProof.Message);
+                    }
                 }
 
                 MarkWebProxyRuntimeObservationStart(_lastWebProxyProof);
@@ -989,12 +1020,14 @@ public sealed class DiscordTunnelController : IAsyncDisposable
     private async Task<long> StartWireSockProcessAsync(
         string wireSockExecutable,
         string profilePath,
+        bool useVirtualAdapterMode,
         CancellationToken cancellationToken)
     {
         SetStatus(TunnelState.Connecting, "Hedef bağlantısı kuruluyor");
         var arguments = await PrepareWireSockArgumentsAsync(
             wireSockExecutable,
             profilePath,
+            useVirtualAdapterMode,
             cancellationToken);
         CaptureWireSockTrafficBaseline();
         _diagnostics.Info(
@@ -1319,6 +1352,54 @@ public sealed class DiscordTunnelController : IAsyncDisposable
         }
 
         return proof;
+    }
+
+    private static bool CanReuseCompleteScopedWebProxyProof(
+        RoutingPlan routingPlan,
+        ScopedWebProxyProof proof)
+    {
+        if (!proof.Required)
+        {
+            return true;
+        }
+
+        if (!proof.IsVerified)
+        {
+            return false;
+        }
+
+        var requiredTargetIds = routingPlan.SelectedTargets
+            .Where(target => target.HasWebScope)
+            .Select(target => target.Id)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(id => id, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (requiredTargetIds.Length == 0)
+        {
+            return true;
+        }
+
+        if (proof.RequiredTargetCount is int requiredTargetCount
+            && requiredTargetCount < requiredTargetIds.Length)
+        {
+            return false;
+        }
+
+        if (proof.VerifiedTargetCount is int verifiedTargetCount
+            && verifiedTargetCount < requiredTargetIds.Length)
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(proof.VerifiedTargetIds))
+        {
+            return false;
+        }
+
+        var verifiedTargetIds = proof.VerifiedTargetIds
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return requiredTargetIds.All(verifiedTargetIds.Contains);
     }
 
     public TunnelSnapshot ReportTargetAccessProofFailure(
@@ -2005,20 +2086,28 @@ public sealed class DiscordTunnelController : IAsyncDisposable
     private static Task<IReadOnlyList<string>> PrepareWireSockArgumentsAsync(
         string wireSockExecutable,
         string profilePath,
+        bool useVirtualAdapterMode,
         CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(wireSockExecutable);
         ArgumentException.ThrowIfNullOrWhiteSpace(profilePath);
         cancellationToken.ThrowIfCancellationRequested();
 
-        return Task.FromResult<IReadOnlyList<string>>([
+        var arguments = new List<string>
+        {
             "run",
             "-config",
             profilePath,
-            "-lac",
             "-log-level",
             "info"
-        ]);
+        };
+
+        if (useVirtualAdapterMode)
+        {
+            arguments.Insert(3, "-lac");
+        }
+
+        return Task.FromResult<IReadOnlyList<string>>(arguments);
     }
 
     private static async Task<string> ComputeRoutingProfileSha256Async(

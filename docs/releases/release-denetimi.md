@@ -16,9 +16,9 @@ Bu doküman, GitHub Releases yüzeyindeki sürüm kararlarını ve yayın kapıs
 
 ## Güncel Sürüm Kararı
 
-Güncel yayın adayı `v2.2.32` olarak doğrulanır; yayınlanmadan önce aynı release kapıları tekrar çalıştırılır.
+Güncel yayın adayı `v2.2.33` olarak doğrulanır; yayınlanmadan önce aynı release kapıları tekrar çalıştırılır.
 
-Neden `v2.2.32`?
+Neden `v2.2.33`?
 
 - v2.2.24 release asset'i yayınlandıktan sonra arka plan video paketinin yerel doğrulanan build ile aynı olmadığı görüldü; aynı sürüm numarasına tekrar güncelleme yapılamayacağı için düzeltme zorunlu olarak `v2.2.25` hotfix'ine taşındı.
 - v2.2.25, istenen yeni arka plan videosunu SHA-256 doğrulamalı repo-local `Assets/background.mp4` olarak paketledi.
@@ -30,19 +30,21 @@ Neden `v2.2.32`?
 - v2.2.31, v2.2.30 üzerinde kalan Discord ve geç web hedefi yanlış-pozitif yollarını kapatır; Discord dahil tüm uygulama kapsamlı hedeflerde seçili hedef process'inin hedef host'a ait owned TCP bağlantısı kanıtlanmadan, web hedeflerinde de tünel hazır olduktan sonra scoped WebProxy final çıkış kanıtı alınmadan Astral tam `Bağlı` durumuna geçmez.
 - v2.2.32, v2.2.31 kanıt modelini hedef ID listesiyle sıkılaştırır ve `Astral.WebProxy` public DNS fallback davranışını varsayılan olarak kapatır.
 - v2.2.21 tanı paketleri WireSock sürecinin ve Astral.WebProxy/PAC kapsamının başladığını, ancak transparent modda sanal adapter `Down` kaldığı için pasif readiness kapısının bağlantıyı yanlış başarısız saydığını gösterdi.
-- Eski transparent-mode hotfixlerinde sanal adapter `Up` kanıtına bağlı kalmama kararı kullanıldı; v2.2.30'dan itibaren WireSock `run -lac` ile scoped sanal ağ arayüzü modunda başlatılır ve web hedefleri için doğru aktif kanıt, yalnız `Astral.WebProxy.exe` üzerinden seçili hedef hostlarına yapılan scoped `CONNECT` denemesidir.
+- Eski transparent-mode hotfixlerinde sanal adapter `Up` kanıtına bağlı kalmama kararı kullanıldı; v2.2.30-v2.2.32 arası uygulama kanıtı için WireSock `run -lac` scoped sanal ağ arayüzü moduna geçildi. v2.2.33 ile bu mod yalnız uygulama kapsamı olan seçimlerde kullanılır; web-only hedeflerde WireSock transparent process modunda kalır ve doğru aktif kanıt, yalnız `Astral.WebProxy.exe` üzerinden seçili hedef hostlarına yapılan scoped `CONNECT` denemesidir.
 - v2.2.30, PAC uygulandıktan sonra seçili her web hedefi için scoped WebProxy kanıtı alır; app hedefleri için ise ayrıca WireSock handshake veya adapter trafik kanıtı ister.
 - Tarayıcı executable'ları yine WireSock `AllowedApps` içine girmez; proof trafiği yalnız `Astral.WebProxy.exe` sürecinden çıkar.
 - v2.2.21 yayınlandığı için bu bağlantı doğrulama düzeltmesi ayrı `v2.2.22` hotfix sürümü olarak çıkarılır; böylece 2.2.21 kullanıcıları otomatik güncelleme görür.
 - v2.2.22 yayınlandıktan sonra tek başarılı hostun yeterli olması daraltıldı; `v2.2.23` tüm seçili web hedefleri için hedef bazlı kanıt ister.
 - v2.2.31, app kapsamlı hedeflerde WireSock handshake/adapter trafik kanıtına ek olarak target-owned TCP kanıtını zorunlu hale getirir; web kapsamlı hedeflerde ilk proof sonrası tünel hazır olduğunda final scoped WebProxy kanıtı tekrar alınır. Discord dahil app hedefleri için manuel hedef aksiyonu durumunu `TargetActionRequired` olarak yazar, aksiyon sonrası recheck ile aktif tüneli kesmeden yeniden doğrular ve cleanup doğrulanamazsa bağlantı temiz kapandı diye raporlanmaz.
 - v2.2.32, final scoped WebProxy kanıtını `webProxyProof.verifiedTargetIds` ile machine-readable hale getirir. UI hedef testi ve live smoke artık yalnız sayıya değil, seçili hedef ID'lerinin gerçekten doğrulanmasına bakar.
+- v2.2.33, ilk tam WebProxy hedef kanıtı alındıktan sonra final aşamada aynı 15 hedefin tekrar uzun CONNECT sweep'e sokulup bağlantıyı hata durumuna düşürmesini engeller; final aşamada scoped PAC/WebProxy kapsamı doğrulanır ve tam hedef-ID proof korunur. Aynı hotfix web-only seçimlerde `-lac` sanal adapter modunu kapatarak seçili olmayan TCP/443 trafiğin normal hatta kalmasını tekrar canlı smoke kapısına bağlar.
 
 ## Public Release Yüzeyi
 
 | Release | Canlı durum | Asset durumu | Karar | Gerekçe |
 | --- | --- | --- | --- | --- |
-| `v2.2.32` | Yayında | 4 asset | Güncel yayın | Exact `verifiedTargetIds` WebProxy kanıtı, target-test health proof detayları ve public DNS fallback'in varsayılan kapalı olması. |
+| `v2.2.33` | Aday | Yerel artefact doğrulandı | Güncel aday | Tam hedef-ID WebProxy proof'un final bulk re-probe timeout'larıyla düşürülmemesi, app hedefleri eksikken `TargetActionRequired` durumunun korunması ve web-only seçimlerde `-lac` kapatılarak non-target direct trafiğin korunması. |
+| `v2.2.32` | Yayında | 4 asset | v2.2.33 ile üstlen | Exact `verifiedTargetIds` WebProxy kanıtı, target-test health proof detayları ve public DNS fallback'in varsayılan kapalı olması. |
 | `v2.2.31` | Yayında | 4 asset | v2.2.32 ile üstlen | Discord dahil app hedeflerinde target-owned TCP proof kapısı, tünel hazırlandıktan sonra final scoped WebProxy proof kapısı, live smoke script'inde hedef app proof alanları ve 2.2.31 sürüm hizalaması. |
 | `v2.2.30` | Yayında | 4 asset | v2.2.31 ile üstlen | App+web yanlış bağlı pozitifinin kapatılması, Discord dışı app hedeflerinin target-specific proof kapısı, cleanup doğrulama kapısı ve 2.2.30 sürüm hizalaması. |
 | `v2.2.29` | Aday | Yerine geçti | v2.2.30 ile üstlen | Üretim Discord process yenileme, cleanup timeout dayanıklılığı ve 2.2.29 sürüm hizalaması. |
@@ -79,13 +81,13 @@ Neden `v2.2.32`?
 
 ## Yayın Kapısı
 
-`v2.2.32` yayını için doğrulanacak koşullar:
+`v2.2.33` yayını için doğrulanacak koşullar:
 
-- Proje, updater ve web proxy sürümü `2.2.32` ile aynı.
+- Proje, updater ve web proxy sürümü `2.2.33` ile aynı.
 - `src/Astral.App/app.manifest` kimlik sürümü proje sürümüyle aynı.
-- `Astral-2.2.32-win-x64.zip` ve sabit `Astral-win-x64.zip` aynı içeriği gösterir.
+- `Astral-2.2.33-win-x64.zip` ve sabit `Astral-win-x64.zip` aynı içeriği gösterir.
 - ZIP içinde `Astral.exe`, `Astral.Updater.exe`, `Astral.WebProxy.exe`, update manifest'i ve gerekli runtime dosyaları bulunur.
-- ZIP içindeki update manifest sürümü `2.2.32`.
+- ZIP içindeki update manifest sürümü `2.2.33`.
 - Astral release içinde eski isimli uyumluluk ZIP'i yayınlanmaz.
 - Kod imzalama sertifikası yapılandırılmadıysa paket imzasız olduğu açıkça not edilir.
 - `dotnet build`, Core tests, Windows tests, `scripts/verify.ps1`, `scripts/build-release.ps1`, `git diff --check` ve Gitleaks geçer.

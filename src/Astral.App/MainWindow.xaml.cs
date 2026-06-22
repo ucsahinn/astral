@@ -71,7 +71,7 @@ public partial class MainWindow : Window, IDisposable
     private static readonly Uri RepositoryUri = new(
         "https://github.com/ucsahinn/astral");
     private static readonly Uri ReleaseNotesUri = new(
-        "https://github.com/ucsahinn/astral/releases/tag/v2.2.32");
+        "https://github.com/ucsahinn/astral/releases/tag/v2.2.33");
     private static readonly Uri BackgroundVideoCdnUri = new(
         "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260328_105406_16f4600d-7a92-4292-b96e-b19156c7830a.mp4");
     private static readonly string LocalBackgroundVideoPath = Path.Combine(
