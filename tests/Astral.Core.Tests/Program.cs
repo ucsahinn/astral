@@ -2,6 +2,7 @@
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -34,6 +35,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Hedef app kaniti hedef process baglantisini IPv4 ile dogrular", TargetApplicationProofProviderVerifiesOwnedIpv4ConnectionAsync),
     ("Hedef app kaniti hedef process baglantisini IPv6 ile dogrular", TargetApplicationProofProviderVerifiesOwnedIpv6ConnectionAsync),
     ("Hedef app kaniti process var ama hedef TCP yoksa reddeder", TargetApplicationProofProviderRequiresOwnedTargetConnectionAsync),
+    ("Hedef app kaniti probe host DNS cozumlerini paralel yapar", TargetApplicationProofProviderResolvesProbeHostsInParallelAsync),
     ("Hedef çözümleyici eski özel hedef girdilerini kapsama almaz", TargetScopeResolverIgnoresLegacyCustomTargetsAsync),
     ("Web proxy politikası yalnızca seçili domainleri kabul eder", WebProxyPolicyAllowsOnlySelectedDomainsAsync),
     ("PAC üretici yalnızca seçili domainleri proxyye yönlendirir", ProxyPacRoutesOnlySelectedDomainsAsync),
@@ -117,6 +119,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Denetleyici karışık app hedeflerinde tek hedef kanıtıyla bağlı raporlamaz", ControllerRequiresManualActionForMixedAppTargetsWithoutEveryProcessProofAsync),
     ("Denetleyici eksik provider missing listesiyle de bağlı raporlamaz", ControllerNormalizesIncompleteTargetApplicationProofAsync),
     ("Denetleyici Discord açılınca hedef aksiyonunu aktif tünelde yeniden doğrular", ControllerPromotesTargetActionAfterDiscordStartsAsync),
+    ("Denetleyici recheck sırasında stale web kanıtıyla bağlıya yükselmez", ControllerRecheckRequiresFreshWebProofBeforeConnectedAsync),
     ("Denetleyici recheck sırasında eski WireSock markerını app kanıtı saymaz", ControllerDoesNotPromoteTargetActionUsingStaleWireSockMarkerAsync),
     ("Denetleyici Discord dışı app hedeflerini recheck ile kanıtsız bağlı yapmaz", ControllerKeepsNonDiscordAppTargetsActionRequiredAfterRecheckAsync),
     ("Denetleyici hedef aksiyonu recheck iptalinde doğrulamada takılı kalmaz", ControllerKeepsTargetActionRequiredWhenRecheckIsCanceledAsync),
@@ -705,6 +708,43 @@ static async Task TargetApplicationProofProviderRequiresOwnedTargetConnectionAsy
         Assert(proof.VerifiedTargetIds.Count == 0);
         Assert(proof.MissingTargetIds.SequenceEqual([TargetIds.Azar]));
         Assert(proof.FailureKind == "TargetApplicationProofMissingOwnedConnection");
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task TargetApplicationProofProviderResolvesProbeHostsInParallelAsync()
+{
+    var root = CreateTemporaryDirectory();
+
+    try
+    {
+        var targetAddress = IPAddress.Parse("203.0.113.42");
+        var resolver = new DelayedTargetHostAddressResolver(
+            TimeSpan.FromMilliseconds(180),
+            new Dictionary<string, IReadOnlyList<IPAddress>>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["gateway.discord.gg"] = [targetAddress]
+            });
+        var provider = new WindowsTargetApplicationProofProvider(
+            new FakeTargetApplicationProcessProvider(
+                [new TargetApplicationProcessInfo(4242, "Discord")]),
+            new FakeOwnedTcpConnectionProvider(
+                [new OwnedTcpConnectionInfo(4242, targetAddress, TcpState.Established)]),
+            resolver);
+        var plan = CreateTargetRoutingPlan(root, TargetIds.Discord);
+
+        var stopwatch = Stopwatch.StartNew();
+        var proof = await provider.VerifyAsync(plan, CancellationToken.None);
+        stopwatch.Stop();
+
+        Assert(proof.Required);
+        Assert(proof.IsVerified);
+        Assert(proof.VerifiedTargetIds.SequenceEqual([TargetIds.Discord]));
+        Assert(resolver.MaxConcurrentCalls > 1);
+        Assert(stopwatch.Elapsed < TimeSpan.FromMilliseconds(900));
     }
     finally
     {
@@ -4397,7 +4437,7 @@ static async Task ControllerRejectsScopedWebProxyProofAfterPermanentFailureAsync
 
         Assert(controller.Snapshot.State == TunnelState.Error);
         Assert(process.HasExited);
-        Assert(webProxy.VerifyTargetAccessCount == 2);
+        Assert(webProxy.VerifyTargetAccessCount > 1);
 
         var details = controller.CreateDiagnosticDetails();
         Assert(details["wireSockMode"] == "transparent");
@@ -5119,6 +5159,108 @@ static async Task ControllerPromotesTargetActionAfterDiscordStartsAsync()
         var health = await File.ReadAllTextAsync(paths.HealthReport);
         Assert(health.Contains("\"status\":\"bağlantı hazır\"", StringComparison.Ordinal));
         Assert(!health.Contains("\"status\":\"hedef için ek aksiyon gerekli\"", StringComparison.Ordinal));
+    }
+    finally
+    {
+        await controller.DisposeAsync();
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task ControllerRecheckRequiresFreshWebProofBeforeConnectedAsync()
+{
+    var root = CreateTemporaryDirectory();
+    var process = new FakeManagedProcess();
+    var accessLock = new FakeDiscordAccessLock();
+    var paths = new AppPaths(root);
+    var diagnostics = new AstralDiagnostics(
+        paths,
+        TimeSpan.Zero);
+    var discordManager = new FakeDiscordProcessManager(
+        new DiscordProcessSnapshot(
+            1,
+            [Path.Combine(root, "Discord", "app-1.0.9999", "Discord.exe")],
+            [100]));
+    var readinessBytes = 256;
+    var readinessProbe = new ObservingTunnelReadinessProbe(() =>
+    {
+        readinessBytes += 128;
+        return TunnelReadinessSnapshot.Ready(
+            "Up",
+            128,
+            readinessBytes,
+            "wt0",
+            "WireGuard Tunnel");
+    });
+    var webProxy = new FakeScopedWebProxyService
+    {
+        ProofFactory = (attempt, _) => attempt == 1
+            ? ScopedWebProxyProof.VerifiedAll(
+                ["Discord=discord.com", "Azar=azarlive.com"],
+                18088,
+                2,
+                [TargetIds.Azar, TargetIds.Discord])
+            : ScopedWebProxyProof.Failed(
+                "azarlive.com",
+                18088,
+                "Recheck should not rerun complete web proof.",
+                requiredTargetCount: 2,
+                verifiedTargetCount: 1,
+                failedTargets: "Azar=azarlive.com=Proxy CONNECT timed out.")
+    };
+    var registry = TargetRegistry.CreateDefault();
+    Assert(registry.TryGet(TargetIds.Discord, out var discord));
+    Assert(registry.TryGet(TargetIds.Azar, out var azar));
+    var targetProof = new MutableTargetApplicationProofProvider(
+        new TargetApplicationProofResult(
+            Required: true,
+            IsVerified: false,
+            VerifiedTargetIds: [TargetIds.Discord],
+            MissingTargetIds: [TargetIds.Azar],
+            Message: "Azar app proof is waiting.",
+            FailureKind: "TargetApplicationProofMissingOwnedConnection",
+            Diagnostic: "azar:process-not-running"));
+    var controller = new DiscordTunnelController(
+        paths,
+        new DiscordAppScope(root, root, root),
+        new FakeWireSockBootstrapper(Path.Combine(
+            root,
+            "WireSock VPN Client",
+            "bin",
+            WireSockPackage.CliExecutableFileName)),
+        new FakeProfileProvisioner(Path.Combine(root, "mixed.conf")),
+        new FakeProcessLauncher(process, "WireSock started"),
+        TimeSpan.Zero,
+        accessLock,
+        diagnostics,
+        discordManager,
+        readinessProbe,
+        tunnelReadinessRetryDelay: TimeSpan.Zero,
+        webProxyService: webProxy,
+        targetApplicationProofProvider: targetProof);
+    controller.TrySetTargetSelection(new TargetSelection([TargetIds.Discord, TargetIds.Azar]));
+
+    try
+    {
+        await controller.ConnectAsync();
+
+        Assert(controller.Snapshot.State == TunnelState.TargetActionRequired);
+        Assert(webProxy.VerifyTargetAccessCount == 1);
+
+        targetProof.Result = TargetApplicationProofResult.Verified(
+            [discord!, azar!],
+            "Fake target application proof succeeded.");
+
+        var rechecked = await controller.RecheckTargetActionAsync();
+
+        Assert(rechecked.State == TunnelState.TargetActionRequired);
+        Assert(!controller.Snapshot.IsConnected);
+        Assert(webProxy.VerifyTargetAccessCount > 1);
+        Assert(targetProof.VerifyCount == 2);
+
+        var health = await File.ReadAllTextAsync(paths.HealthReport);
+        Assert(health.Contains("\"status\":\"hedef için ek aksiyon gerekli\"", StringComparison.Ordinal));
+        Assert(health.Contains("Recheck should not rerun complete web proof", StringComparison.Ordinal));
     }
     finally
     {
@@ -8578,6 +8720,24 @@ file sealed class FakeTargetApplicationProofProvider(
     }
 }
 
+file sealed class MutableTargetApplicationProofProvider(
+    TargetApplicationProofResult result)
+    : ITargetApplicationProofProvider
+{
+    public TargetApplicationProofResult Result { get; set; } = result;
+
+    public int VerifyCount { get; private set; }
+
+    public Task<TargetApplicationProofResult> VerifyAsync(
+        RoutingPlan routingPlan,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        VerifyCount++;
+        return Task.FromResult(Result);
+    }
+}
+
 file sealed class FakeTargetApplicationProcessProvider(
     IReadOnlyList<TargetApplicationProcessInfo> processes)
     : ITargetApplicationProcessProvider
@@ -8608,6 +8768,35 @@ file sealed class FakeTargetHostAddressResolver(
             addresses.TryGetValue(host, out var result)
                 ? result
                 : []);
+    }
+}
+
+file sealed class DelayedTargetHostAddressResolver(
+    TimeSpan delay,
+    IReadOnlyDictionary<string, IReadOnlyList<IPAddress>> addresses)
+    : ITargetHostAddressResolver
+{
+    private int _activeCalls;
+
+    public int MaxConcurrentCalls { get; private set; }
+
+    public async Task<IReadOnlyList<IPAddress>> ResolveAsync(
+        string host,
+        CancellationToken cancellationToken)
+    {
+        var active = Interlocked.Increment(ref _activeCalls);
+        try
+        {
+            MaxConcurrentCalls = Math.Max(MaxConcurrentCalls, active);
+            await Task.Delay(delay, cancellationToken);
+            return addresses.TryGetValue(host, out var result)
+                ? result
+                : [];
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _activeCalls);
+        }
     }
 }
 

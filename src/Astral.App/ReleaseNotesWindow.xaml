@@ -82,7 +82,7 @@
                                 VerticalAlignment="Center">
                         <TextBlock FontSize="22"
                                    FontWeight="SemiBold"
-                                   Text="Astral VPN v2.2.33" />
+                                   Text="Astral VPN v2.2.34" />
                         <TextBlock Margin="0,5,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource SecondaryTextBrush}"
@@ -249,6 +249,14 @@
                                            LineHeight="22"
                                            TextWrapping="Wrap"
                                            Text="&#x2022; Final WebProxy kanıtı artık daha önce tam doğrulanan hedef ID listesini gereksiz bulk re-probe ile düşürmez." />
+                                <TextBlock FontSize="13"
+                                           LineHeight="22"
+                                           TextWrapping="Wrap"
+                                           Text="&#x2022; App hedef kanıtı probe host DNS çözümlerini paralel yapar; Discord gibi çok hostlu hedeflerde bağlantı beklemesi kısalır." />
+                                <TextBlock FontSize="13"
+                                           LineHeight="22"
+                                           TextWrapping="Wrap"
+                                           Text="&#x2022; Hedef aksiyonu recheck sırasında tam web kanıtı tekrar ölçülmez; mevcut hedef-ID kanıtı korunur." />
                             </StackPanel>
                         </Border>
 
@@ -294,7 +302,7 @@
                     <TextBlock VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{StaticResource MutedTextBrush}"
-                                   Text="Bu not, v2.2.33 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
+                                   Text="Bu not, v2.2.34 hotfix kapsamını uygulama içinden hızlıca okuyabilmek için eklendi." />
                     <Button Grid.Column="1"
                             Margin="0,0,10,0"
                             Height="40"

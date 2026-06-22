@@ -1430,10 +1430,13 @@ try {
                             [string]$health.status
                     }
 
+                    $targetActionStillRequired =
+                        Test-HealthTargetActionRequired -Health $health
                     $result.TargetActionRecheckPassed =
                         [bool]$result.HealthTunnelReady -and
                         [bool]$result.HealthHasRequiredWebProxyProof -and
-                        [bool]$result.HealthHasRequiredApplicationProof
+                        [bool]$result.HealthHasRequiredApplicationProof -and
+                        (-not $targetActionStillRequired)
                 }
             }
         }
@@ -1545,7 +1548,6 @@ if (
     )
 ) {
     $criticalChecks += @(
-        'InitialSelectedTargetProcessWasClosed',
         'TargetActionRequiredDetected',
         'TargetActionProcessSeenBeforeRecheck',
         'TargetActionNewProcessDetected',
@@ -1554,6 +1556,12 @@ if (
         'TargetActionRecheckHealthFresh',
         'TargetActionRecheckPassed'
     )
+
+    if ([bool]$result.InitialSelectedTargetProcessWasClosed) {
+        $criticalChecks += @(
+            'InitialSelectedTargetProcessWasClosed'
+        )
+    }
 }
 
 if ($requiresWebProxy -and -not $requiresApplicationTunnelProof) {

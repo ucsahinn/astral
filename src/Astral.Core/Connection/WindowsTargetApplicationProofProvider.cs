@@ -129,19 +129,17 @@ public sealed class WindowsTargetApplicationProofProvider : ITargetApplicationPr
         IReadOnlyList<string> proofHosts,
         CancellationToken cancellationToken)
     {
-        var addresses = new HashSet<IPAddress>();
-        foreach (var host in proofHosts)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            foreach (var address in await _addressResolver.ResolveAsync(
+        var resolveTasks = proofHosts
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(host => _addressResolver.ResolveAsync(
                 host,
                 cancellationToken))
-            {
-                addresses.Add(address);
-            }
-        }
+            .ToArray();
+        var resolvedHosts = await Task.WhenAll(resolveTasks);
 
-        return addresses;
+        return resolvedHosts
+            .SelectMany(addresses => addresses)
+            .ToHashSet();
     }
 
     private static string[] EnumerateProofHosts(TargetDefinition target)

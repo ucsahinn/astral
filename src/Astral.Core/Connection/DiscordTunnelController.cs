@@ -452,9 +452,13 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                     _lastWebProxyStatus.Message);
             }
 
-            _lastWebProxyProof = await VerifyScopedWebProxyTargetAccessWithRetryAsync(
-                routingPlan,
-                cancellationToken);
+            if (!CanReuseCompleteScopedWebProxyProof(routingPlan, _lastWebProxyProof))
+            {
+                _lastWebProxyProof = await VerifyScopedWebProxyTargetAccessWithRetryAsync(
+                    routingPlan,
+                    cancellationToken);
+            }
+
             if (_lastWebProxyProof.Required && !_lastWebProxyProof.IsVerified)
             {
                 throw new InvalidOperationException(
@@ -535,7 +539,10 @@ public sealed class DiscordTunnelController : IAsyncDisposable
                         _lastWebProxyStatus.Message);
                 }
 
-                if (!CanReuseCompleteScopedWebProxyProof(routingPlan, _lastWebProxyProof))
+                var canStayInActionRequiredWithCachedWebProof =
+                    _lastTargetProcessRefresh.RequiresManualAction
+                    && CanReuseCompleteScopedWebProxyProof(routingPlan, _lastWebProxyProof);
+                if (!canStayInActionRequiredWithCachedWebProof)
                 {
                     _lastWebProxyProof = await VerifyScopedWebProxyTargetAccessWithRetryAsync(
                         routingPlan,
